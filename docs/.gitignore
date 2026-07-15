@@ -1,0 +1,19 @@
+# Arquivos de credenciais locais (Altamente Crítico!)
+.env
+
+# Pastas de cache do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Ambientes virtuais e pacotes locais do UV / pip
+.venv/
+venv/
+env/
+.uv/
+
+# Arquivos temporários de IDEs
+.vscode/
+.idea/

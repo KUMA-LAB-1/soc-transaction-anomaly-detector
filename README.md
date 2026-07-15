@@ -1,0 +1,1 @@
+# detector_de_anomalias_em_transa-es_de_seguran-a

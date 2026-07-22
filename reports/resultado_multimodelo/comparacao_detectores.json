@@ -1,0 +1,102 @@
+{
+  "criterio_selecao": "maior F1; desempate por recall, precision e menor tempo",
+  "melhor_modelo": "elliptic_envelope",
+  "resultados": [
+    {
+      "modelo": "isolation_forest",
+      "status": "ok",
+      "features": [
+        "valor_transacao",
+        "hora",
+        "zscore_valor_cliente",
+        "qtd_transacoes_anteriores",
+        "falhas_login_recentes",
+        "dispositivo_novo_flag",
+        "alteracao_limite_flag",
+        "mudanca_localizacao_flag"
+      ],
+      "contamination_estimado": 0.3,
+      "contamination_usado": 0.15,
+      "qtd_anomalias": 315,
+      "taxa_anomalias": 0.15,
+      "precision_vs_status_real": 0.9174603174603174,
+      "recall_vs_status_real": 0.38533333333333336,
+      "f1_vs_status_real": 0.5427230046948357,
+      "roc_auc_score_anomalia": 0.9807644444444443,
+      "tempo_segundos": 0.2790884999994887,
+      "nota": "Modelo não supervisionado/novelty detection. status_transacao foi usado somente para auditoria comparativa."
+    },
+    {
+      "modelo": "local_outlier_factor",
+      "status": "ok",
+      "features": [
+        "valor_transacao",
+        "hora",
+        "zscore_valor_cliente",
+        "qtd_transacoes_anteriores",
+        "falhas_login_recentes",
+        "dispositivo_novo_flag",
+        "alteracao_limite_flag",
+        "mudanca_localizacao_flag"
+      ],
+      "contamination_estimado": 0.3,
+      "contamination_usado": 0.15,
+      "qtd_anomalias": 296,
+      "taxa_anomalias": 0.14095238095238094,
+      "precision_vs_status_real": 0.46621621621621623,
+      "recall_vs_status_real": 0.184,
+      "f1_vs_status_real": 0.2638623326959847,
+      "roc_auc_score_anomalia": 0.5653669135802469,
+      "tempo_segundos": 0.08981910000147764,
+      "nota": "Modelo não supervisionado/novelty detection. status_transacao foi usado somente para auditoria comparativa."
+    },
+    {
+      "modelo": "one_class_svm",
+      "status": "ok",
+      "features": [
+        "valor_transacao",
+        "hora",
+        "zscore_valor_cliente",
+        "qtd_transacoes_anteriores",
+        "falhas_login_recentes",
+        "dispositivo_novo_flag",
+        "alteracao_limite_flag",
+        "mudanca_localizacao_flag"
+      ],
+      "contamination_estimado": 0.3,
+      "contamination_usado": 0.15,
+      "qtd_anomalias": 315,
+      "taxa_anomalias": 0.15,
+      "precision_vs_status_real": 0.7714285714285715,
+      "recall_vs_status_real": 0.324,
+      "f1_vs_status_real": 0.4563380281690141,
+      "roc_auc_score_anomalia": 0.7184711111111111,
+      "tempo_segundos": 0.059423400001833215,
+      "nota": "Modelo não supervisionado/novelty detection. status_transacao foi usado somente para auditoria comparativa."
+    },
+    {
+      "modelo": "elliptic_envelope",
+      "status": "ok",
+      "features": [
+        "valor_transacao",
+        "hora",
+        "zscore_valor_cliente",
+        "qtd_transacoes_anteriores",
+        "falhas_login_recentes",
+        "dispositivo_novo_flag",
+        "alteracao_limite_flag",
+        "mudanca_localizacao_flag"
+      ],
+      "contamination_estimado": 0.3,
+      "contamination_usado": 0.15,
+      "qtd_anomalias": 315,
+      "taxa_anomalias": 0.15,
+      "precision_vs_status_real": 1.0,
+      "recall_vs_status_real": 0.42,
+      "f1_vs_status_real": 0.5915492957746479,
+      "roc_auc_score_anomalia": 0.9995476543209877,
+      "tempo_segundos": 0.11555410000073607,
+      "nota": "Modelo não supervisionado/novelty detection. status_transacao foi usado somente para auditoria comparativa."
+    }
+  ]
+}

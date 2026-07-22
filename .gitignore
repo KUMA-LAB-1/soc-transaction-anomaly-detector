@@ -1,0 +1,42 @@
+# Variáveis de ambiente e credenciais
+.env
+docs/.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Cache e testes
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+
+# Modelos treinados
+*.joblib
+*.pkl
+
+# Arquivos temporários
+*.tmp
+*.bak
+~$*

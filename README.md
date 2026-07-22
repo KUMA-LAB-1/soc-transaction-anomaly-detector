@@ -94,11 +94,12 @@ Gráficos, JSON, CSV e relatório PDF
 │   └── resultado_multimodelo/
 │
 ├── docs/
+│   └── .env.example    
 ├── README.md
 ├── CHANGELOG.md
 ├── requirements.txt
 ├── .gitignore
-└── .env.example
+
 ```
 
 ---

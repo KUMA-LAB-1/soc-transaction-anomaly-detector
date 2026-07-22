@@ -99,6 +99,9 @@ Gráficos, JSON, CSV e relatório PDF
 ├── CHANGELOG.md
 ├── requirements.txt
 ├── .gitignore
+│ 
+├── LICENSE
+    └── MIT License
 
 ```
 

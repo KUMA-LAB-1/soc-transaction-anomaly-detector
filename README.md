@@ -303,7 +303,7 @@ docs/.env
 Depois preencha a variável:
 
 ```env
-DATABASE_URL=postgresql://USUARIO:SENHA@HOST:PORTA/BANCO
+DATABASE_URL=postgresql://postgres.HOST:SENHA@aws-1-us-west-2.pooler.supabase.com:6543/postgres?sslmode=require
 ```
 
 ### 5. Preparar o banco

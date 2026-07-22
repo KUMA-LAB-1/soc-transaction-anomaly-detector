@@ -92,19 +92,6 @@ CREATE POLICY admin_full_access_auditoria ON tbl_auditoria_acessos
     TO service_role USING (true);
 
 
--- ----------------------------------------------------------------------------
--- 3. CHECKLIST DE REVISÃO MANUAL (não dá para automatizar sem saber seus papéis)
--- ----------------------------------------------------------------------------
--- [ ] Confirme se o papel usado no DATABASE_URL tem BYPASSRLS:
---       SELECT rolname, rolbypassrls FROM pg_roles WHERE rolname = 'SEU_ROLE_AQUI';
---     Se vier TRUE, as policies de RLS abaixo não têm efeito nenhum para esse
---     papel — nesse caso a única proteção real é a de nível de aplicação.
---
--- [ ] Restrinja o acesso direto às tabelas-fonte para o papel usado pela
---     aplicação de investigação de rotina, por exemplo:
---       REVOKE SELECT ON tbl_clientes, tbl_transacoes, tbl_logs_seguranca FROM PUBLIC;
---       GRANT SELECT ON v_analise_investigacao_soc TO role_investigador_soc;
---
 -- [ ] Considere criptografar o CPF em repouso com pgcrypto
 --     (pgp_sym_encrypt na escrita / pgp_sym_decrypt só em rotina de auditoria
 --     legal explícita), em vez de manter em texto puro em tbl_clientes.

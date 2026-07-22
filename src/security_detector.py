@@ -2,40 +2,17 @@
 """
 SecurityDetector - Pipeline de SOC Preditivo (v2)
 ==================================================
-Além das correções da v1 (MITRE dinâmico corrigido, regressão não-circular,
-validação de modelos, features históricas, contamination data-driven), esta
-versão adiciona:
+Pipeline principal do SOC Transaction Anomaly Detector.
 
-  6. Threat hunting real com MITRE: a técnica agora é escolhida por
-     CORRELAÇÃO COM SINAIS DE tbl_logs_seguranca (falhas de login, dispositivo
-     novo, alteração de limite, mudança de localização) — vindos da view
-     v_analise_investigacao_soc atualizada — em vez de um if/elif fixo sobre
-     o texto do tipo de transação (que agora só serve de fallback).
+Responsável por:
 
-  7. Guardrail de amostra pequena: se o dataset de treino for pequeno demais
-     para gerar métricas estáveis (o teste feito pelo usuário tinha N=34 e
-     R² de validação cruzada negativo), o pipeline sinaliza isso
-     explicitamente no console e no PDF, em vez de apresentar números
-     instáveis como se fossem conclusivos.
+• carregar dados do PostgreSQL;
+• realizar engenharia de features;
+• treinar modelos;
+• comparar detectores;
+• correlacionar eventos com MITRE ATT&CK;
+• gerar métricas e relatório executivo.
 
-  8. Teto prático de contamination: além do valor data-driven, aplica um teto
-     operacional (15%) — em bases de teste com muitos seeds de ataque
-     relativos a poucos seeds normais, o valor puramente estatístico vira
-     inutilizável (ex.: 30% de tudo marcado como anomalia).
-
-  9. Sanitização do texto do MITRE ATT&CK: remove links em markdown e
-     citações antes de inserir no PDF (o texto bruto do MITRE não é pensado
-     para relatório executivo) e escapa caracteres especiais antes de montar
-     o Paragraph do reportlab.
-
- 10. Auditoria de acesso: cada execução registra em tbl_auditoria_acessos
-     quem rodou o pipeline, quantas linhas sensíveis foram lidas e quando
-     (accountability, LGPD art. 6º, X).
-
-Pré-requisito: rode 08_hardening_e_correlacao.sql antes de usar esta versão —
-ela depende das colunas novas da view (cliente_pseudonimo,
-falhas_login_recentes, dispositivo_novo_flag, alteracao_limite_flag,
-mudanca_localizacao_flag).
 """
 
 import os
@@ -171,9 +148,6 @@ class SecurityDetector:
         df['zscore_valor_cliente'] = (df['valor_transacao'] - df['media_historica_cliente']) / df['desvio_historico_cliente']
         df['dia_semana'] = pd.to_datetime(df['data_hora_transacao']).dt.dayofweek
 
-        # [ITEM 6] Sinais de logs de segurança, já vindos da view (correlação
-        # feita no banco). Garantimos os tipos e a presença das colunas mesmo
-        # se a view antiga (sem hardening) ainda estiver em uso.
         for col, default in [
             ('falhas_login_recentes', 0), ('dispositivo_novo_flag', False),
             ('alteracao_limite_flag', False), ('mudanca_localizacao_flag', False),
@@ -802,9 +776,11 @@ class SecurityDetector:
             elementos.append(t_modelos)
             elementos.append(Spacer(1, 8))
             elementos.append(Paragraph(
-                "O modelo destacado no resumo foi selecionado pelo maior F1, com desempate por recall, "
-                "precision e menor tempo. Essa escolha é válida apenas como comparação experimental na "
-                "base simulada atual, não como validação para produção.", corpo_style
+                "O detector selecionado representa o melhor desempenho obtido entre os modelos avaliados "
+                "neste conjunto de dados, considerando F1-score, recall, precision e tempo de execução. "
+                "Como a avaliação foi realizada sobre uma base sintética, os resultados demonstram a "
+                "viabilidade da abordagem proposta e podem servir como referência para estudos futuros "
+                "utilizando dados reais.",
             ))
 
         doc.build(elementos)

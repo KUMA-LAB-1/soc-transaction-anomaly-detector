@@ -3,19 +3,8 @@
 -- Aplique depois dos scripts 01-07 já existentes.
 -- ============================================================================
 
--- 0. Extensão necessária para hashing/pseudonimização (nativa no Supabase)
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- ----------------------------------------------------------------------------
--- 1. VIEW REDEFINIDA: pseudonimização real (não reversível por inspeção) +
---    mascaramento de conta + sinais correlacionados de tbl_logs_seguranca.
---
---    ATENÇÃO: troque 'TROQUE_ESTE_PEPPER_SECRETO' por um valor secreto seu,
---    guardado fora do controle de versão (idealmente via
---    ALTER DATABASE seu_banco SET app.pepper = 'valor-secreto';
---    e troque a literal abaixo por current_setting('app.pepper', true)).
---    Deixei como literal aqui só para simplificar o teste.
--- ----------------------------------------------------------------------------
 CREATE OR REPLACE VIEW v_analise_investigacao_soc AS
 SELECT
     c.id_cliente,

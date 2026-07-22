@@ -1,308 +1,425 @@
-# 🛡️ Detector Inteligente de Anomalias em Transações Financeiras
+# 🛡️ SOC Transaction Anomaly Detector
 
-![Python](https://img.shields.io/badge/Python-3.12-blue)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue)
-![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-ML-orange)
-![Status](https://img.shields.io/badge/Status-Concluído-success)
-![LGPD](https://img.shields.io/badge/LGPD-Compliant-green)
+Projeto de análise de dados e detecção de anomalias em transações financeiras desenvolvido durante o Bootcamp **Bradesco - GenAI, Dados & Cyber**.
 
-Projeto desenvolvido durante o Bootcamp **Bradesco - GenAI, Dados & Cyber**.
+Esta versão corresponde à entrega do módulo:
 
-O objetivo é construir uma plataforma capaz de identificar automaticamente comportamentos anômalos em transações financeiras utilizando Machine Learning, Ciência de Dados e conceitos de Cyber Security.
+> **Análise de Dados com Python: da preparação à aplicação em segurança**
 
-O sistema realiza desde a preparação dos dados até a geração automática de relatórios para um Centro de Operações de Segurança (SOC).
+O sistema integra Python, PostgreSQL, Machine Learning e conceitos de Segurança Cibernética para identificar transações com comportamento fora do padrão, comparar diferentes detectores e gerar um relatório técnico voltado para análise em um SOC.
 
 ---
 
-# 📌 Objetivos
+## 📌 Objetivo
 
-Este projeto busca demonstrar a aplicação prática de:
+O objetivo do projeto é construir um pipeline capaz de:
 
-- Ciência de Dados
-- Machine Learning
-- Engenharia de Features
-- Banco de Dados
-- Inteligência Artificial
-- Segurança Cibernética
-- Detecção de Fraudes
-- Threat Intelligence
+- carregar transações armazenadas em PostgreSQL;
+- validar, limpar e preparar os dados;
+- criar variáveis comportamentais;
+- detectar padrões anômalos;
+- comparar algoritmos de Machine Learning;
+- estimar a severidade dos eventos;
+- correlacionar sinais de segurança com o MITRE ATT&CK;
+- gerar gráficos, métricas e relatório executivo.
 
 ---
 
-# 🏗 Arquitetura
+## 🧪 Natureza dos dados
+
+A base utilizada neste projeto é composta por **dados sintéticos**, criados exclusivamente para fins educacionais e experimentais.
+
+O banco foi populado com:
+
+- transações consideradas normais;
+- transações classificadas como suspeitas;
+- eventos de autenticação;
+- falhas recentes de login;
+- uso de dispositivo novo;
+- alterações de limite;
+- mudanças de localização.
+
+Nos modelos não supervisionados, o status da transação não participa do treinamento. Ele é utilizado apenas posteriormente para auditoria e comparação dos resultados.
+
+---
+
+## 🏗️ Arquitetura
 
 ```text
-                    PostgreSQL
-                         │
-                         ▼
-          Coleta das Transações Financeiras
-                         │
-                         ▼
-            Preparação e Limpeza dos Dados
-                         │
-                         ▼
-             Engenharia de Features
-                         │
-     ┌───────────────────┼────────────────────┐
-     ▼                   ▼                    ▼
- Classificador      Detectores         Regressão
- Supervisionado   Não Supervisionados  Severidade
-     │                   │                    │
-     └──────────────┬────┘
-                    ▼
-          Comparação Automática
-                    │
-                    ▼
-      Relatório Técnico do SOC (PDF)
-                    │
-                    ▼
-          Correlação MITRE ATT&CK
+PostgreSQL / Supabase
+        │
+        ▼
+View de investigação do SOC
+        │
+        ▼
+Validação e preparação dos dados
+        │
+        ▼
+Engenharia de features
+        │
+        ├── Classificador de triagem
+        ├── Detectores de anomalia
+        └── Regressão de severidade
+                │
+                ▼
+Comparação de métricas
+                │
+                ▼
+Seleção do melhor detector
+                │
+                ▼
+Correlação MITRE ATT&CK
+                │
+                ▼
+Gráficos, JSON, CSV e relatório PDF
 ```
 
 ---
 
-# 📂 Estrutura do Projeto
+## 📂 Estrutura do repositório
 
 ```text
-Projeto
-│
-├── sql/
-│     ├── criação_banco.sql
-│     ├── procedures.sql
-│     └── população.sql
-│
+.
 ├── src/
-│     ├── detector.py
-│     ├── modelos.py
-│     ├── engenharia_features.py
-│     ├── relatorio_soc.py
-│     └── utilitarios.py
+│   ├── security_detector.py
+│   ├── db_connector.py
+│   └── ingest_mitre.py
 │
-├── graficos/
+├── database/
+│   ├── schema/
+│   ├── queries/
+│   └── seeds/
 │
-├── relatorios/
+├── reports/
+│   └── resultado_multimodelo/
 │
-├── resultados/
-│
+├── docs/
 ├── README.md
-│
-└── requirements.txt
+├── CHANGELOG.md
+├── requirements.txt
+├── .gitignore
+└── .env.example
 ```
 
 ---
 
-# 📊 Engenharia de Features
+## 🔎 Engenharia de features
 
-O projeto utiliza atributos derivados do comportamento histórico do cliente.
+O pipeline utiliza atributos originais e derivados do comportamento histórico dos clientes:
 
-Principais features:
+- valor da transação;
+- horário do evento;
+- dia da semana;
+- média histórica por cliente;
+- desvio-padrão histórico;
+- Z-Score do valor da transação;
+- quantidade de transações anteriores;
+- falhas recentes de login;
+- uso de dispositivo novo;
+- alteração de limite;
+- mudança de localização;
+- tipo da transação.
 
-- Valor da transação
-- Hora do evento
-- Média histórica
-- Desvio histórico
-- Z-Score individual
-- Quantidade de transações anteriores
-- Dispositivo novo
-- Alteração de limite Pix
-- Mudança de localização
-- Falhas recentes de login
-- Tipo da transação
-
-Essas variáveis simulam indicadores normalmente utilizados por mecanismos de prevenção à fraude.
-
----
-
-# 🤖 Modelos Implementados
-
-Foram implementados quatro detectores de anomalias para comparação de desempenho.
-
-| Modelo | Tipo |
-|---------|------|
-| Isolation Forest | Não supervisionado |
-| Local Outlier Factor | Não supervisionado |
-| One-Class SVM | Não supervisionado |
-| Elliptic Envelope | Não supervisionado |
-
-Além dos detectores, foi treinado um classificador supervisionado para avaliação das features e geração das probabilidades de risco.
+O Z-Score mede quanto o valor atual se afasta do comportamento histórico do cliente.
 
 ---
 
-# 📈 Comparação dos Modelos
+## 🤖 Modelos implementados
 
-Critério utilizado para seleção:
+### Classificador supervisionado
 
-1. Maior F1-Score
-2. Maior Recall
-3. Maior Precision
-4. Menor tempo de execução
+Foi utilizado um `DecisionTreeClassifier` para reproduzir decisões históricas de triagem.
 
-## Resultado
+O objetivo desse classificador não é descobrir ataques inéditos, mas avaliar quais features mais contribuíram para a classificação das transações já rotuladas.
 
-| Modelo | Precision | Recall | F1 |
-|---------|----------|--------|------|
-| Elliptic Envelope | **1.00** | **0.42** | **0.59** |
-| Isolation Forest | 0.92 | 0.39 | 0.54 |
-| One-Class SVM | 0.77 | 0.32 | 0.46 |
-| Local Outlier Factor | 0.47 | 0.18 | 0.26 |
+### Detectores não supervisionados
 
-🏆 Modelo selecionado:
+Foram comparados quatro modelos:
 
-**Elliptic Envelope**
+| Modelo | Característica principal |
+|---|---|
+| Isolation Forest | Isola observações incomuns por particionamento aleatório |
+| Local Outlier Factor | Identifica desvios em relação à densidade local |
+| One-Class SVM | Aprende uma fronteira para representar o comportamento normal |
+| Elliptic Envelope | Modela a distribuição dos dados por uma região elíptica robusta |
 
----
+### Regressão de severidade
 
-# 📉 Classificador Supervisionado
+Foi utilizada uma regressão linear para estimar um score de risco entre 0 e 100.
 
-O classificador utilizado para triagem obteve:
-
-- ROC-AUC ≈ **0.99**
-
-Principais fatores utilizados na decisão:
-
-- Z-Score do cliente
-- Média histórica
-- Falhas de login
-- Alteração de limite
-- Mudança de localização
-
-O atributo **Z-Score do cliente** foi o mais relevante para o processo de classificação.
+Essa parte é experimental e deverá ser reavaliada com uma base maior e modelos mais adequados para níveis ordinais de risco.
 
 ---
 
-# 📊 Resultados Obtidos
+## 📊 Resultados experimentais
 
-Durante a execução foram identificadas:
+Os detectores utilizaram o mesmo conjunto de features e foram avaliados com o mesmo conjunto de dados.
 
-- 315 transações anômalas
-- geração automática de gráficos
-- classificação por severidade
-- relatório PDF
-- histórico das execuções
-- comparação automática entre modelos
+| Modelo | Anomalias | Precision | Recall | F1-score | ROC-AUC | Tempo |
+|---|---:|---:|---:|---:|---:|---:|
+| Elliptic Envelope | 315 | **1,000** | **0,420** | **0,592** | **0,9995** | 0,116 s |
+| Isolation Forest | 315 | 0,917 | 0,385 | 0,543 | 0,9808 | 0,279 s |
+| One-Class SVM | 315 | 0,771 | 0,324 | 0,456 | 0,7185 | **0,059 s** |
+| Local Outlier Factor | 296 | 0,466 | 0,184 | 0,264 | 0,5654 | 0,090 s |
 
----
+### Modelo selecionado
 
-# 📄 Relatório SOC
+O modelo selecionado automaticamente foi:
 
-O sistema gera automaticamente um relatório contendo:
+> **Elliptic Envelope**
 
-- Resumo Executivo
-- Incidentes Detectados
-- Probabilidade de fraude
-- Score de severidade
-- Correlação MITRE ATT&CK
-- Informações pseudonimizadas (LGPD)
+O critério utilizado foi:
 
----
+1. maior F1-score;
+2. maior recall;
+3. maior precision;
+4. menor tempo de execução.
 
-# 🛡️ Segurança
-
-O projeto foi desenvolvido considerando conceitos de:
-
-- Defesa em Profundidade
-- MITRE ATT&CK
-- LGPD
-- Princípio do Menor Privilégio
-- Auditoria
-- Pseudonimização de clientes
+O Elliptic Envelope apresentou o maior F1-score e precision igual a 1,0 no conjunto sintético utilizado.
 
 ---
 
-# ⚙ Tecnologias Utilizadas
+## 📈 Comparação visual
 
-- Python
-- PostgreSQL
-- Pandas
-- NumPy
-- Scikit-Learn
-- Matplotlib
-- Seaborn
-- ReportLab
+![Comparação dos detectores](reports/resultado_multimodelo/comparacao_detectores.png)
 
 ---
 
-# 🚀 Como executar
+## 🌲 Isolation Forest
 
-## Clone o projeto
+![Isolation Forest](reports/resultado_multimodelo/anomalias_isolation_forest.png)
+
+---
+
+## 📐 Elliptic Envelope
+
+![Elliptic Envelope](reports/resultado_multimodelo/anomalias_elliptic_envelope.png)
+
+---
+
+## 🧭 Local Outlier Factor
+
+![Local Outlier Factor](reports/resultado_multimodelo/anomalias_local_outlier_factor.png)
+
+---
+
+## 🧠 One-Class SVM
+
+![One-Class SVM](reports/resultado_multimodelo/anomalias_one_class_svm.png)
+
+---
+
+## 🔬 Importância das features
+
+O classificador de triagem atingiu ROC-AUC próximo de `0,99`.
+
+![Importância das features](reports/resultado_multimodelo/importancia_features_classificador.png)
+
+A feature `zscore_valor_cliente` concentrou aproximadamente 92,3% da importância do classificador.
+
+Esse resultado indica que a separação entre transações normais e suspeitas no conjunto sintético está fortemente relacionada ao desvio do valor em relação ao histórico do cliente.
+
+Embora o resultado seja positivo para a prova de conceito, ele também representa uma limitação: o modelo pode estar excessivamente dependente de uma única variável.
+
+---
+
+## 🛡️ Segurança e privacidade
+
+O projeto aplica medidas como:
+
+- conexão SSL obrigatória com o banco;
+- credenciais armazenadas fora do código;
+- pseudonimização dos clientes;
+- auditoria de acesso;
+- políticas de segurança no PostgreSQL;
+- correlação entre transações e eventos de segurança;
+- minimização da exposição de dados nos relatórios.
+
+Os dados utilizados são sintéticos e não representam clientes ou operações reais.
+
+---
+
+## 🎯 MITRE ATT&CK
+
+O pipeline utiliza dados do MITRE ATT&CK armazenados no PostgreSQL.
+
+A correlação considera sinais como:
+
+- múltiplas falhas de login;
+- dispositivo novo;
+- alteração de limite;
+- mudança de localização;
+- possível comprometimento de conta.
+
+O mapeamento é utilizado como apoio à investigação e não representa confirmação automática de ataque.
+
+---
+
+## ⚙️ Como executar
+
+### 1. Clonar o repositório
 
 ```bash
-git clone https://github.com/seuusuario/detector-anomalias.git
+git clone https://github.com/SEU_USUARIO/soc-transaction-anomaly-detector.git
+cd soc-transaction-anomaly-detector
 ```
 
-Instale as dependências
+### 2. Criar o ambiente virtual
+
+No Windows:
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+No Linux ou macOS:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Instalar as dependências
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Configure o PostgreSQL.
+### 4. Configurar a conexão
 
-Execute
+Copie:
+
+```text
+.env.example
+```
+
+para:
+
+```text
+docs/.env
+```
+
+Depois preencha a variável:
+
+```env
+DATABASE_URL=postgresql://USUARIO:SENHA@HOST:PORTA/BANCO
+```
+
+### 5. Preparar o banco
+
+Execute os scripts SQL na ordem indicada pelos números:
+
+```text
+01_schema.sql
+06_security_policies.sql
+07_view_seguranca.sql
+08_hardening_e_correlacao.sql
+```
+
+Depois execute o script de população da base.
+
+### 6. Importar o MITRE ATT&CK
 
 ```bash
-python detector.py
+python src/ingest_mitre.py
+```
+
+### 7. Executar o detector
+
+```bash
+python src/security_detector.py
+```
+
+Os resultados serão gerados na pasta `reports`.
+
+---
+
+## 📄 Relatório
+
+O pipeline gera automaticamente um relatório contendo:
+
+- resumo executivo;
+- transações sinalizadas;
+- pseudônimos dos clientes;
+- score de risco;
+- probabilidade de suspeita;
+- comparação dos modelos;
+- métricas de validação;
+- correlação com MITRE ATT&CK.
+
+Arquivo gerado:
+
+```text
+reports/resultado_multimodelo/Relatorio_Incidente_SOC.pdf
 ```
 
 ---
 
-# 📚 Conceitos Aplicados
+## ⚠️ Limitações
 
-✔ Machine Learning
+Este projeto é uma prova de conceito baseada em dados sintéticos.
 
-✔ Data Science
+As principais limitações são:
 
-✔ Feature Engineering
-
-✔ Banco de Dados
-
-✔ Cyber Security
-
-✔ Fraud Detection
-
-✔ SOC
-
-✔ Threat Intelligence
-
-✔ MITRE ATT&CK
-
-✔ Engenharia de Software
-
-✔ Visualização de Dados
+- as anomalias foram simuladas;
+- a base ainda não representa toda a diversidade de fraudes reais;
+- os resultados não podem ser generalizados para ambiente produtivo;
+- o parâmetro `contamination=0.15` influencia a quantidade de alertas;
+- o classificador apresentou forte dependência do Z-Score;
+- a regressão de severidade necessita de validação adicional;
+- não foi realizada validação temporal;
+- não há monitoramento de data drift ou concept drift.
 
 ---
 
-# 📌 Limitações
+## 🧾 Conclusão
 
-Este projeto utiliza uma base de dados sintética construída para fins educacionais.
+A comparação mostrou que o Elliptic Envelope apresentou o melhor equilíbrio entre precision e recall na base sintética utilizada.
 
-Embora os modelos tenham apresentado excelente desempenho no cenário proposto, a aplicação em ambiente produtivo exigiria:
+O Isolation Forest também apresentou bom desempenho e demonstrou maior flexibilidade para distribuições menos restritivas.
 
-- maior volume de dados;
-- validação contínua;
-- ajuste de hiperparâmetros;
-- monitoramento contra drift dos dados;
-- integração com SIEM/SOC.
+O resultado do Elliptic Envelope deve ser interpretado dentro do cenário experimental, pois esse modelo pressupõe que os dados normais possam ser representados por uma distribuição aproximadamente elíptica.
+
+Por isso, a seleção atual representa o melhor resultado para esta base, não uma conclusão universal sobre detecção de fraudes.
 
 ---
 
-# 🔮 Próximas Evoluções
+## 🗺️ Roadmap
 
-- API REST
-- Dashboard em Streamlit
-- Docker
-- DevSecOps
-- GitHub Actions
-- SHAP Explainability
-- Autoencoders
-- XGBoost
-- Monitoramento contínuo
-- Deploy em Cloud
+### ✅ v1.0.0 — Análise de Dados e Segurança
+
+- preparação dos dados;
+- engenharia de features;
+- comparação entre detectores;
+- geração de métricas e gráficos;
+- PostgreSQL;
+- relatório PDF;
+- MITRE ATT&CK;
+- pseudonimização e auditoria.
+
+### ⏳ v2.0.0 — DevSecOps
+
+- testes automatizados;
+- análise estática;
+- auditoria de dependências;
+- Docker;
+- GitHub Actions;
+- scan de segurança;
+- pipeline CI/CD.
+
+### 🔮 v3.0.0 — Projeto final
+
+- API REST;
+- dashboard;
+- autenticação;
+- monitoramento;
+- deploy.
 
 ---
 
-# 👨‍💻 Autor
+## 👨‍💻 Autor
 
-Desenvolvido por Wellington Hikaru Kumagai
+**Wellington Hikaru Kumagai**
 
 Projeto desenvolvido durante o Bootcamp Bradesco - GenAI, Dados & Cyber.

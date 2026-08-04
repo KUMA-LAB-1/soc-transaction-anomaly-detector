@@ -183,6 +183,11 @@ O Elliptic Envelope apresentou o maior F1-score e precision igual a 1,0 no conju
 
 ---
 
+## 📑 Documentação
+
+- 📄 [Relatório Executivo SOC (PDF)](reports/resultado_multimodelo/Relatorio_Incidente_SOC.pdf)
+  
+---
 ## 📈 Comparação visual
 
 ![Comparação dos detectores](reports/resultado_multimodelo/comparacao_detectores.png)

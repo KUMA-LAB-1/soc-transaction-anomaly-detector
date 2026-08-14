@@ -1,24 +1,26 @@
 # src/db_connector.py
 import os
 from pathlib import Path
-from sqlalchemy import create_engine
+
 import psycopg2
 from dotenv import load_dotenv
+from sqlalchemy import create_engine
 
 # 0. Localização segura e padronizada do arquivo de variáveis de ambiente (.env)
-BASE_DIR = Path(__file__).resolve().parent.parent 
-DOTENV_PATH = BASE_DIR / "docs" / ".env"
+BASE_DIR = Path(__file__).resolve().parent.parent
+DOTENV_PATH = BASE_DIR / ".env"
 
 # 1. Carrega as variáveis de ambiente com tratamento de caminho
 load_dotenv(dotenv_path=DOTENV_PATH)
 DATABASE_URL = os.getenv("DATABASE_URL")
+
 
 class DBConnector:
     """
     Classe responsável por gerenciar conexões seguras com o Supabase,
     garantindo criptografia SSL em trânsito (Defense-in-Depth).
     """
-    
+
     @staticmethod
     def get_engine():
         """
@@ -26,8 +28,10 @@ class DBConnector:
         ideal para manipulação de grandes volumes de dados via Pandas.
         """
         if not DATABASE_URL:
-            raise ValueError(f"❌ Erro: DATABASE_URL não encontrada no caminho configurado: {DOTENV_PATH}")
-        
+            raise ValueError(
+                f"❌ Erro: DATABASE_URL não encontrada no caminho configurado: {DOTENV_PATH}"
+            )
+
         try:
             # Força o SQLAlchemy a usar SSL nas conexões para mitigar ataques de interceptação (MitM)
             connect_args = {"sslmode": "require"}
@@ -44,8 +48,10 @@ class DBConnector:
         para execução direta de transações no banco.
         """
         if not DATABASE_URL:
-            raise ValueError(f"❌ Erro: DATABASE_URL não encontrada no caminho configurado: {DOTENV_PATH}")
-            
+            raise ValueError(
+                f"❌ Erro: DATABASE_URL não encontrada no caminho configurado: {DOTENV_PATH}"
+            )
+
         try:
             # Estabelece a conexão com parâmetro SSL obrigatório
             conn = psycopg2.connect(DATABASE_URL, sslmode="require")
@@ -54,6 +60,7 @@ class DBConnector:
             print(f"❌ Falha crítica ao conectar via Psycopg2 (SSL): {e}")
             raise
 
+
 if __name__ == "__main__":
     # Teste rápido de integridade e conectividade criptografada
     print("🔐 Iniciando handshake SSL e validação de conexões seguras...")
@@ -61,7 +68,7 @@ if __name__ == "__main__":
         engine = DBConnector.get_engine()
         with engine.connect() as conn:
             print("🚀 [OK] Canal encriptado via SQLAlchemy estabelecido com sucesso!")
-            
+
         raw_conn = DBConnector.get_raw_connection()
         raw_conn.close()
         print("🚀 [OK] Canal de conexão direta (Psycopg2 + SSL) validado com sucesso!")

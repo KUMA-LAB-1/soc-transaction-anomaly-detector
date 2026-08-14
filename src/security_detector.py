@@ -42,12 +42,9 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import (
     classification_report,
     confusion_matrix,
-    f1_score,
     mean_absolute_error,
     mean_squared_error,
-    precision_score,
     r2_score,
-    recall_score,
     roc_auc_score,
 )
 from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
@@ -61,7 +58,7 @@ from sqlalchemy import text
 from .data.columns import resolver_coluna_cliente
 from .db_connector import DBConnector
 from .features.engineering import criar_features
-from .models.evaluation import selecionar_melhor_detector
+from .models.evaluation import avaliar_detector, selecionar_melhor_detector
 
 MAPA_SEVERIDADE_STATUS = {
     "Aprovada": 5,
@@ -412,13 +409,17 @@ class SecurityDetector:
                 score_original = modelo.decision_function(X)  # maior = mais normal
                 segundos = time.perf_counter() - inicio
 
-                y_pred = (predicao_original == -1).astype(int)
-                precision = precision_score(y_real, y_pred, zero_division=0)
-                recall = recall_score(y_real, y_pred, zero_division=0)
-                f1 = f1_score(y_real, y_pred, zero_division=0)
-                auc = None
-                if y_real.nunique() > 1 and len(np.unique(score_original)) > 1:
-                    auc = float(roc_auc_score(y_real, -score_original))
+                avaliacao = avaliar_detector(
+                    y_real=y_real,
+                    predicao_original=predicao_original,
+                    score_original=score_original,
+                )
+
+                y_pred = avaliacao["y_pred"]
+                precision = avaliacao["precision"]
+                recall = avaliacao["recall"]
+                f1 = avaliacao["f1"]
+                auc = avaliacao["roc_auc"]
 
                 slug = nome
                 df[f"anomalia_{slug}"] = predicao_original

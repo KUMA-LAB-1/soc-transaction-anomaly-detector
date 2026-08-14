@@ -38,22 +38,16 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sklearn.covariance import EllipticEnvelope
 from sklearn.ensemble import IsolationForest
-from sklearn.metrics import (
-    classification_report,
-    confusion_matrix,
-    roc_auc_score,
-)
-from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import OneClassSVM
-from sklearn.tree import DecisionTreeClassifier
 from sqlalchemy import text
 
 from .data.columns import resolver_coluna_cliente
 from .db_connector import DBConnector
 from .features.engineering import criar_features
+from .models.classification import treinar_classificador_triagem
 from .models.evaluation import avaliar_detector, selecionar_melhor_detector
 from .models.regression import treinar_regressao_severidade
 
@@ -160,113 +154,58 @@ class SecurityDetector:
         return df
 
     def _treinar_classificacao(self, df):
-        """
-        Classificador de TRIAGEM (reproduz decisões históricas de status_transacao,
-        não descobre ataques inéditos — essa função é do Isolation Forest).
-        [ITEM 6] Agora inclui os sinais de logs de segurança como features.
-        """
+        """Executa o classificador supervisionado de triagem do SOC."""
         print(
-            "\n⚙️ Treinando classificador de triagem (features históricas + sinais de log)..."
+            "\n⚙️ Treinando classificador de triagem "
+            "(features históricas + sinais de log)..."
         )
 
-        df_class = pd.get_dummies(df, columns=["tipo_transacao"], drop_first=True)
-        candidatos = [
-            c for c in df_class.columns if c.startswith("tipo_transacao_")
-        ] + [
-            "hora",
-            "media_historica_cliente",
-            "desvio_historico_cliente",
-            "qtd_transacoes_anteriores",
-            "zscore_valor_cliente",
-            "dia_semana",
-            "falhas_login_recentes",
-            "dispositivo_novo_flag",
-            "alteracao_limite_flag",
-            "mudanca_localizacao_flag",
-        ]
-        features = [f for f in candidatos if f in df_class.columns]
+        resultado = treinar_classificador_triagem(df)
 
-        X = df_class[features].fillna(0).astype(float)
-        y = (
-            df_class["status_transacao"]
-            .isin(["Em Análise", "Bloqueada por Suspeita"])
-            .astype(int)
-        )
+        self.modelo_classificacao = resultado["modelo"]
+        self.metricas["classificacao"] = resultado["metricas"]
 
-        estratificar = y if y.nunique() > 1 else None
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.25, random_state=42, stratify=estratificar
-        )
+        metricas = resultado["metricas"]
+        classes_no_treino = resultado["classes_no_treino"]
+        auc = metricas["roc_auc_teste"]
+        cv_scores = resultado["cv_scores"]
 
-        self.modelo_classificacao = DecisionTreeClassifier(
-            max_depth=4, random_state=42, class_weight="balanced"
-        )
-        self.modelo_classificacao.fit(X_train, y_train)
-
-        # [PROTEÇÃO] Com dataset pequeno, o split pode deixar só uma classe no
-        # treino (o modelo nunca vê a classe "suspeita"). Isso não é bug de
-        # lógica, é sintoma de amostra pequena/desbalanceada — mas o código
-        # precisa continuar rodando em vez de quebrar em predict_proba.
-        classes_no_treino = len(self.modelo_classificacao.classes_)
         if classes_no_treino < 2:
             self.aviso_amostra_pequena = True
             print(
-                f"   ⚠️ O treino ficou com apenas 1 classe presente ({self.modelo_classificacao.classes_[0]}) "
-                f"— dataset pequeno demais para o classificador aprender as duas classes ainda. "
-                f"Aumente o volume de transações rotuladas (principalmente da classe minoritária)."
+                "   ⚠️ O treino ficou com apenas 1 classe presente "
+                f"({self.modelo_classificacao.classes_[0]}) "
+                "— dataset pequeno demais para o classificador aprender "
+                "as duas classes ainda."
             )
 
-        y_pred = self.modelo_classificacao.predict(X_test)
-        auc = float("nan")
-        if y_test.nunique() > 1 and classes_no_treino > 1:
-            y_proba = self.modelo_classificacao.predict_proba(X_test)[:, 1]
-            auc = roc_auc_score(y_test, y_proba)
-
-        relatorio = classification_report(
-            y_test, y_pred, labels=[0, 1], output_dict=True, zero_division=0
-        )
-        cv_scores = []
-        if y.nunique() > 1 and y.value_counts().min() >= 3:
-            skf = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
-            cv_scores = cross_val_score(
-                self.modelo_classificacao, X, y, cv=skf, scoring="roc_auc"
-            ).tolist()
-
-        self.metricas["classificacao"] = {
-            "n_treino": len(X_train),
-            "n_teste": len(X_test),
-            "classes_no_treino": classes_no_treino,
-            "roc_auc_teste": auc,
-            "roc_auc_cv_media": float(np.mean(cv_scores)) if cv_scores else None,
-            "precision_classe_suspeita": relatorio.get("1", {}).get("precision"),
-            "recall_classe_suspeita": relatorio.get("1", {}).get("recall"),
-            "f1_classe_suspeita": relatorio.get("1", {}).get("f1-score"),
-            "matriz_confusao": confusion_matrix(y_test, y_pred, labels=[0, 1]).tolist(),
-        }
         print(
             f"   ROC-AUC (teste): {auc:.3f}"
             if not np.isnan(auc)
             else "   ROC-AUC indisponível (classe única no treino ou no teste)"
         )
+
         if cv_scores:
             print(
-                f"   ROC-AUC (CV 3-fold): {np.mean(cv_scores):.3f} ± {np.std(cv_scores):.3f}"
+                f"   ROC-AUC (CV 3-fold): "
+                f"{np.mean(cv_scores):.3f} ± {np.std(cv_scores):.3f}"
             )
 
-        X_full = df_class[features].fillna(0).astype(float)
-        if classes_no_treino > 1:
-            df["proba_suspeita"] = self.modelo_classificacao.predict_proba(X_full)[:, 1]
-        else:
-            # só existe 1 classe -> não há "probabilidade da classe suspeita" a extrair;
-            # usamos 1.0 se a única classe aprendida for a suspeita, senão 0.0
-            valor_constante = 1.0 if self.modelo_classificacao.classes_[0] == 1 else 0.0
-            df["proba_suspeita"] = valor_constante
+        df["proba_suspeita"] = resultado["proba_suspeita"]
 
-        importancias = self.modelo_classificacao.feature_importances_
+        features = resultado["features"]
+        importancias = resultado["importancias"]
+
         plt.figure(figsize=(9.5, 5))
+
         bars = plt.barh(
-            features, importancias, color="#00ffcc", edgecolor="cyan", height=0.5
+            features,
+            importancias,
+            color="#00ffcc",
+            edgecolor="cyan",
+            height=0.5,
         )
+
         plt.title(
             "VETORES DE RISCO IDENTIFICADOS PELO CLASSIFICADOR",
             fontsize=12,
@@ -274,15 +213,20 @@ class SecurityDetector:
             color="cyan",
             pad=15,
         )
+
         auc_label = f"{auc:.2f}" if not np.isnan(auc) else "N/D"
+
         plt.xlabel(
             f"Relevância na Tomada de Decisão do SOC (ROC-AUC teste: {auc_label})",
             fontsize=10,
             color="gray",
         )
+
         plt.grid(axis="x", linestyle="--", alpha=0.3)
+
         for bar in bars:
             width = bar.get_width()
+
             plt.text(
                 width + 0.005,
                 bar.get_y() + bar.get_height() / 2,
@@ -293,11 +237,19 @@ class SecurityDetector:
                 fontsize=9,
                 fontweight="bold",
             )
+
         plt.tight_layout()
-        plt.savefig("reports/importancia_features_classificador.png", dpi=150)
+        plt.savefig(
+            "reports/importancia_features_classificador.png",
+            dpi=150,
+        )
         plt.close()
 
-        joblib.dump(self.modelo_classificacao, "reports/models/classificador.joblib")
+        joblib.dump(
+            self.modelo_classificacao,
+            "reports/models/classificador.joblib",
+        )
+
         return df
 
     def _comparar_detectores_anomalia(self, df):

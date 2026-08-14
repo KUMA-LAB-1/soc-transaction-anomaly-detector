@@ -25,6 +25,10 @@ from datetime import datetime
 from pathlib import Path
 
 import joblib
+import matplotlib
+
+matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -54,7 +58,7 @@ from sklearn.svm import OneClassSVM
 from sklearn.tree import DecisionTreeClassifier
 from sqlalchemy import text
 
-from db_connector import DBConnector
+from .db_connector import DBConnector
 
 MAPA_SEVERIDADE_STATUS = {
     "Aprovada": 5,
@@ -76,8 +80,11 @@ CONTAMINATION_TETO_PRATICO = 0.15
 
 
 class SecurityDetector:
-    def __init__(self):
-        self.engine = DBConnector.get_engine()
+    def __init__(self, engine=None):
+        if engine is None:
+            engine = DBConnector.get_engine()
+
+        self.engine = engine
         self.modelo_classificacao = None
         self.modelo_agrupamento = None
         self.modelos_anomalia = {}

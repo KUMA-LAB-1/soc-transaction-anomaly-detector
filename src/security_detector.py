@@ -38,13 +38,9 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sklearn.covariance import EllipticEnvelope
 from sklearn.ensemble import IsolationForest
-from sklearn.linear_model import LinearRegression
 from sklearn.metrics import (
     classification_report,
     confusion_matrix,
-    mean_absolute_error,
-    mean_squared_error,
-    r2_score,
     roc_auc_score,
 )
 from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
@@ -59,14 +55,7 @@ from .data.columns import resolver_coluna_cliente
 from .db_connector import DBConnector
 from .features.engineering import criar_features
 from .models.evaluation import avaliar_detector, selecionar_melhor_detector
-
-MAPA_SEVERIDADE_STATUS = {
-    "Aprovada": 5,
-    "Concluída": 5,
-    "Em Análise": 55,
-    "Bloqueada por Suspeita": 95,
-}
-SEVERIDADE_PADRAO = 30
+from .models.regression import treinar_regressao_severidade
 
 # Abaixo deste tamanho de treino, o pipeline continua rodando (é útil para
 # desenvolvimento/teste), mas sinaliza explicitamente que as métricas não são
@@ -570,50 +559,38 @@ class SecurityDetector:
     def _treinar_regressao(self, df):
         print("⚙️ Treinando regressão de severidade de risco...")
 
-        df["severidade_real"] = (
-            df["status_transacao"].map(MAPA_SEVERIDADE_STATUS).fillna(SEVERIDADE_PADRAO)
-        )
-        features_r = [
-            "valor_transacao",
-            "hora",
-            "media_historica_cliente",
-            "desvio_historico_cliente",
-            "zscore_valor_cliente",
-            "qtd_transacoes_anteriores",
-            "dia_semana",
-            "falhas_login_recentes",
-        ]
-        X_r = df[features_r].fillna(0)
-        y_r = df["severidade_real"]
+        resultado = treinar_regressao_severidade(df)
+        metricas = resultado["metricas"]
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X_r, y_r, test_size=0.25, random_state=42
-        )
-        self.modelo_regressao = LinearRegression()
-        self.modelo_regressao.fit(X_train, y_train)
-
-        y_pred_test = self.modelo_regressao.predict(X_test)
-        r2 = r2_score(y_test, y_pred_test)
-        mae = mean_absolute_error(y_test, y_pred_test)
-        rmse = float(np.sqrt(mean_squared_error(y_test, y_pred_test)))
-        cv_scores = cross_val_score(self.modelo_regressao, X_r, y_r, cv=5, scoring="r2")
+        self.modelo_regressao = resultado["modelo"]
 
         self.metricas["regressao"] = {
-            "r2_teste": r2,
-            "mae_teste": mae,
-            "rmse_teste": rmse,
-            "r2_cv_media": float(np.mean(cv_scores)),
+            "r2_teste": metricas["r2_teste"],
+            "mae_teste": metricas["mae_teste"],
+            "rmse_teste": metricas["rmse_teste"],
+            "r2_cv_media": metricas["r2_cv_media"],
         }
-        print(f"   R² (teste): {r2:.3f} | MAE: {mae:.1f} | RMSE: {rmse:.1f}")
-        print(f"   R² (CV 5-fold): {np.mean(cv_scores):.3f} ± {np.std(cv_scores):.3f}")
-        if np.mean(cv_scores) < 0:
+
+        print(
+            f"   R² (teste): {metricas['r2_teste']:.3f} | "
+            f"MAE: {metricas['mae_teste']:.1f} | "
+            f"RMSE: {metricas['rmse_teste']:.1f}"
+        )
+        print(
+            f"   R² (CV 5-fold): {metricas['r2_cv_media']:.3f} "
+            f"± {metricas['r2_cv_desvio']:.3f}"
+        )
+
+        if metricas["r2_cv_media"] < 0:
             print(
                 "   ⚠️ R² negativo em validação cruzada: o modelo de severidade ainda não "
                 "generaliza de forma confiável (típico de base pequena). Isso será sinalizado no PDF."
             )
 
-        df["score_risco_predito"] = self.modelo_regressao.predict(X_r).clip(0, 100)
+        df["score_risco_predito"] = resultado["score_risco_predito"]
+
         joblib.dump(self.modelo_regressao, "reports/models/regressao.joblib")
+
         return df
 
     def _salvar_metricas(self):

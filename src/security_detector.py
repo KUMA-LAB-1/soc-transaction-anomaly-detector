@@ -19,7 +19,6 @@ import getpass
 import html
 import json
 import os
-import re
 from datetime import datetime
 from pathlib import Path
 
@@ -30,7 +29,6 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-from sqlalchemy import text
 
 from .data.columns import resolver_coluna_cliente
 from .db_connector import DBConnector
@@ -44,6 +42,7 @@ from .reporting.charts import (
     gerar_grafico_detector,
     gerar_grafico_importancia_classificador,
 )
+from .threat_intel.mitre import enriquecer_com_mitre
 
 # Abaixo deste tamanho de treino, o pipeline continua rodando (é útil para
 # desenvolvimento/teste), mas sinaliza explicitamente que as métricas não são
@@ -333,100 +332,6 @@ class SecurityDetector:
         print(f"📈 Métricas registradas em {caminho}")
 
     # ------------------------------------------------------------------
-    # Threat hunting MITRE [ITEM 6]
-    # ------------------------------------------------------------------
-    def _determinar_padrao_por_correlacao(self, sinais):
-        """
-        Decide a técnica MITRE a partir de sinais REAIS de comportamento
-        (correlação com tbl_logs_seguranca), não do texto do tipo de transação.
-        Retorna (termo_busca, descricao_criterio) ou (None, None) se nenhum
-        sinal de log bateu — nesse caso cai no fallback por tipo de transação.
-        """
-        if sinais.get("falhas_login_recentes", 0) >= 2:
-            return (
-                "%T1110%",
-                "múltiplas falhas de login antes da transação (força bruta)",
-            )
-        if sinais.get("dispositivo_novo_flag") and sinais.get("alteracao_limite_flag"):
-            return (
-                "%T1098%",
-                "dispositivo novo vinculado + alteração de limite Pix (tomada de conta)",
-            )
-        if sinais.get("mudanca_localizacao_flag"):
-            return (
-                "%T1078%",
-                "mudança de localização entre acessos recentes (uso de credencial fora do padrão)",
-            )
-        return None, None
-
-    @staticmethod
-    def _limpar_texto_mitre(texto):
-        """[ITEM 9] Remove links markdown/citações do texto bruto do MITRE e escapa
-        caracteres especiais antes de ir para o Paragraph do reportlab."""
-        if not texto:
-            return "Nenhum procedimento de mitigação listado."
-        texto = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", texto)  # [Nome](url) -> Nome
-        texto = re.sub(r"\(Citation:[^)]*\)", "", texto)  # remove (Citation: ...)
-        texto = re.sub(r"\s+", " ", texto).strip()
-        if len(texto) > 450:
-            texto = texto[:450].rsplit(" ", 1)[0] + "…"
-        return html.escape(texto)
-
-    def enriquecer_com_mitre(self, tipo_evento, sinais=None):
-        sinais = sinais or {}
-        termo_busca, criterio = self._determinar_padrao_por_correlacao(sinais)
-        if not termo_busca:
-            criterio = "tipo de transação (fallback, sem correlação de log disponível)"
-            if "Pix" in tipo_evento:
-                termo_busca = "%T1565%"
-            elif "Transferência" in tipo_evento:
-                termo_busca = "%T1043%"
-            else:
-                termo_busca = "%T1110%"
-
-        try:
-            query = text("""
-                SELECT mitre_id, mitre_tecnica, mitre_tatica, procedimentos
-                FROM tbl_mitre_mapping
-                WHERE mitre_id ILIKE :termo OR mitre_tecnica ILIKE :termo
-                ORDER BY mitre_id
-                LIMIT 1;
-            """)
-            with self.engine.connect() as conn:
-                result = conn.execute(query, {"termo": termo_busca}).fetchone()
-                if result:
-                    return {
-                        "mitre_id": html.escape(str(result[0])),
-                        "tecnica": html.escape(str(result[1])),
-                        "tatica": html.escape(str(result[2])),
-                        "procedimentos": self._limpar_texto_mitre(result[3]),
-                        "fonte": "banco de dados (dinâmico)",
-                        "criterio": criterio,
-                    }
-        except Exception as e:
-            print(
-                f"⚠️ Alerta ao consultar Threat Intel no banco: {e}. Usando mapeamento local resiliente."
-            )
-
-        if "Pix" in tipo_evento:
-            return {
-                "mitre_id": "T1565.001",
-                "tecnica": "Manipulação de Dados: Transferência Financeira Não Autorizada",
-                "tatica": "Impacto / Roubo de Ativos",
-                "procedimentos": "Aplicar MFA mandatório para transações fora do horário comercial.",
-                "fonte": "fallback local",
-                "criterio": criterio,
-            }
-        return {
-            "mitre_id": "T1110.001",
-            "tecnica": "Ataque de Força Bruta (Brute Force Credential Stuffing)",
-            "tatica": "Acesso Inicial",
-            "procedimentos": "Bloquear temporariamente o IP de origem e forçar redefinição de senha.",
-            "fonte": "fallback local",
-            "criterio": criterio,
-        }
-
-    # ------------------------------------------------------------------
     # Relatório PDF
     # ------------------------------------------------------------------
     def gerar_pdf_report(self, df_analisado):
@@ -611,7 +516,11 @@ class SecurityDetector:
                         "mudanca_localizacao_flag", False
                     ),
                 }
-                intel = self.enriquecer_com_mitre(tipo_evento, sinais)
+                intel = enriquecer_com_mitre(
+                    engine=self.engine,
+                    tipo_evento=tipo_evento,
+                    sinais=sinais,
+                )
                 chave = (intel["mitre_id"], row[col_cliente])
                 if intel and chave not in ameacas_vistas:
                     ameacas_vistas.add(chave)

@@ -20,7 +20,6 @@ import html
 import json
 import os
 import re
-import time
 from datetime import datetime
 from pathlib import Path
 
@@ -36,19 +35,14 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-from sklearn.covariance import EllipticEnvelope
-from sklearn.ensemble import IsolationForest
-from sklearn.neighbors import LocalOutlierFactor
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.svm import OneClassSVM
 from sqlalchemy import text
 
 from .data.columns import resolver_coluna_cliente
 from .db_connector import DBConnector
 from .features.engineering import criar_features
+from .models.anomaly_detection import executar_detectores_anomalia
 from .models.classification import treinar_classificador_triagem
-from .models.evaluation import avaliar_detector, selecionar_melhor_detector
+from .models.evaluation import selecionar_melhor_detector
 from .models.regression import treinar_regressao_severidade
 
 # Abaixo deste tamanho de treino, o pipeline continua rodando (é útil para
@@ -253,160 +247,55 @@ class SecurityDetector:
         return df
 
     def _comparar_detectores_anomalia(self, df):
-        """
-        Treina quatro detectores de anomalia com as mesmas features e o mesmo
-        orçamento operacional de alertas. Cada detector é salvo separadamente,
-        recebe métricas próprias e produz um gráfico individual.
 
-        IMPORTANTE: status_transacao não entra no treino dos detectores. Ele é
-        usado apenas como referência de auditoria para comparar os resultados.
-        """
-        print("\n⚙️ Comparando detectores de anomalia...")
+        execucao = executar_detectores_anomalia(df)
 
-        taxa_suspeita_real = (
-            df["status_transacao"].isin(["Em Análise", "Bloqueada por Suspeita"]).mean()
-        )
-        contamination_estimado = float(np.clip(taxa_suspeita_real, 0.02, 0.30))
-        contamination = min(contamination_estimado, CONTAMINATION_TETO_PRATICO)
+        resultados = execucao["resultados"]
+        self.modelos_anomalia = execucao["modelos"]
+
+        taxa_suspeita_real = execucao["taxa_suspeita_real"]
+        contamination = execucao["contamination"]
 
         print(f"   taxa histórica suspeita: {taxa_suspeita_real:.3f}")
         print(f"   contamination comum aos modelos: {contamination:.3f}")
 
-        features = [
-            "valor_transacao",
-            "hora",
-            "zscore_valor_cliente",
-            "qtd_transacoes_anteriores",
-            "falhas_login_recentes",
-            "dispositivo_novo_flag",
-            "alteracao_limite_flag",
-            "mudanca_localizacao_flag",
-        ]
-        features = [col for col in features if col in df.columns]
-        X = df[features].fillna(0).astype(float)
-        y_real = (
-            df["status_transacao"]
-            .isin(["Em Análise", "Bloqueada por Suspeita"])
-            .astype(int)
-        )
+        for resultado in resultados:
+            nome = resultado["modelo"]
 
-        n_vizinhos = max(5, min(35, len(X) - 1))
-        detectores = {
-            "isolation_forest": IsolationForest(
-                contamination=contamination,
-                n_estimators=300,
-                random_state=42,
-                n_jobs=-1,
-            ),
-            "local_outlier_factor": Pipeline(
-                [
-                    ("scaler", StandardScaler()),
-                    (
-                        "modelo",
-                        LocalOutlierFactor(
-                            n_neighbors=n_vizinhos,
-                            contamination=contamination,
-                            novelty=True,
-                            n_jobs=-1,
-                        ),
-                    ),
-                ]
-            ),
-            "one_class_svm": Pipeline(
-                [
-                    ("scaler", StandardScaler()),
-                    (
-                        "modelo",
-                        OneClassSVM(
-                            kernel="rbf",
-                            gamma="scale",
-                            nu=contamination,
-                        ),
-                    ),
-                ]
-            ),
-            "elliptic_envelope": Pipeline(
-                [
-                    ("scaler", StandardScaler()),
-                    (
-                        "modelo",
-                        EllipticEnvelope(
-                            contamination=contamination,
-                            random_state=42,
-                            support_fraction=None,
-                        ),
-                    ),
-                ]
-            ),
-        }
-
-        resultados = []
-        for nome, modelo in detectores.items():
             print(f"\n   ▶ {nome}")
-            inicio = time.perf_counter()
-            try:
-                modelo.fit(X)
-                predicao_original = modelo.predict(X)  # 1 normal, -1 anomalia
-                score_original = modelo.decision_function(X)  # maior = mais normal
-                segundos = time.perf_counter() - inicio
 
-                avaliacao = avaliar_detector(
-                    y_real=y_real,
-                    predicao_original=predicao_original,
-                    score_original=score_original,
-                )
-
-                y_pred = avaliacao["y_pred"]
-                precision = avaliacao["precision"]
-                recall = avaliacao["recall"]
-                f1 = avaliacao["f1"]
-                auc = avaliacao["roc_auc"]
-
-                slug = nome
-                df[f"anomalia_{slug}"] = predicao_original
-                df[f"score_anomalia_{slug}"] = score_original
-                joblib.dump(modelo, f"reports/models/{slug}.joblib")
-                self.modelos_anomalia[nome] = modelo
-
-                resultado = {
-                    "modelo": nome,
-                    "status": "ok",
-                    "features": features,
-                    "contamination_estimado": contamination_estimado,
-                    "contamination_usado": contamination,
-                    "qtd_anomalias": int(y_pred.sum()),
-                    "taxa_anomalias": float(y_pred.mean()),
-                    "precision_vs_status_real": float(precision),
-                    "recall_vs_status_real": float(recall),
-                    "f1_vs_status_real": float(f1),
-                    "roc_auc_score_anomalia": auc,
-                    "tempo_segundos": float(segundos),
-                    "nota": (
-                        "Modelo não supervisionado/novelty detection. "
-                        "status_transacao foi usado somente para auditoria comparativa."
-                    ),
-                }
-                resultados.append(resultado)
+            if resultado["status"] == "erro":
                 self.metricas[nome] = resultado
+                print(f"      ⚠️ modelo ignorado por erro: {resultado['erro']}")
+                continue
 
-                print(
-                    f"      anomalias={resultado['qtd_anomalias']} | "
-                    f"precision={precision:.3f} | recall={recall:.3f} | "
-                    f"F1={f1:.3f} | tempo={segundos:.3f}s"
-                )
-                self._gerar_grafico_detector(df, nome, contamination)
+            predicoes = execucao["predicoes"][nome]
+            predicao_original = predicoes["predicao_original"]
+            score_original = predicoes["score_original"]
 
-            except Exception as exc:
-                segundos = time.perf_counter() - inicio
-                resultado = {
-                    "modelo": nome,
-                    "status": "erro",
-                    "erro": str(exc),
-                    "tempo_segundos": float(segundos),
-                }
-                resultados.append(resultado)
-                self.metricas[nome] = resultado
-                print(f"      ⚠️ modelo ignorado por erro: {exc}")
+            df[f"anomalia_{nome}"] = predicao_original
+            df[f"score_anomalia_{nome}"] = score_original
+
+            joblib.dump(
+                self.modelos_anomalia[nome],
+                f"reports/models/{nome}.joblib",
+            )
+
+            self.metricas[nome] = resultado
+
+            print(
+                f"      anomalias={resultado['qtd_anomalias']} | "
+                f"precision={resultado['precision_vs_status_real']:.3f} | "
+                f"recall={resultado['recall_vs_status_real']:.3f} | "
+                f"F1={resultado['f1_vs_status_real']:.3f} | "
+                f"tempo={resultado['tempo_segundos']:.3f}s"
+            )
+
+            self._gerar_grafico_detector(
+                df,
+                nome,
+                contamination,
+            )
 
         validos = [r for r in resultados if r.get("status") == "ok"]
         melhor = selecionar_melhor_detector(validos)

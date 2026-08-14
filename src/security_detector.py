@@ -61,6 +61,7 @@ from sqlalchemy import text
 from .data.columns import resolver_coluna_cliente
 from .db_connector import DBConnector
 from .features.engineering import criar_features
+from .models.evaluation import selecionar_melhor_detector
 
 MAPA_SEVERIDADE_STATUS = {
     "Aprovada": 5,
@@ -466,21 +467,8 @@ class SecurityDetector:
                 print(f"      ⚠️ modelo ignorado por erro: {exc}")
 
         validos = [r for r in resultados if r.get("status") == "ok"]
-        if not validos:
-            raise RuntimeError(
-                "Nenhum detector de anomalia conseguiu concluir o treinamento."
-            )
+        melhor = selecionar_melhor_detector(validos)
 
-        # Critério transparente: maior F1; desempate por recall, precision e menor tempo.
-        melhor = max(
-            validos,
-            key=lambda r: (
-                r["f1_vs_status_real"],
-                r["recall_vs_status_real"],
-                r["precision_vs_status_real"],
-                -r["tempo_segundos"],
-            ),
-        )
         self.melhor_detector = melhor["modelo"]
         self.modelo_agrupamento = self.modelos_anomalia[self.melhor_detector]
 

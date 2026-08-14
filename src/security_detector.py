@@ -58,7 +58,9 @@ from sklearn.svm import OneClassSVM
 from sklearn.tree import DecisionTreeClassifier
 from sqlalchemy import text
 
+from .data.columns import resolver_coluna_cliente
 from .db_connector import DBConnector
+from .features.engineering import criar_features
 
 MAPA_SEVERIDADE_STATUS = {
     "Aprovada": 5,
@@ -146,61 +148,6 @@ class SecurityDetector:
             print(f"❌ Erro na leitura segura do banco: {e}")
             raise
 
-    def _col_cliente(self, df):
-        for candidato in (
-            "cliente_pseudonimo",
-            "cliente_anonimizado",
-            "cliente_anonimado",
-        ):
-            if candidato in df.columns:
-                return candidato
-        df["cliente_pseudonimo"] = "Usuário Anonimizado"
-        return "cliente_pseudonimo"
-
-    def engenharia_de_features(self, df):
-        col_cliente = self._col_cliente(df)
-        df = df.sort_values([col_cliente, "data_hora_transacao"]).reset_index(drop=True)
-
-        grupo_cliente = df.groupby(col_cliente, group_keys=False)["valor_transacao"]
-        df["media_historica_cliente"] = grupo_cliente.apply(
-            lambda s: s.shift(1).expanding().mean()
-        )
-        df["desvio_historico_cliente"] = grupo_cliente.apply(
-            lambda s: s.shift(1).expanding().std()
-        )
-        df["qtd_transacoes_anteriores"] = df.groupby(col_cliente).cumcount()
-
-        media_global = df["valor_transacao"].mean()
-        desvio_global = df["valor_transacao"].std() or 1.0
-        df["media_historica_cliente"] = df["media_historica_cliente"].fillna(
-            media_global
-        )
-        df["desvio_historico_cliente"] = (
-            df["desvio_historico_cliente"].fillna(desvio_global).replace(0, 0.01)
-        )
-        df["zscore_valor_cliente"] = (
-            df["valor_transacao"] - df["media_historica_cliente"]
-        ) / df["desvio_historico_cliente"]
-        df["dia_semana"] = pd.to_datetime(df["data_hora_transacao"]).dt.dayofweek
-
-        for col, default in [
-            ("falhas_login_recentes", 0),
-            ("dispositivo_novo_flag", False),
-            ("alteracao_limite_flag", False),
-            ("mudanca_localizacao_flag", False),
-        ]:
-            if col not in df.columns:
-                df[col] = default
-        df["falhas_login_recentes"] = df["falhas_login_recentes"].fillna(0).astype(int)
-        for col in (
-            "dispositivo_novo_flag",
-            "alteracao_limite_flag",
-            "mudanca_localizacao_flag",
-        ):
-            df[col] = df[col].fillna(False).astype(bool)
-
-        return df
-
     # ------------------------------------------------------------------
     # Orquestração
     # ------------------------------------------------------------------
@@ -208,7 +155,7 @@ class SecurityDetector:
         df = df_soc.copy()
         df["hora"] = pd.to_datetime(df["data_hora_transacao"]).dt.hour
 
-        df = self.engenharia_de_features(df)
+        df = criar_features(df)
 
         if len(df) < MIN_AMOSTRAS_TREINO_CONFIAVEL:
             self.aviso_amostra_pequena = True
@@ -573,7 +520,7 @@ class SecurityDetector:
         coluna_score = f"score_anomalia_{nome_modelo}"
         normais = df[df[coluna_pred] == 1]
         anomalas = df[df[coluna_pred] == -1]
-        col_cliente = self._col_cliente(df)
+        col_cliente = resolver_coluna_cliente(df)
 
         plt.figure(figsize=(12, 7))
         plt.scatter(
@@ -792,7 +739,7 @@ class SecurityDetector:
         pdf_path = "reports/Relatorio_Incidente_SOC.pdf"
         print(f"\n📄 Compilando Relatório Executivo PDF em '{pdf_path}'...")
 
-        col_cliente = self._col_cliente(df_analisado)
+        col_cliente = resolver_coluna_cliente(df_analisado)
         col_id_transacao = (
             "id_transacao" if "id_transacao" in df_analisado.columns else None
         )

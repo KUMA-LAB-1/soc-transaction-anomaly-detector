@@ -22,6 +22,8 @@ import joblib
 import numpy as np
 import pandas as pd
 
+from sqlalchemy.engine import Engine
+from pathlib import Path
 from .data.repository import SocDataRepository
 from .db_connector import DBConnector
 from .features.engineering import criar_features
@@ -49,7 +51,7 @@ CONTAMINATION_TETO_PRATICO = 0.15
 
 
 class SecurityDetector:
-    def __init__(self, engine=None):
+    def __init__(self, engine: Engine | None = None) -> None:
         if engine is None:
             engine = DBConnector.get_engine()
 
@@ -72,13 +74,13 @@ class SecurityDetector:
     # ------------------------------------------------------------------
     # Carga, preparação e auditoria
     # ------------------------------------------------------------------
-    def carregar_dados(self):
+    def carregar_dados(self) -> pd.DataFrame:
         return self.repository.carregar_dataset_soc()
 
     # ------------------------------------------------------------------
     # Orquestração
     # ------------------------------------------------------------------
-    def processar_modelos_e_graficos(self, df_soc):
+    def analisar_transacoes(self, df_soc: pd.DataFrame) -> pd.DataFrame:
         df = df_soc.copy()
         df["hora"] = pd.to_datetime(df["data_hora_transacao"]).dt.hour
 
@@ -99,7 +101,7 @@ class SecurityDetector:
         self._salvar_metricas()
         return df
 
-    def _treinar_classificacao(self, df):
+    def _treinar_classificacao(self, df: pd.DataFrame) -> pd.DataFrame:
         """Executa o classificador supervisionado de triagem do SOC."""
         print(
             "\n⚙️ Treinando classificador de triagem "
@@ -150,8 +152,7 @@ class SecurityDetector:
 
         return df
 
-    def _comparar_detectores_anomalia(self, df):
-
+    def _comparar_detectores_anomalia(self, df: pd.DataFrame) -> pd.DataFrame:
         execucao = executar_detectores_anomalia(df)
 
         resultados = execucao["resultados"]
@@ -237,7 +238,7 @@ class SecurityDetector:
         print(f"\n   🏆 Detector selecionado para o relatório: {self.melhor_detector}")
         return df
 
-    def _treinar_regressao(self, df):
+    def _treinar_regressao(self, df: pd.DataFrame) -> pd.DataFrame:
         print("⚙️ Treinando regressão de severidade de risco...")
 
         resultado = treinar_regressao_severidade(df)
@@ -274,7 +275,7 @@ class SecurityDetector:
 
         return df
 
-    def _salvar_metricas(self):
+    def _salvar_metricas(self) -> Path:
         return salvar_historico_metricas(
             metricas=self.metricas,
             aviso_amostra_pequena=self.aviso_amostra_pequena,
@@ -283,7 +284,7 @@ class SecurityDetector:
     # ------------------------------------------------------------------
     # Relatório PDF
     # ------------------------------------------------------------------
-    def gerar_pdf_report(self, df_analisado):
+    def gerar_pdf_report(self, df_analisado: pd.DataFrame) -> Path:
         return gerar_relatorio_pdf(
             df_analisado=df_analisado,
             metricas=self.metricas,
@@ -292,9 +293,9 @@ class SecurityDetector:
             engine=self.engine,
         )
 
-    def executar_pipeline_completo(self):
+    def executar_pipeline_completo(self) -> None:
         df_soc = self.carregar_dados()
-        df_analisado = self.processar_modelos_e_graficos(df_soc)
+        df_analisado = self.analisar_transacoes(df_soc)
         self.gerar_pdf_report(df_analisado)
         print("\n🏆 Pipeline do SOC Preditivo Concluído com Sucesso!")
 

@@ -45,3 +45,10 @@ docstring-code-format = true
 lint = [
     "ruff>=0.16.1",
 ]
+test = [
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+]
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

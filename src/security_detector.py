@@ -17,13 +17,13 @@ Responsável por:
 
 import json
 import os
+from pathlib import Path
 
 import joblib
 import numpy as np
 import pandas as pd
-
 from sqlalchemy.engine import Engine
-from pathlib import Path
+
 from .data.repository import SocDataRepository
 from .db_connector import DBConnector
 from .features.engineering import criar_features

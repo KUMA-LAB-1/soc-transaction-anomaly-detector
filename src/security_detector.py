@@ -15,7 +15,6 @@ Responsável por:
 
 """
 
-import getpass
 import json
 import os
 from datetime import UTC, datetime
@@ -25,6 +24,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
+from .data.repository import SocDataRepository
 from .db_connector import DBConnector
 from .features.engineering import criar_features
 from .models.anomaly_detection import executar_detectores_anomalia
@@ -55,6 +55,10 @@ class SecurityDetector:
             engine = DBConnector.get_engine()
 
         self.engine = engine
+        self.repository = SocDataRepository(
+            engine=self.engine,
+            raw_connection_factory=DBConnector.get_raw_connection,
+        )
         self.modelo_classificacao = None
         self.modelo_agrupamento = None
         self.modelos_anomalia = {}
@@ -69,51 +73,8 @@ class SecurityDetector:
     # ------------------------------------------------------------------
     # Carga, preparação e auditoria
     # ------------------------------------------------------------------
-    def validar_e_preparar_dataset(self, df, nome_tabela):
-        if df.isnull().sum().sum() > 0:
-            df = df.fillna(0)
-        return df.drop_duplicates()
-
-    def _registrar_auditoria(self, view_acessada, qtd_linhas, finalidade):
-        """[ITEM 10] Log de accountability: quem acessou dados sensíveis, quando, quantos."""
-        try:
-            usuario = (
-                os.getenv("SOC_PIPELINE_USER")
-                or getpass.getuser()
-                or "pipeline_automatizado"
-            )
-            conn = DBConnector.get_raw_connection()
-            cur = conn.cursor()
-            cur.execute(
-                "INSERT INTO tbl_auditoria_acessos "
-                "(usuario_execucao, view_ou_tabela_acessada, qtd_linhas_retornadas, finalidade) "
-                "VALUES (%s, %s, %s, %s)",
-                (usuario, view_acessada, int(qtd_linhas), finalidade),
-            )
-            conn.commit()
-            cur.close()
-            conn.close()
-        except Exception as e:
-            print(
-                f"⚠️ Não foi possível registrar auditoria de acesso (tabela existe? rode 08_hardening_e_correlacao.sql): {e}"
-            )
-
     def carregar_dados(self):
-        try:
-            query_view = "SELECT * FROM v_analise_investigacao_soc;"
-            df_consolidado = pd.read_sql_query(query_view, self.engine)
-            df_consolidado = self.validar_e_preparar_dataset(
-                df_consolidado, "v_analise_investigacao_soc"
-            )
-            self._registrar_auditoria(
-                "v_analise_investigacao_soc",
-                len(df_consolidado),
-                "Execução do pipeline de detecção preditiva do SOC",
-            )
-            return df_consolidado
-        except Exception as e:
-            print(f"❌ Erro na leitura segura do banco: {e}")
-            raise
+        return self.repository.carregar_dataset_soc()
 
     # ------------------------------------------------------------------
     # Orquestração

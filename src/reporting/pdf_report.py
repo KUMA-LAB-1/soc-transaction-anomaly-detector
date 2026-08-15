@@ -26,6 +26,8 @@ def gerar_relatorio_pdf(
     engine,
     pdf_path: str | Path = "reports/Relatorio_Incidente_SOC.pdf",
 ) -> Path:
+    pdf_path = Path(pdf_path)
+    pdf_path.parent.mkdir(parents=True, exist_ok=True)
 
     col_cliente = resolver_coluna_cliente(df_analisado)
     col_id_transacao = (
@@ -33,7 +35,7 @@ def gerar_relatorio_pdf(
     )
 
     doc = SimpleDocTemplate(
-        pdf_path,
+        str(pdf_path),
         pagesize=letter,
         rightMargin=40,
         leftMargin=40,

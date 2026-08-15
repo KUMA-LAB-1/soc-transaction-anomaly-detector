@@ -18,7 +18,7 @@ Responsável por:
 import getpass
 import json
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import joblib
@@ -316,7 +316,7 @@ class SecurityDetector:
 
     def _salvar_metricas(self):
         registro = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "amostra_pequena": self.aviso_amostra_pequena,
             **self.metricas,
         }

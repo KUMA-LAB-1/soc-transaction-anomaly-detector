@@ -17,8 +17,6 @@ Responsável por:
 
 import json
 import os
-from datetime import UTC, datetime
-from pathlib import Path
 
 import joblib
 import numpy as np
@@ -36,6 +34,7 @@ from .reporting.charts import (
     gerar_grafico_detector,
     gerar_grafico_importancia_classificador,
 )
+from .reporting.metrics import salvar_historico_metricas
 from .reporting.pdf_report import gerar_relatorio_pdf
 
 # Abaixo deste tamanho de treino, o pipeline continua rodando (é útil para
@@ -276,15 +275,10 @@ class SecurityDetector:
         return df
 
     def _salvar_metricas(self):
-        registro = {
-            "timestamp": datetime.now(UTC).isoformat(),
-            "amostra_pequena": self.aviso_amostra_pequena,
-            **self.metricas,
-        }
-        caminho = Path("reports/historico_metricas.jsonl")
-        with open(caminho, "a", encoding="utf-8") as f:
-            f.write(json.dumps(registro, ensure_ascii=False, default=str) + "\n")
-        print(f"📈 Métricas registradas em {caminho}")
+        return salvar_historico_metricas(
+            metricas=self.metricas,
+            aviso_amostra_pequena=self.aviso_amostra_pequena,
+        )
 
     # ------------------------------------------------------------------
     # Relatório PDF

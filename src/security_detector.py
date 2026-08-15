@@ -149,6 +149,10 @@ class SecurityDetector:
             importancias=importancias,
             auc=auc,
         )
+        joblib.dump(
+            self.modelo_classificacao,
+            "reports/models/classificador.joblib",
+        )
 
         return df
 

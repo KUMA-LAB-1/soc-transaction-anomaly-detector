@@ -416,6 +416,11 @@ def test_treinar_classificacao_classe_unica_ativa_aviso(monkeypatch):
         lambda **kwargs: None,
     )
 
+    monkeypatch.setattr(
+        "src.security_detector.joblib.dump",
+        lambda *args, **kwargs: None,
+    )
+
     df = pd.DataFrame({"valor": [1, 2]})
 
     detector._treinar_classificacao(df)

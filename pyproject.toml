@@ -46,14 +46,22 @@ line-ending = "auto"
 docstring-code-format = true
 
 
+[tool.bandit]
+exclude_dirs = ["tests"]
+
 [dependency-groups]
 lint = [
     "ruff>=0.16.1",
+]
+security = [
+    "bandit[toml]>=1.9.4",
 ]
 test = [
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
 ]
+
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]

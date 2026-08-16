@@ -55,6 +55,7 @@ lint = [
 ]
 security = [
     "bandit[toml]>=1.9.4",
+    "pip-audit>=2.10.1",
 ]
 test = [
     "pytest>=9.1.1",

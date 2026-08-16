@@ -5,7 +5,6 @@ on:
     branches:
       - main
       - feature/devsecops
-      - refactor/security-detector
 
   pull_request:
     branches:
@@ -73,3 +72,38 @@ jobs:
 
       - name: Run pipeline smoke test
         run: uv run pytest tests/integration/test_pipeline_smoke.py -v --no-cov
+
+  secrets:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository with full history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install Gitleaks 8.18.4
+        run: |
+          curl -sSfL \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz \
+            -o /tmp/gitleaks_8.18.4_linux_x64.tar.gz
+
+          curl -sSfL \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_checksums.txt \
+            -o /tmp/gitleaks_8.18.4_checksums.txt
+
+          cd /tmp
+
+          grep "gitleaks_8.18.4_linux_x64.tar.gz" \
+            gitleaks_8.18.4_checksums.txt \
+            | sha256sum -c -
+
+          tar -xzf gitleaks_8.18.4_linux_x64.tar.gz gitleaks
+
+          sudo install gitleaks /usr/local/bin/gitleaks
+
+          gitleaks version
+
+      - name: Scan Git history for secrets
+        run: gitleaks detect --source . --redact --verbose

@@ -17,10 +17,12 @@ dependencies = [
     "sqlalchemy>=2.0.51",
 ]
 
+
 [tool.ruff]
 target-version = "py312"
 line-length = 88
 src = ["src"]
+
 
 [tool.ruff.lint]
 select = [
@@ -32,8 +34,10 @@ select = [
 ]
 ignore = []
 
+
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
+
 
 [tool.ruff.format]
 quote-style = "double"
@@ -41,7 +45,26 @@ indent-style = "space"
 line-ending = "auto"
 docstring-code-format = true
 
+
 [dependency-groups]
 lint = [
     "ruff>=0.16.1",
+]
+test = [
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+]
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = [
+    "--cov=src",
+    "--cov-report=term-missing",
+    "--cov-fail-under=95",
+]
+
+
+markers = [
+    "unit: testes unitários rápidos e isolados",
+    "integration: testes de integração entre componentes do pipeline",
 ]

@@ -20,112 +20,149 @@ DOTENV_PATH = BASE_DIR / ".env"
 load_dotenv(dotenv_path=DOTENV_PATH)
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-if not DATABASE_URL:
-    print("❌ Erro: DATABASE_URL não encontrada.")
-    print(f"🔍 Caminho tentado: {DOTENV_PATH}")
-    exit()
 
 # URL oficial do MITRE ATT&CK Enterprise (formato STIX/JSON)
 MITRE_JSON_URL = "https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json"
 
 
-def baixar_e_processar_mitre():
-    print("📥 Baixando base de dados oficial do MITRE ATT&CK de forma automatizada...")
-    response = requests.get(MITRE_JSON_URL)
-    if response.status_code != 200:
-        raise Exception(
-            f"Falha ao conectar com o repositório do MITRE. Status: {response.status_code}"
-        )
-
-    dados_stix = response.json()
+def processar_dados_mitre(dados_stix: dict) -> list[tuple]:
+    """Transforma objetos STIX do MITRE em registros prontos para persistência."""
     elementos = dados_stix.get("objects", [])
 
-    # Dicionários temporários para mapear relacionamentos e táticas
     taticas_nomes = {}
-    relacoes_procedimentos = {}  # Mapeia ID da técnica -> lista de descrições de procedimentos (exemplos reais)
+    relacoes_procedimentos = {}
     tecnicas = []
 
-    print("🧠 Analisando relacionamentos de procedimentos e mitigação (TTPs)...")
-
-    # Passo 1: Mapear nomes de táticas e coletar relações de uso (Procedimentos)
     for obj in elementos:
         tipo = obj.get("type")
 
-        # Mapeia código curto de táticas para nome legível
         if tipo == "x-mitre-tactic":
             taticas_nomes[obj.get("x_mitre_shortname")] = obj.get("name")
 
-        # Coleta descrições de uso prático (procedimentos relacionando um grupo/software a uma técnica)
         elif tipo == "relationship" and obj.get("relationship_type") == "uses":
-            target_ref = obj.get("target_ref")  # Técnica (ex: attack-pattern--...)
+            target_ref = obj.get("target_ref")
             description = obj.get("description")
 
             if target_ref and description:
-                if target_ref not in relacoes_procedimentos:
-                    relacoes_procedimentos[target_ref] = []
-                # Guardamos a descrição do procedimento (limite de caracteres por segurança)
-                relacoes_procedimentos[target_ref].append(description[:200] + "...")
+                relacoes_procedimentos.setdefault(
+                    target_ref,
+                    [],
+                ).append(description[:200] + "...")
 
-    # Passo 2: Filtrar e extrair as técnicas (attack-pattern)
-    print("🧩 Estruturando técnicas e associando os procedimentos correspondentes...")
     for obj in elementos:
-        if obj.get("type") == "attack-pattern" and not obj.get(
-            "x_mitre_is_subtechnique", False
-        ):
-            # Obtém o ID externo do MITRE (ex: T1110)
-            external_references = obj.get("external_references", [])
-            mitre_id = None
-            for ref in external_references:
-                if ref.get("source_name") == "mitre-attack":
-                    mitre_id = ref.get("external_id")
-                    break
+        if obj.get("type") != "attack-pattern":
+            continue
 
-            if not mitre_id:
-                continue
+        if obj.get("x_mitre_is_subtechnique", False):
+            continue
 
-            nome_tecnica = obj.get("name")
-            descricao_tecnica = (
-                obj.get("description", "Sem descrição disponível.")[:300] + "..."
+        external_references = obj.get(
+            "external_references",
+            [],
+        )
+
+        mitre_id = None
+
+        for ref in external_references:
+            if ref.get("source_name") == "mitre-attack":
+                mitre_id = ref.get("external_id")
+                break
+
+        if not mitre_id:
+            continue
+
+        nome_tecnica = obj.get("name")
+
+        descricao_tecnica = (
+            obj.get(
+                "description",
+                "Sem descrição disponível.",
+            )[:300]
+            + "..."
+        )
+
+        stix_id = obj.get("id")
+
+        lista_procedimentos = relacoes_procedimentos.get(
+            stix_id,
+            [],
+        )
+
+        if lista_procedimentos:
+            procedimentos_consolidados = " | ".join(lista_procedimentos[:3])
+        else:
+            procedimentos_consolidados = (
+                "Nenhum exemplo prático documentado "
+                "ou monitoramento padrão recomendado."
             )
 
-            # Recupera os procedimentos práticos salvos no Passo 1 para esta técnica específica
-            stix_id = obj.get("id")
-            lista_procedimentos = relacoes_procedimentos.get(stix_id, [])
+        kill_chain_phases = obj.get(
+            "kill_chain_phases",
+            [],
+        )
 
-            if lista_procedimentos:
-                # Une os 3 principais exemplos de procedimentos reais encontrados
-                procedimentos_consolidados = " | ".join(lista_procedimentos[:3])
-            else:
-                procedimentos_consolidados = "Nenhum exemplo prático documentado ou monitoramento padrão recomendado."
+        for phase in kill_chain_phases:
+            fase_codificada = phase.get("phase_name")
 
-            # Associa a técnica à sua respectiva tática principal (kill chain phase)
-            kill_chain_phases = obj.get("kill_chain_phases", [])
-            for phase in kill_chain_phases:
-                fase_codificada = phase.get("phase_name")
-                nome_tatica = taticas_nomes.get(
-                    fase_codificada, fase_codificada.replace("-", " ").title()
+            nome_tatica = taticas_nomes.get(
+                fase_codificada,
+                fase_codificada.replace("-", " ").title(),
+            )
+
+            tecnicas.append(
+                (
+                    mitre_id,
+                    nome_tecnica,
+                    nome_tatica,
+                    descricao_tecnica,
+                    procedimentos_consolidados,
                 )
+            )
 
-                # Armazena a tupla estruturada para inserção no banco
-                tecnicas.append(
-                    (
-                        mitre_id,
-                        nome_tecnica,
-                        nome_tatica,
-                        descricao_tecnica,
-                        procedimentos_consolidados,
-                    )
-                )
-
-    print(f"✔️ {len(tecnicas)} táticas e técnicas de adversários mapeadas e prontas!")
     return tecnicas
 
 
-def salvar_no_supabase(dados_tecnicas):
+def baixar_e_processar_mitre() -> list[tuple]:
+    """Baixa a base oficial do MITRE ATT&CK e processa os objetos STIX."""
+    print("📥 Baixando base de dados oficial do MITRE ATT&CK de forma automatizada...")
+
+    response = requests.get(
+        MITRE_JSON_URL,
+        timeout=30,
+    )
+
+    if response.status_code != 200:
+        raise RuntimeError(
+            "Falha ao conectar com o repositório do MITRE. "
+            f"Status: {response.status_code}"
+        )
+
+    print("🧠 Analisando relacionamentos de procedimentos e mitigação (TTPs)...")
+
+    tecnicas = processar_dados_mitre(response.json())
+
+    print(f"✔️ {len(tecnicas)} táticas e técnicas de adversários mapeadas e prontas!")
+
+    return tecnicas
+
+
+def salvar_no_supabase(
+    dados_tecnicas: list[tuple],
+    database_url: str | None = None,
+) -> None:
+    database_url = database_url or DATABASE_URL
+
+    if not database_url:
+        raise ValueError(
+            f"DATABASE_URL não encontrada. Caminho configurado: {DOTENV_PATH}"
+        )
+
     print("🔌 Conectando ao PostgreSQL (Supabase)...")
 
-    # Aqui dizemos explicitamente para o psycopg2 usar SSL
-    conn = psycopg2.connect(DATABASE_URL, sslmode="require")
+    conn = psycopg2.connect(
+        database_url,
+        sslmode="require",
+    )
     cursor = conn.cursor()
 
     print("🛠️ Criando a tabela 'tbl_mitre_mapping' no Supabase...")

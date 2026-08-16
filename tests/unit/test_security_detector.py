@@ -392,13 +392,12 @@ def test_treinar_classificacao_integra_resultado_no_detector(monkeypatch):
     assert grafico["features"] == ["hora", "valor"]
     assert grafico["importancias"] == [0.4, 0.6]
     assert grafico["auc"] == 0.91
-
     assert dumps == [
-            (
-                modelo_fake,
-                "reports/models/classificador.joblib",
-            )
-        ]
+        (
+            modelo_fake,
+            "reports/models/classificador.joblib",
+        )
+    ]
 
 
 def test_treinar_classificacao_classe_unica_ativa_aviso(monkeypatch):

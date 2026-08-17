@@ -164,6 +164,24 @@ jobs:
             soc-anomaly-detector:ci \
             -c "test ! -f /app/.env"
 
+      - name: Generate Trivy vulnerability report
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: soc-anomaly-detector:ci
+          format: json
+          output: trivy-report.json
+          exit-code: "0"
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          scanners: vuln
+
+      - name: Upload Trivy vulnerability report
+        uses: actions/upload-artifact@v6
+        with:
+          name: trivy-container-report
+          path: trivy-report.json
+          if-no-files-found: error
+
       - name: Scan image for fixable HIGH/CRITICAL vulnerabilities
         uses: aquasecurity/trivy-action@v0.36.0
         with:

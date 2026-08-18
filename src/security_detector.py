@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 from sqlalchemy.engine import Engine
 
+from .alerts.bootstrap import criar_alert_repository_configurado
 from .alerts.contract import Alert
 from .alerts.engine import criar_alerta, deve_gerar_alerta
 from .alerts.repository import AlertRepository
@@ -359,5 +360,9 @@ class SecurityDetector:
 
 
 if __name__ == "__main__":
-    detector = SecurityDetector()
+    alert_repository = criar_alert_repository_configurado()
+
+    detector = SecurityDetector(
+        alert_repository=alert_repository,
+    )
     detector.executar_pipeline_completo()

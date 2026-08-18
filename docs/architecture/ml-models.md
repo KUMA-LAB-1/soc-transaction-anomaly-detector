@@ -1,4 +1,4 @@
-# Modelos Analíticos e Estratégia de Machine Learning
+﻿# Modelos Analíticos e Estratégia de Machine Learning
 
 ## 1. Objetivo
 
@@ -64,9 +64,9 @@ do comportamento analisado.
 
 ---
 
-# Parte I — Classificação supervisionada
+## Parte I — Classificação supervisionada
 
-## 3. Objetivo da classificação
+### 3. Objetivo da classificação
 
 O classificador de triagem utiliza aprendizado supervisionado.
 
@@ -87,7 +87,7 @@ treinar_classificador_triagem()
 
 ---
 
-## 4. Algoritmo utilizado
+### 4. Algoritmo utilizado
 
 O modelo atual é:
 
@@ -123,7 +123,7 @@ Esse controle é especialmente útil quando a quantidade de transações suspeit
 
 ---
 
-## 5. Construção do target
+### 5. Construção do target
 
 Os status definidos como suspeitos são:
 
@@ -156,7 +156,7 @@ anomalia.
 
 ---
 
-## 6. Features utilizadas
+### 6. Features utilizadas
 
 A classificação utiliza as seguintes features-base:
 
@@ -186,7 +186,7 @@ transformação do dataset.
 
 ---
 
-## 7. Train/test split
+### 7. Train/test split
 
 O dataset é dividido em:
 
@@ -208,7 +208,7 @@ conjuntos de treino e teste.
 
 ---
 
-## 8. Métricas da classificação
+### 8. Métricas da classificação
 
 A avaliação produz métricas como:
 
@@ -241,7 +241,7 @@ ROC-AUC
 
 ---
 
-## 9. Caso de classe única
+### 9. Caso de classe única
 
 Datasets pequenos ou desequilibrados podem produzir um conjunto de treino
 contendo apenas uma classe.
@@ -259,7 +259,7 @@ conceito sem esconder a limitação metodológica.
 
 ---
 
-## 10. Output da classificação
+### 10. Output da classificação
 
 Depois do treinamento, o modelo é aplicado ao conjunto completo.
 
@@ -282,7 +282,7 @@ Também é produzido um gráfico de importância das features.
 
 ---
 
-## 11. Como interpretar `proba_suspeita`
+### 11. Como interpretar `proba_suspeita`
 
 `proba_suspeita` deve ser interpretada como uma saída do classificador
 supervisionado treinado sobre os rótulos históricos utilizados.
@@ -311,9 +311,9 @@ histórica de `status_transacao`.
 
 ---
 
-# Parte II — Detecção de anomalias
+## Parte II — Detecção de anomalias
 
-## 12. Objetivo da abordagem multi-detector
+### 12. Objetivo da abordagem multi-detector
 
 O projeto não assume que um único algoritmo será sempre superior.
 
@@ -349,7 +349,7 @@ selecionar
 
 ---
 
-## 13. Features utilizadas pelos detectores
+### 13. Features utilizadas pelos detectores
 
 Os detectores utilizam:
 
@@ -370,7 +370,7 @@ Valores ausentes são preenchidos com zero antes da execução.
 
 ---
 
-## 14. O papel de `status_transacao`
+### 14. O papel de `status_transacao`
 
 Uma distinção arquitetural importante é que:
 
@@ -411,7 +411,7 @@ dos algoritmos utilizados.
 
 ---
 
-## 15. Estimativa de contamination
+### 15. Estimativa de contamination
 
 O pipeline calcula a taxa histórica de status suspeitos:
 
@@ -447,7 +447,7 @@ da implementação.
 
 ---
 
-## 16. Por que limitar contamination?
+### 16. Por que limitar contamination?
 
 Datasets de demonstração podem conter uma proporção artificialmente alta de
 eventos suspeitos.
@@ -475,9 +475,9 @@ qualquer dataset.
 
 ---
 
-# Parte III — Detectores
+## Parte III — Detectores
 
-## 17. Isolation Forest
+### 17. Isolation Forest
 
 O primeiro detector é:
 
@@ -502,7 +502,7 @@ multi-detector.
 
 ---
 
-## 18. Local Outlier Factor
+### 18. Local Outlier Factor
 
 O segundo detector utiliza:
 
@@ -528,7 +528,7 @@ O parâmetro `contamination` é compartilhado com os demais detectores.
 
 ---
 
-## 19. One-Class SVM
+### 19. One-Class SVM
 
 A implementação utiliza:
 
@@ -552,7 +552,7 @@ das features.
 
 ---
 
-## 20. Elliptic Envelope
+### 20. Elliptic Envelope
 
 O quarto detector utiliza:
 
@@ -576,7 +576,7 @@ dos demais algoritmos presentes no conjunto.
 
 ---
 
-## 21. Por que alguns detectores utilizam `StandardScaler`?
+### 21. Por que alguns detectores utilizam `StandardScaler`?
 
 LOF, One-Class SVM e Elliptic Envelope são executados dentro de pipelines que
 incluem normalização.
@@ -595,9 +595,9 @@ na implementação atual.
 
 ---
 
-# Parte IV — Avaliação dos detectores
+## Parte IV — Avaliação dos detectores
 
-## 22. Conversão das predições
+### 22. Conversão das predições
 
 Os detectores utilizados retornam:
 
@@ -617,7 +617,7 @@ produzindo uma representação binária compatível com as métricas utilizadas.
 
 ---
 
-## 23. Métricas comparativas
+### 23. Métricas comparativas
 
 A função:
 
@@ -648,7 +648,7 @@ Essas informações permitem comparar os detectores sob uma referência comum.
 
 ---
 
-## 24. Significado dessas métricas
+### 24. Significado dessas métricas
 
 As métricas comparam as anomalias identificadas pelo detector com os status
 históricos classificados como suspeitos.
@@ -670,7 +670,7 @@ ROC-AUC nesse contexto.
 
 ---
 
-## 25. Tratamento de falha individual
+### 25. Tratamento de falha individual
 
 Cada detector é executado isoladamente dentro de tratamento de exceção.
 
@@ -700,9 +700,9 @@ Somente quando não existe nenhum detector válido a seleção final gera erro.
 
 ---
 
-# Parte V — Seleção automática
+## Parte V — Seleção automática
 
-## 26. Critério de seleção
+### 26. Critério de seleção
 
 A função:
 
@@ -739,7 +739,7 @@ F1
 
 ---
 
-## 27. Por que F1 é o primeiro critério?
+### 27. Por que F1 é o primeiro critério?
 
 F1 combina precision e recall em uma única métrica.
 
@@ -768,7 +768,7 @@ tempo de execução
 
 ---
 
-## 28. Resultado da seleção
+### 28. Resultado da seleção
 
 O nome do vencedor é armazenado em:
 
@@ -793,7 +793,7 @@ Essas colunas funcionam como referência comum para as etapas posteriores.
 
 ---
 
-## 29. Resultados individuais preservados
+### 29. Resultados individuais preservados
 
 A seleção do melhor detector não elimina os resultados dos demais.
 
@@ -817,7 +817,7 @@ Isso permite comparação e auditoria posterior.
 
 ---
 
-## 30. Persistência dos detectores
+### 30. Persistência dos detectores
 
 Cada modelo é salvo em:
 
@@ -830,9 +830,9 @@ na execução.
 
 ---
 
-# Parte VI — Regressão de severidade
+## Parte VI — Regressão de severidade
 
-## 31. Objetivo
+### 31. Objetivo
 
 A terceira perspectiva analítica do pipeline é a regressão.
 
@@ -850,7 +850,7 @@ treinar_regressao_severidade()
 
 ---
 
-## 32. Construção do target de severidade
+### 32. Construção do target de severidade
 
 O projeto define a seguinte escala:
 
@@ -873,7 +873,7 @@ Ela não representa uma escala externa padronizada de fraude, incidente ou risco
 
 ---
 
-## 33. Interpretação correta do target
+### 33. Interpretação correta do target
 
 O target pode ser entendido como:
 
@@ -892,7 +892,7 @@ Essa distinção deve ser preservada em relatórios, documentação e apresenta�
 
 ---
 
-## 34. Features utilizadas pela regressão
+### 34. Features utilizadas pela regressão
 
 A regressão utiliza:
 
@@ -912,7 +912,7 @@ contextuais.
 
 ---
 
-## 35. Treinamento
+### 35. Treinamento
 
 A divisão utilizada é:
 
@@ -935,7 +935,7 @@ LinearRegression
 
 ---
 
-## 36. Métricas da regressão
+### 36. Métricas da regressão
 
 A avaliação utiliza:
 
@@ -963,7 +963,7 @@ r2_cv_desvio
 
 ---
 
-## 37. R² negativo
+### 37. R² negativo
 
 R² negativo em validação cruzada é interpretado como sinal de que o modelo ainda
 não generaliza adequadamente para os folds avaliados.
@@ -975,7 +975,7 @@ interpretados de maneira adequada.
 
 ---
 
-## 38. Score final de severidade
+### 38. Score final de severidade
 
 Depois do treinamento, a regressão é aplicada ao dataset completo.
 
@@ -996,7 +996,7 @@ target definida pelo projeto.
 
 ---
 
-## 39. Persistência da regressão
+### 39. Persistência da regressão
 
 O modelo treinado é persistido em:
 
@@ -1006,9 +1006,9 @@ reports/models/regressao.joblib
 
 ---
 
-# Parte VII — Persistência dos modelos
+## Parte VII — Persistência dos modelos
 
-## 40. Artifacts produzidos
+### 40. Artifacts produzidos
 
 A execução atual pode produzir:
 
@@ -1027,7 +1027,7 @@ respectivo modelo.
 
 ---
 
-## 41. Estado mantido pelo orquestrador
+### 41. Estado mantido pelo orquestrador
 
 `SecurityDetector` mantém durante a execução:
 
@@ -1045,9 +1045,9 @@ componentes especializados.
 
 ---
 
-# Parte VIII — Relação entre as três abordagens
+## Parte VIII — Relação entre as três abordagens
 
-## 42. Classificação
+### 42. Classificação
 
 ```text
 Tipo:
@@ -1062,7 +1062,7 @@ proba_suspeita
 
 ---
 
-## 43. Anomaly Detection
+### 43. Anomaly Detection
 
 ```text
 Tipo:
@@ -1080,7 +1080,7 @@ anomalia_score
 
 ---
 
-## 44. Regressão
+### 44. Regressão
 
 ```text
 Tipo:
@@ -1095,7 +1095,7 @@ score_risco_predito
 
 ---
 
-## 45. Visão combinada
+### 45. Visão combinada
 
 A arquitetura pode ser resumida como:
 
@@ -1123,9 +1123,9 @@ As três saídas fornecem perspectivas complementares.
 
 ---
 
-# Parte IX — Limitações metodológicas
+## Parte IX — Limitações metodológicas
 
-## 46. Dataset sintético ou limitado
+### 46. Dataset sintético ou limitado
 
 Resultados obtidos em datasets sintéticos, controlados ou pequenos não devem ser
 interpretados automaticamente como desempenho de produção.
@@ -1142,7 +1142,7 @@ podem refletir características específicas do conjunto analisado.
 
 ---
 
-## 47. Status histórico não é verdade absoluta
+### 47. Status histórico não é verdade absoluta
 
 O projeto utiliza `status_transacao` em diferentes papéis:
 
@@ -1158,7 +1158,7 @@ Eles não provam automaticamente a ocorrência real de fraude ou incidente.
 
 ---
 
-## 48. Severidade é definida pelo projeto
+### 48. Severidade é definida pelo projeto
 
 A escala:
 
@@ -1172,7 +1172,7 @@ Ela não deve ser apresentada como score padronizado reconhecido externamente.
 
 ---
 
-## 49. Seleção do detector depende do dataset
+### 49. Seleção do detector depende do dataset
 
 O melhor detector é escolhido de acordo com o conjunto analisado.
 
@@ -1189,7 +1189,7 @@ A própria existência do mecanismo de comparação busca evitar essa suposiçã
 
 ---
 
-## 50. Contamination não é universal
+### 50. Contamination não é universal
 
 O teto atual de 15% é uma regra operacional da implementação.
 
@@ -1200,9 +1200,9 @@ não como constante universal de anomaly detection.
 
 ---
 
-# Parte X — Decisões atuais
+## Parte X — Decisões atuais
 
-## 51. Por que Decision Tree?
+### 51. Por que Decision Tree?
 
 No estado atual do projeto, `DecisionTreeClassifier` fornece uma abordagem
 supervisionada simples e interpretável para triagem.
@@ -1217,7 +1217,7 @@ evolução futura.
 
 ---
 
-## 52. Por que quatro detectores?
+### 52. Por que quatro detectores?
 
 Os algoritmos utilizados fazem hipóteses diferentes sobre os dados.
 
@@ -1235,7 +1235,7 @@ em vez de fixar antecipadamente um único algoritmo como vencedor permanente.
 
 ---
 
-## 53. Por que Linear Regression?
+### 53. Por que Linear Regression?
 
 A regressão atual oferece uma baseline simples para transformar sinais
 analíticos em uma estimativa contínua de severidade.
@@ -1253,9 +1253,9 @@ representativos justifiquem modelos adicionais.
 
 ---
 
-# Parte XI — Como explicar em entrevista
+## Parte XI — Como explicar em entrevista
 
-## 54. “Por que você usa classificação e anomaly detection?”
+### 54. “Por que você usa classificação e anomaly detection?”
 
 Uma resposta curta:
 
@@ -1267,7 +1267,7 @@ Uma resposta curta:
 
 ---
 
-## 55. “Por que quatro detectores?”
+### 55. “Por que quatro detectores?”
 
 > Porque anomaly detection depende bastante das características dos dados. Em vez
 > de escolher arbitrariamente um algoritmo, eu executo quatro abordagens,
@@ -1276,7 +1276,7 @@ Uma resposta curta:
 
 ---
 
-## 56. “Isso não torna anomaly detection supervisionada?”
+### 56. “Isso não torna anomaly detection supervisionada?”
 
 > Não. O `status_transacao` não entra como feature de treinamento dos detectores.
 > Ele é utilizado posteriormente como referência de auditoria para comparar as
@@ -1284,7 +1284,7 @@ Uma resposta curta:
 
 ---
 
-## 57. “O que significa `proba_suspeita`?”
+### 57. “O que significa `proba_suspeita`?”
 
 > É a probabilidade produzida pelo classificador para a classe histórica definida
 > como suspeita. Eu não interpreto esse valor automaticamente como probabilidade
@@ -1293,7 +1293,7 @@ Uma resposta curta:
 
 ---
 
-## 58. “O que significa `score_risco_predito`?”
+### 58. “O que significa `score_risco_predito`?”
 
 > É uma estimativa contínua produzida pela regressão usando uma escala de
 > severidade definida dentro do projeto. Ela serve para demonstração e
@@ -1302,7 +1302,7 @@ Uma resposta curta:
 
 ---
 
-## 59. “Por que limitar contamination?”
+### 59. “Por que limitar contamination?”
 
 > A taxa histórica do dataset pode ser artificialmente alta, especialmente em
 > bases sintéticas usadas para testes. Se eu transferisse essa taxa diretamente
@@ -1312,7 +1312,7 @@ Uma resposta curta:
 
 ---
 
-## 60. “Por que salvar todos os modelos se um detector vence?”
+### 60. “Por que salvar todos os modelos se um detector vence?”
 
 > Porque a seleção do vencedor não elimina a importância da auditoria. Eu
 > preservo os modelos e resultados individuais para conseguir comparar,
@@ -1320,9 +1320,9 @@ Uma resposta curta:
 
 ---
 
-# Parte XII — Possíveis evoluções
+## Parte XII — Possíveis evoluções
 
-## 61. Evoluções futuras
+### 61. Evoluções futuras
 
 A arquitetura permite avaliar futuramente, conforme a disponibilidade de dados e
 necessidades do projeto:
@@ -1348,7 +1348,7 @@ implementadas no estado atual.
 
 ---
 
-## 62. Relação com os demais documentos
+### 62. Relação com os demais documentos
 
 A visão arquitetural geral está em:
 

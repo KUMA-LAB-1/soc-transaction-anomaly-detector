@@ -1,4 +1,4 @@
-# Pipeline Analítico
+﻿# Pipeline Analítico
 
 ## 1. Objetivo
 
@@ -78,8 +78,9 @@ reporting. Ele não participa do treinamento ou da seleção dos modelos
 analíticos.
 
 ---
+## Parte I — Entrada, preparação e feature engineering
 
-## 3. Ponto de entrada
+### 3. Ponto de entrada
 
 A execução completa é coordenada pelo método:
 
@@ -104,7 +105,7 @@ implementação analítica dentro da classe `SecurityDetector`.
 
 ---
 
-## 4. Inicialização do `SecurityDetector`
+### 4. Inicialização do `SecurityDetector`
 
 Durante a inicialização, o pipeline recebe opcionalmente uma instância de
 `sqlalchemy.engine.Engine`.
@@ -139,7 +140,7 @@ reports/models/
 
 ---
 
-## 5. Carregamento dos dados
+### 5. Carregamento dos dados
 
 O método:
 
@@ -173,7 +174,7 @@ registro de auditoria de acesso aos dados.
 
 ---
 
-## 6. Preparação inicial
+### 6. Preparação inicial
 
 O método:
 
@@ -199,7 +200,7 @@ Depois disso, o dataset é encaminhado para a camada de feature engineering.
 
 ---
 
-## 7. Validação e preparação do dataset
+### 7. Validação e preparação do dataset
 
 O módulo:
 
@@ -226,7 +227,7 @@ na camada de repository.
 
 ---
 
-## 8. Resolução da identidade pseudonimizada
+### 8. Resolução da identidade pseudonimizada
 
 Algumas features históricas dependem da identificação lógica do cliente.
 
@@ -261,7 +262,7 @@ compatíveis utilizam pequenas variações no nome da coluna de identificação.
 
 ---
 
-## 9. Feature Engineering
+### 9. Feature Engineering
 
 A transformação principal ocorre em:
 
@@ -380,7 +381,7 @@ preservar a compatibilidade do pipeline.
 
 ---
 
-## 10. Controle de amostra pequena
+### 10. Controle de amostra pequena
 
 O pipeline possui o parâmetro:
 
@@ -407,9 +408,9 @@ testes sem mascarar suas limitações.
 
 ---
 
-# Parte II — Classificação supervisionada
+## Parte II — Classificação supervisionada
 
-## 11. Classificador de triagem
+### 11. Classificador de triagem
 
 A classificação é implementada por:
 
@@ -436,7 +437,7 @@ status considerados suspeitos.
 
 ---
 
-## 12. Target da classificação
+### 12. Target da classificação
 
 Os seguintes status são tratados como suspeitos:
 
@@ -457,7 +458,7 @@ supervisionada.
 
 ---
 
-## 13. Features da classificação
+### 13. Features da classificação
 
 As features-base incluem:
 
@@ -487,7 +488,7 @@ utilizadas.
 
 ---
 
-## 14. Divisão treino/teste
+### 14. Divisão treino/teste
 
 O dataset é dividido em:
 
@@ -506,7 +507,7 @@ Quando existem múltiplas classes, a divisão utiliza estratificação.
 
 ---
 
-## 15. Avaliação da classificação
+### 15. Avaliação da classificação
 
 Entre as métricas produzidas estão:
 
@@ -526,7 +527,7 @@ limitação e continua a execução.
 
 ---
 
-## 16. Probabilidade de suspeita
+### 16. Probabilidade de suspeita
 
 Depois do treinamento, o classificador é aplicado ao conjunto completo para
 produzir:
@@ -548,9 +549,9 @@ Também é gerado um gráfico de importância das features.
 
 ---
 
-# Parte III — Detecção de anomalias
+## Parte III — Detecção de anomalias
 
-## 17. Estratégia multi-detector
+### 17. Estratégia multi-detector
 
 O projeto não depende de um único algoritmo de anomaly detection.
 
@@ -567,7 +568,7 @@ Eles utilizam uma configuração comum para permitir comparação posterior.
 
 ---
 
-## 18. Features dos detectores
+### 18. Features dos detectores
 
 A camada de anomaly detection utiliza:
 
@@ -588,7 +589,7 @@ Valores ausentes são preenchidos com zero antes da execução.
 
 ---
 
-## 19. Contamination
+### 19. Contamination
 
 O pipeline estima inicialmente a proporção histórica de transações suspeitas:
 
@@ -621,7 +622,7 @@ uma parcela excessiva das observações como anômalas.
 
 ---
 
-## 20. Isolation Forest
+### 20. Isolation Forest
 
 O `IsolationForest` é configurado atualmente com:
 
@@ -635,7 +636,7 @@ e utiliza o `contamination` calculado pelo pipeline.
 
 ---
 
-## 21. Local Outlier Factor
+### 21. Local Outlier Factor
 
 O `LocalOutlierFactor` é executado dentro de um pipeline com:
 
@@ -657,7 +658,7 @@ dataset.
 
 ---
 
-## 22. One-Class SVM
+### 22. One-Class SVM
 
 O `OneClassSVM` também utiliza normalização:
 
@@ -678,7 +679,7 @@ nu = contamination
 
 ---
 
-## 23. Elliptic Envelope
+### 23. Elliptic Envelope
 
 O quarto detector utiliza:
 
@@ -693,7 +694,7 @@ com o mesmo `contamination` utilizado pelos demais detectores.
 
 ---
 
-## 24. Independência em relação ao target
+### 24. Independência em relação ao target
 
 Os quatro detectores são treinados sem utilizar `status_transacao` como feature
 de entrada.
@@ -716,7 +717,7 @@ em modelos supervisionados.
 
 ---
 
-## 25. Representação das anomalias
+### 25. Representação das anomalias
 
 Os detectores do scikit-learn utilizados pelo projeto retornam:
 
@@ -734,7 +735,7 @@ Para comparação com o status histórico, o pipeline converte:
 
 ---
 
-## 26. Avaliação dos detectores
+### 26. Avaliação dos detectores
 
 Cada detector é avaliado por:
 
@@ -758,7 +759,7 @@ O tempo de execução também participa do processo de desempate.
 
 ---
 
-## 27. Isolamento de falhas
+### 27. Isolamento de falhas
 
 Cada detector é executado dentro de tratamento individual de exceção.
 
@@ -780,7 +781,7 @@ erro explícito.
 
 ---
 
-## 28. Seleção do melhor detector
+### 28. Seleção do melhor detector
 
 A função:
 
@@ -829,7 +830,7 @@ modelo_agrupamento
 
 ---
 
-## 29. Resultado dos detectores
+### 29. Resultado dos detectores
 
 Para cada detector executado com sucesso, o `DataFrame` recebe:
 
@@ -854,7 +855,7 @@ reports/models/<detector>.joblib
 
 ---
 
-## 30. Evidências da comparação
+### 30. Evidências da comparação
 
 A comparação entre os detectores é persistida em:
 
@@ -870,9 +871,9 @@ desempenho relativo dos algoritmos avaliados.
 
 ---
 
-# Parte IV — Regressão de severidade
+## Parte IV — Regressão de severidade
 
-## 31. Objetivo
+### 31. Objetivo
 
 Além da classificação e da detecção de anomalias, o pipeline produz uma
 estimativa contínua de severidade.
@@ -885,7 +886,7 @@ LinearRegression
 
 ---
 
-## 32. Target de severidade
+### 32. Target de severidade
 
 O target é derivado de `status_transacao` utilizando o seguinte mapeamento:
 
@@ -909,7 +910,7 @@ interpretado como escala universal de risco.
 
 ---
 
-## 33. Features da regressão
+### 33. Features da regressão
 
 A regressão utiliza:
 
@@ -926,7 +927,7 @@ falhas_login_recentes
 
 ---
 
-## 34. Treinamento e avaliação
+### 34. Treinamento e avaliação
 
 Assim como na classificação, a divisão utilizada é:
 
@@ -957,7 +958,7 @@ pequenos.
 
 ---
 
-## 35. Score de risco predito
+### 35. Score de risco predito
 
 Depois do treinamento, a regressão é aplicada ao dataset completo.
 
@@ -981,9 +982,9 @@ reports/models/regressao.joblib
 
 ---
 
-# Parte V — Métricas e artifacts
+## Parte V — Métricas e artifacts
 
-## 36. Consolidação das métricas
+### 36. Consolidação das métricas
 
 Durante a execução, `SecurityDetector` mantém:
 
@@ -1010,7 +1011,7 @@ salvar_historico_metricas()
 
 ---
 
-## 37. Dataset analisado
+### 37. Dataset analisado
 
 Ao final de:
 
@@ -1043,9 +1044,9 @@ reporting.
 
 ---
 
-# Parte VI — Reporting e MITRE ATT&CK
+## Parte VI — Reporting e MITRE ATT&CK
 
-## 38. Separação entre análise e reporting
+### 38. Separação entre análise e reporting
 
 Uma distinção arquitetural importante é:
 
@@ -1075,7 +1076,7 @@ modelos.
 
 ---
 
-## 39. Geração do relatório
+### 39. Geração do relatório
 
 O método:
 
@@ -1103,7 +1104,7 @@ analíticas e contexto adicional.
 
 ---
 
-## 40. MITRE ATT&CK
+### 40. MITRE ATT&CK
 
 O enriquecimento MITRE utiliza a camada:
 
@@ -1143,9 +1144,9 @@ decisão interna dos modelos.
 
 ---
 
-# Parte VII — Tratamento de limitações
+## Parte VII — Tratamento de limitações
 
-## 41. Dataset pequeno
+### 41. Dataset pequeno
 
 O pipeline permite execução com datasets pequenos para facilitar:
 
@@ -1161,7 +1162,7 @@ O próprio pipeline mantém um indicador explícito dessa condição.
 
 ---
 
-## 42. Classes insuficientes
+### 42. Classes insuficientes
 
 Quando o classificador encontra apenas uma classe no conjunto de treino:
 
@@ -1172,7 +1173,7 @@ Quando o classificador encontra apenas uma classe no conjunto de treino:
 
 ---
 
-## 43. Falha de detector
+### 43. Falha de detector
 
 Uma falha individual em um algoritmo de anomaly detection não impede
 automaticamente a execução dos demais.
@@ -1183,7 +1184,7 @@ Somente a ausência de qualquer detector válido impede a seleção final.
 
 ---
 
-## 44. Interpretação das métricas
+### 44. Interpretação das métricas
 
 As métricas produzidas pelo pipeline devem ser interpretadas no contexto do
 dataset utilizado.
@@ -1197,9 +1198,9 @@ existência de fraude ou incidente.
 
 ---
 
-# Parte VIII — Como explicar o pipeline
+## Parte VIII — Como explicar o pipeline
 
-## 45. Explicação curta
+### 45. Explicação curta
 
 Uma forma resumida de apresentar o projeto é:
 
@@ -1213,7 +1214,7 @@ Uma forma resumida de apresentar o projeto é:
 
 ---
 
-## 46. Explicação arquitetural
+### 46. Explicação arquitetural
 
 Em uma discussão mais técnica, o ponto principal é que o projeto separa:
 
@@ -1236,7 +1237,7 @@ individualmente.
 
 ---
 
-## 47. Diferença entre classificação e anomaly detection
+### 47. Diferença entre classificação e anomaly detection
 
 Um ponto importante para explicar é:
 
@@ -1265,7 +1266,7 @@ transações.
 
 ---
 
-## 48. Por que múltiplos detectores?
+### 48. Por que múltiplos detectores?
 
 Algoritmos de anomaly detection fazem hipóteses diferentes sobre os dados.
 
@@ -1289,7 +1290,7 @@ preferência fixa escondida no código.
 
 ---
 
-## 49. Por que separar MITRE dos modelos?
+### 49. Por que separar MITRE dos modelos?
 
 MITRE ATT&CK não é utilizado como target ou feature dos modelos atuais.
 
@@ -1311,7 +1312,7 @@ permitindo que ambas evoluam independentemente.
 
 ---
 
-## 50. Resumo operacional
+### 50. Resumo operacional
 
 O fluxo completo pode ser lembrado pela sequência:
 
@@ -1344,7 +1345,7 @@ execução atual do projeto.
 
 ---
 
-## 51. Relação com os demais documentos
+### 51. Relação com os demais documentos
 
 Este documento descreve o comportamento do pipeline.
 

@@ -1,8 +1,140 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from src.security_detector import SecurityDetector
+
+
+def criar_dataframe_alertas():
+    return pd.DataFrame(
+        [
+            {
+                "id_transacao": 1,
+                "cliente_pseudonimo": "cliente-01",
+                "data_hora_transacao": datetime(
+                    2026,
+                    8,
+                    18,
+                    12,
+                    0,
+                    tzinfo=UTC,
+                ),
+                "tipo_transacao": "Pix",
+                "valor_transacao": 5000.0,
+                "proba_suspeita": 0.90,
+                "anomalia_score": -1,
+                "anomalia_score_bruto": -0.42,
+                "score_risco_predito": 92.0,
+                "falhas_login_recentes": 4,
+                "dispositivo_novo_flag": True,
+                "alteracao_limite_flag": True,
+                "mudanca_localizacao_flag": False,
+            },
+            {
+                "id_transacao": 2,
+                "cliente_pseudonimo": "cliente-02",
+                "data_hora_transacao": datetime(
+                    2026,
+                    8,
+                    18,
+                    12,
+                    30,
+                    tzinfo=UTC,
+                ),
+                "tipo_transacao": "Compra",
+                "valor_transacao": 120.0,
+                "proba_suspeita": 0.10,
+                "anomalia_score": 1,
+                "anomalia_score_bruto": 0.31,
+                "score_risco_predito": 8.0,
+                "falhas_login_recentes": 0,
+                "dispositivo_novo_flag": False,
+                "alteracao_limite_flag": False,
+                "mudanca_localizacao_flag": False,
+            },
+        ]
+    )
+
+
+def test_gerar_alertas_cria_alerta_apenas_para_registro_elegivel(monkeypatch):
+    detector = criar_detector(monkeypatch)
+    detector.melhor_detector = "isolation_forest"
+
+    alertas = detector._gerar_alertas(criar_dataframe_alertas())
+
+    assert len(alertas) == 1
+    assert len(detector.alertas) == 1
+
+    alerta = alertas[0]
+
+    assert alerta.event.transaction_id == 1
+    assert alerta.detection.detector == "isolation_forest"
+    assert alerta.detection.anomaly_detected is True
+    assert alerta.risk.severity == "critical"
+
+
+def test_gerar_alertas_retorna_lista_vazia_sem_registros_elegiveis(monkeypatch):
+    detector = criar_detector(monkeypatch)
+    detector.melhor_detector = "isolation_forest"
+
+    df = criar_dataframe_alertas()
+
+    df["proba_suspeita"] = 0.10
+    df["anomalia_score"] = 1
+
+    alertas = detector._gerar_alertas(df)
+
+    assert alertas == []
+    assert detector.alertas == []
+
+
+def test_gerar_alertas_propaga_aviso_amostra_pequena(monkeypatch):
+    detector = criar_detector(monkeypatch)
+    detector.melhor_detector = "isolation_forest"
+    detector.aviso_amostra_pequena = True
+
+    alertas = detector._gerar_alertas(criar_dataframe_alertas())
+
+    assert len(alertas) == 1
+    assert alertas[0].quality.small_sample_warning is True
+
+
+def test_gerar_alertas_preserva_evidencias_observadas(monkeypatch):
+    detector = criar_detector(monkeypatch)
+    detector.melhor_detector = "isolation_forest"
+
+    df = criar_dataframe_alertas().drop(
+        columns=[
+            "alteracao_limite_flag",
+            "mudanca_localizacao_flag",
+        ]
+    )
+
+    alertas = detector._gerar_alertas(df)
+
+    alerta = alertas[0]
+
+    assert alerta.evidence.failed_logins.observed is True
+    assert alerta.evidence.new_device.observed is True
+    assert alerta.evidence.limit_change.observed is False
+    assert alerta.evidence.location_change.observed is False
+
+    assert alerta.quality.missing_evidence == (
+        "alteracao_limite_flag",
+        "mudanca_localizacao_flag",
+    )
+
+
+def test_gerar_alertas_exige_melhor_detector(monkeypatch):
+    detector = criar_detector(monkeypatch)
+
+    with pytest.raises(
+        RuntimeError,
+        match="melhor detector deve ser definido",
+    ):
+        detector._gerar_alertas(criar_dataframe_alertas())
 
 
 def criar_detector(monkeypatch):
@@ -91,6 +223,11 @@ def test_analisar_transacoes_executa_etapas_na_ordem(monkeypatch):
         chamadas.append("metricas")
         return Path("fake.jsonl")
 
+    def fake_gerar_alertas(df):
+        chamadas.append("alertas")
+        assert "regressao_fake" in df.columns
+        return []
+
     monkeypatch.setattr(
         "src.security_detector.criar_features",
         fake_criar_features,
@@ -116,6 +253,12 @@ def test_analisar_transacoes_executa_etapas_na_ordem(monkeypatch):
         fake_salvar_metricas,
     )
 
+    monkeypatch.setattr(
+        detector,
+        "_gerar_alertas",
+        fake_gerar_alertas,
+    )
+
     resultado = detector.analisar_transacoes(df_original)
 
     assert chamadas == [
@@ -123,6 +266,7 @@ def test_analisar_transacoes_executa_etapas_na_ordem(monkeypatch):
         "classificacao",
         "anomalia",
         "regressao",
+        "alertas",
         "metricas",
     ]
 
@@ -165,6 +309,11 @@ def test_analisar_transacoes_cria_coluna_hora(monkeypatch):
     )
     monkeypatch.setattr(
         detector,
+        "_gerar_alertas",
+        lambda _: [],
+    )
+    monkeypatch.setattr(
+        detector,
         "_salvar_metricas",
         lambda: Path("fake.jsonl"),
     )
@@ -204,6 +353,11 @@ def test_dataset_pequeno_ativa_aviso(monkeypatch):
         detector,
         "_treinar_regressao",
         lambda dataframe: dataframe,
+    )
+    monkeypatch.setattr(
+        detector,
+        "_gerar_alertas",
+        lambda _: [],
     )
     monkeypatch.setattr(
         detector,

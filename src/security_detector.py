@@ -24,6 +24,8 @@ import numpy as np
 import pandas as pd
 from sqlalchemy.engine import Engine
 
+from .alerts.contract import Alert
+from .alerts.engine import criar_alerta, deve_gerar_alerta
 from .data.repository import SocDataRepository
 from .db_connector import DBConnector
 from .features.engineering import criar_features
@@ -67,6 +69,7 @@ class SecurityDetector:
         self.modelo_regressao = None
         self.metricas = {}
         self.aviso_amostra_pequena = False
+        self.alertas: list[Alert] = []
 
         os.makedirs("reports", exist_ok=True)
         os.makedirs("reports/models", exist_ok=True)
@@ -98,6 +101,7 @@ class SecurityDetector:
         df = self._treinar_classificacao(df)
         df = self._comparar_detectores_anomalia(df)
         df = self._treinar_regressao(df)
+        self._gerar_alertas(df)
         self._salvar_metricas()
         return df
 
@@ -278,6 +282,41 @@ class SecurityDetector:
         joblib.dump(self.modelo_regressao, "reports/models/regressao.joblib")
 
         return df
+
+    def _gerar_alertas(self, df: pd.DataFrame) -> list[Alert]:
+        """Transforma registros analíticos elegíveis em alertas SOC estruturados."""
+        if self.melhor_detector is None:
+            raise RuntimeError(
+                "melhor detector deve ser definido antes da geração de alertas"
+            )
+
+        evidencias_observadas = {
+            campo
+            for campo in (
+                "falhas_login_recentes",
+                "dispositivo_novo_flag",
+                "alteracao_limite_flag",
+                "mudanca_localizacao_flag",
+            )
+            if campo in df.columns
+        }
+
+        alertas = []
+
+        for registro in df.to_dict(orient="records"):
+            if not deve_gerar_alerta(registro):
+                continue
+
+            alerta = criar_alerta(
+                registro,
+                detector=self.melhor_detector,
+                aviso_amostra_pequena=self.aviso_amostra_pequena,
+                evidencias_observadas=evidencias_observadas,
+            )
+            alertas.append(alerta)
+
+        self.alertas = alertas
+        return alertas
 
     def _salvar_metricas(self) -> Path:
         return salvar_historico_metricas(

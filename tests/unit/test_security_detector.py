@@ -58,6 +58,101 @@ def criar_dataframe_alertas():
     )
 
 
+def test_analisar_transacoes_persiste_alertas_gerados(monkeypatch):
+    alertas_salvos = []
+
+    class FakeAlertRepository:
+        def save(self, alerta):
+            alertas_salvos.append(alerta)
+
+    detector = criar_detector(
+        monkeypatch,
+        alert_repository=FakeAlertRepository(),
+    )
+
+    df = pd.DataFrame(
+        {
+            "data_hora_transacao": [
+                "2026-08-18 10:00:00",
+            ]
+        }
+    )
+
+    alerta_fake = object()
+
+    monkeypatch.setattr(
+        "src.security_detector.criar_features",
+        lambda dataframe: dataframe,
+    )
+
+    monkeypatch.setattr(
+        detector,
+        "_treinar_classificacao",
+        lambda dataframe: dataframe,
+    )
+
+    monkeypatch.setattr(
+        detector,
+        "_comparar_detectores_anomalia",
+        lambda dataframe: dataframe,
+    )
+
+    monkeypatch.setattr(
+        detector,
+        "_treinar_regressao",
+        lambda dataframe: dataframe,
+    )
+
+    def fake_gerar_alertas(_):
+        detector.alertas = [alerta_fake]
+        return detector.alertas
+
+    monkeypatch.setattr(
+        detector,
+        "_gerar_alertas",
+        fake_gerar_alertas,
+    )
+
+    monkeypatch.setattr(
+        detector,
+        "_salvar_metricas",
+        lambda: Path("fake.jsonl"),
+    )
+
+    detector.analisar_transacoes(df)
+
+    assert alertas_salvos == [alerta_fake]
+
+
+def test_persistir_alertas_nao_faz_nada_sem_repository(monkeypatch):
+    detector = criar_detector(monkeypatch)
+    detector.alertas = [object()]
+
+    detector._persistir_alertas()
+
+
+def test_persistir_alertas_delega_cada_alerta_ao_repository(monkeypatch):
+    alertas_salvos = []
+
+    class FakeAlertRepository:
+        def save(self, alerta):
+            alertas_salvos.append(alerta)
+
+    repository = FakeAlertRepository()
+    detector = criar_detector(
+        monkeypatch,
+        alert_repository=repository,
+    )
+
+    alerta_a = object()
+    alerta_b = object()
+    detector.alertas = [alerta_a, alerta_b]
+
+    detector._persistir_alertas()
+
+    assert alertas_salvos == [alerta_a, alerta_b]
+
+
 def test_gerar_alertas_cria_alerta_apenas_para_registro_elegivel(monkeypatch):
     detector = criar_detector(monkeypatch)
     detector.melhor_detector = "isolation_forest"
@@ -137,14 +232,17 @@ def test_gerar_alertas_exige_melhor_detector(monkeypatch):
         detector._gerar_alertas(criar_dataframe_alertas())
 
 
-def criar_detector(monkeypatch):
+def criar_detector(monkeypatch, alert_repository=None):
     """Cria SecurityDetector sem produzir diretórios durante o teste."""
     monkeypatch.setattr(
         "src.security_detector.os.makedirs",
         lambda *args, **kwargs: None,
     )
 
-    return SecurityDetector(engine=object())
+    return SecurityDetector(
+        engine=object(),
+        alert_repository=alert_repository,
+    )
 
 
 def test_carregar_dados_delega_para_repository(monkeypatch):
@@ -228,6 +326,9 @@ def test_analisar_transacoes_executa_etapas_na_ordem(monkeypatch):
         assert "regressao_fake" in df.columns
         return []
 
+    def fake_persistir_alertas():
+        chamadas.append("persistencia")
+
     monkeypatch.setattr(
         "src.security_detector.criar_features",
         fake_criar_features,
@@ -259,6 +360,12 @@ def test_analisar_transacoes_executa_etapas_na_ordem(monkeypatch):
         fake_gerar_alertas,
     )
 
+    monkeypatch.setattr(
+        detector,
+        "_persistir_alertas",
+        fake_persistir_alertas,
+    )
+
     resultado = detector.analisar_transacoes(df_original)
 
     assert chamadas == [
@@ -267,6 +374,7 @@ def test_analisar_transacoes_executa_etapas_na_ordem(monkeypatch):
         "anomalia",
         "regressao",
         "alertas",
+        "persistencia",
         "metricas",
     ]
 

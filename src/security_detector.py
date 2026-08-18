@@ -26,6 +26,7 @@ from sqlalchemy.engine import Engine
 
 from .alerts.contract import Alert
 from .alerts.engine import criar_alerta, deve_gerar_alerta
+from .alerts.repository import AlertRepository
 from .data.repository import SocDataRepository
 from .db_connector import DBConnector
 from .features.engineering import criar_features
@@ -53,7 +54,11 @@ CONTAMINATION_TETO_PRATICO = 0.15
 
 
 class SecurityDetector:
-    def __init__(self, engine: Engine | None = None) -> None:
+    def __init__(
+        self,
+        engine: Engine | None = None,
+        alert_repository: AlertRepository | None = None,
+    ) -> None:
         if engine is None:
             engine = DBConnector.get_engine()
 
@@ -70,6 +75,7 @@ class SecurityDetector:
         self.metricas = {}
         self.aviso_amostra_pequena = False
         self.alertas: list[Alert] = []
+        self.alert_repository = alert_repository
 
         os.makedirs("reports", exist_ok=True)
         os.makedirs("reports/models", exist_ok=True)
@@ -102,6 +108,7 @@ class SecurityDetector:
         df = self._comparar_detectores_anomalia(df)
         df = self._treinar_regressao(df)
         self._gerar_alertas(df)
+        self._persistir_alertas()
         self._salvar_metricas()
         return df
 
@@ -317,6 +324,14 @@ class SecurityDetector:
 
         self.alertas = alertas
         return alertas
+
+    def _persistir_alertas(self) -> None:
+        """Persiste os alertas gerados quando um repositório estiver configurado."""
+        if self.alert_repository is None:
+            return
+
+        for alerta in self.alertas:
+            self.alert_repository.save(alerta)
 
     def _salvar_metricas(self) -> Path:
         return salvar_historico_metricas(

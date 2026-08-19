@@ -5,7 +5,12 @@ from src.alerts.jsonl_repository import JsonlAlertRepository
 from src.alerts.sqlite_repository import SqliteAlertRepository
 
 
-def test_bootstrap_cria_sqlite_repository(monkeypatch):
+def test_bootstrap_cria_sqlite_repository(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.chdir(tmp_path)
+
     monkeypatch.setenv("ALERT_STORAGE", "sqlite")
     monkeypatch.delenv("ALERT_SQLITE_PATH", raising=False)
 

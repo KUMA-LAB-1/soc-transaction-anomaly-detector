@@ -1,6 +1,8 @@
 import json
 from datetime import UTC, datetime
 
+import pytest
+
 from src.alerts.contract import (
     ALERT_SCHEMA_VERSION,
     Alert,
@@ -12,7 +14,12 @@ from src.alerts.contract import (
     AlertRisk,
     EvidenceValue,
 )
-from src.alerts.serialization import alert_to_dict, alert_to_json
+from src.alerts.serialization import (
+    alert_from_dict,
+    alert_from_json,
+    alert_to_dict,
+    alert_to_json,
+)
 
 
 def test_alert_to_dict_preserva_schema_version():
@@ -170,3 +177,88 @@ def test_alert_to_json_preserva_contrato_ao_recarregar():
         dados["evidence"]["failed_logins"]["observed"]
         is alerta.evidence.failed_logins.observed
     )
+
+
+def test_alert_from_dict_reconstroi_alert():
+    original = criar_alerta_serializacao()
+
+    reconstruido = alert_from_dict(alert_to_dict(original))
+
+    assert reconstruido == original
+
+
+def test_alert_from_json_reconstroi_alert():
+    original = criar_alerta_serializacao()
+
+    reconstruido = alert_from_json(alert_to_json(original))
+
+    assert reconstruido == original
+
+
+def test_alert_from_dict_reconstroi_datetime():
+    original = criar_alerta_serializacao()
+
+    reconstruido = alert_from_dict(alert_to_dict(original))
+
+    assert isinstance(reconstruido.created_at, datetime)
+    assert isinstance(
+        reconstruido.event.transaction_timestamp,
+        datetime,
+    )
+
+
+def test_alert_from_dict_reconstroi_missing_evidence_como_tuple():
+    original = criar_alerta_serializacao()
+
+    reconstruido = alert_from_dict(alert_to_dict(original))
+
+    assert isinstance(
+        reconstruido.quality.missing_evidence,
+        tuple,
+    )
+
+
+def test_alert_from_dict_preserva_none():
+    original = criar_alerta_serializacao()
+
+    dados = alert_to_dict(original)
+    dados["mitre"]["technique_id"] = None
+
+    reconstruido = alert_from_dict(dados)
+
+    assert reconstruido.mitre.technique_id is None
+
+
+def test_alert_from_dict_rejeita_schema_version_desconhecida():
+    original = criar_alerta_serializacao()
+
+    dados = alert_to_dict(original)
+    dados["schema_version"] = "999.0"
+
+    with pytest.raises(
+        ValueError,
+        match="versão de schema de alerta não suportada",
+    ):
+        alert_from_dict(dados)
+
+
+def test_alert_from_json_rejeita_estrutura_que_nao_seja_objeto():
+    with pytest.raises(
+        ValueError,
+        match="JSON do alerta deve representar um objeto",
+    ):
+        alert_from_json("[]")
+
+
+def test_alert_from_json_rejeita_json_invalido():
+    with pytest.raises(json.JSONDecodeError):
+        alert_from_json("{json-invalido")
+
+
+def test_alert_from_dict_preserva_timezone():
+    original = criar_alerta_serializacao()
+
+    reconstruido = alert_from_dict(alert_to_dict(original))
+
+    assert reconstruido.created_at.tzinfo is not None
+    assert reconstruido.event.transaction_timestamp.tzinfo is not None

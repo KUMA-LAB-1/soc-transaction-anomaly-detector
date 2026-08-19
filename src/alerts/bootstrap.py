@@ -12,4 +12,5 @@ def criar_alert_repository_configurado() -> AlertRepository | None:
     return criar_alert_repository(
         config.storage,
         jsonl_path=config.jsonl_path,
+        sqlite_path=config.sqlite_path,
     )

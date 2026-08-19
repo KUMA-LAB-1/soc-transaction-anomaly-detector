@@ -11,6 +11,7 @@ from .factory import DEFAULT_ALERT_JSONL_PATH
 class AlertPersistenceConfig:
     storage: str | None
     jsonl_path: Path
+    sqlite_path: Path
 
 
 def carregar_alert_persistence_config() -> AlertPersistenceConfig:
@@ -24,7 +25,15 @@ def carregar_alert_persistence_config() -> AlertPersistenceConfig:
         )
     )
 
+    sqlite_path = Path(
+        os.getenv(
+            "ALERT_SQLITE_PATH",
+            "reports/alerts/alerts.db",
+        )
+    )
+
     return AlertPersistenceConfig(
         storage=storage,
         jsonl_path=jsonl_path,
+        sqlite_path=sqlite_path,
     )

@@ -78,7 +78,7 @@ class SocDataRepository:
 
         except Exception as exc:
             print(
-                "⚠️ Não foi possível registrar auditoria de acesso "
-                "(tabela existe? rode 08_hardening_e_correlacao.sql): "
-                f"{exc}"
-            )
+            "⚠️ Não foi possível registrar auditoria de acesso "
+            "(verifique a configuração do schema de auditoria e as permissões): "
+            f"{exc}"
+        )

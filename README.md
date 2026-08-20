@@ -297,36 +297,50 @@ pip install -r requirements.txt
 
 ### 4. Configurar a conexão
 
-Copie:
+Copie o arquivo de exemplo:
 
 ```text
 .env.example
 ```
 
-para:
+para um arquivo `.env` na raiz do projeto:
 
 ```text
-docs/.env
+.env
 ```
 
-Depois preencha a variável:
+Depois configure a variável `DATABASE_URL` com a conexão PostgreSQL/Supabase apropriada ao ambiente.
 
-```env
-DATABASE_URL=postgresql://postgres.HOST:SENHA@aws-1-us-west-2.pooler.supabase.com:6543/postgres?sslmode=require
-```
+> O arquivo `.env` não deve ser versionado. Utilize `.env.example` apenas como referência de configuração.
 
 ### 5. Preparar o banco
 
-Execute os scripts SQL na ordem indicada pelos números:
+Execute os scripts de `database/schema/` nesta ordem:
 
 ```text
+00_extensions.sql
 01_schema.sql
-06_security_policies.sql
-07_view_seguranca.sql
-08_hardening_e_correlacao.sql
+02_threat_intelligence.sql
+03_audit.sql
+04_soc_view.sql
+05_security.sql
 ```
 
-Depois execute o script de população da base.
+Depois carregue os dados sintéticos em `database/seeds/`, começando por:
+
+```text
+01_base_entities.sql
+```
+
+Em seguida, execute os seeds de transações normais e anômalas.
+
+As consultas disponíveis em:
+
+```text
+database/queries/forensic_investigation.sql
+```
+
+são destinadas a investigação forense manual e privilegiada e não fazem parte do fluxo normal de inicialização do banco.
 
 ### 6. Importar o MITRE ATT&CK
 

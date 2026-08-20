@@ -1,24 +1,19 @@
-import pandas as pd
-
-COLUNAS_CLIENTE_CANDIDATAS = (
-    "cliente_pseudonimo",
-    "cliente_anonimizado",
-    "cliente_anonimado",
-)
+﻿import pandas as pd
 
 COLUNA_CLIENTE_PADRAO = "cliente_pseudonimo"
-CLIENTE_ANONIMIZADO_PADRAO = "Usuário Anonimizado"
 
 
 def resolver_coluna_cliente(df: pd.DataFrame) -> str:
-    """Retorna a coluna usada para identificar clientes pseudonimizados.
+    """Retorna a coluna canônica de identidade pseudonimizada do cliente.
 
-    Caso nenhuma coluna conhecida esteja disponível, cria uma coluna
-    pseudonimizada padrão para preservar o funcionamento do pipeline.
+    O pipeline exige ``cliente_pseudonimo`` como parte do contrato do dataset
+    SOC. A ausência dessa coluna indica incompatibilidade entre a origem dos
+    dados e o contrato esperado pelo pipeline.
     """
-    for coluna in COLUNAS_CLIENTE_CANDIDATAS:
-        if coluna in df.columns:
-            return coluna
+    if COLUNA_CLIENTE_PADRAO not in df.columns:
+        raise ValueError(
+            "Dataset SOC inválido: coluna obrigatória "
+            "'cliente_pseudonimo' ausente."
+        )
 
-    df[COLUNA_CLIENTE_PADRAO] = CLIENTE_ANONIMIZADO_PADRAO
     return COLUNA_CLIENTE_PADRAO

@@ -40,7 +40,7 @@ def test_carregar_dataset_soc_retorna_dataframe_preparado(monkeypatch):
 
     df_original = pd.DataFrame(
         {
-            "cliente": ["A", "A", "B"],
+            "cliente_pseudonimo": ["cliente-a", "cliente-a", "cliente-b"],
             "valor": [100.0, 100.0, None],
         }
     )
@@ -72,7 +72,7 @@ def test_carregar_dataset_soc_registra_auditoria(monkeypatch):
 
     df = pd.DataFrame(
         {
-            "cliente": ["A", "B"],
+            "cliente_pseudonimo": ["cliente-a", "cliente-b"],
             "valor": [100, 200],
         }
     )

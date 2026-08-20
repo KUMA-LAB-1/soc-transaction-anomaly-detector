@@ -194,3 +194,17 @@ def test_criar_alerta_rejeita_created_at_sem_timezone():
             detector="isolation_forest",
             created_at=datetime(2026, 8, 18, 13, 0),
         )
+
+
+def test_criar_alerta_rejeita_registro_sem_cliente_pseudonimo():
+    registro = criar_registro()
+    registro.pop("cliente_pseudonimo")
+
+    with pytest.raises(
+        KeyError,
+        match="cliente_pseudonimo",
+    ):
+        criar_alerta(
+            registro,
+            detector="isolation_forest",
+        )

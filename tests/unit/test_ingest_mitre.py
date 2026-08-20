@@ -195,6 +195,31 @@ def test_salvar_no_supabase_rejeita_database_url_ausente(monkeypatch):
         raise AssertionError("Era esperado ValueError sem DATABASE_URL")
 
 
+def test_salvar_no_supabase_nao_cria_schema(monkeypatch):
+    conexao = FakeConnection()
+
+    monkeypatch.setattr(
+        ingest_mitre.psycopg2,
+        "connect",
+        lambda database_url, sslmode: conexao,
+    )
+
+    monkeypatch.setattr(
+        ingest_mitre,
+        "execute_values",
+        lambda cursor, query, valores: None,
+    )
+
+    ingest_mitre.salvar_no_supabase(
+        [],
+        database_url="postgresql://fake",
+    )
+
+    assert all(
+        "CREATE TABLE" not in query.upper() for query in conexao.cursor_obj.queries
+    )
+
+
 def test_salvar_no_supabase_forca_ssl_e_persiste_dados(monkeypatch):
     conexao = FakeConnection()
     chamadas = {}
@@ -242,16 +267,11 @@ def test_salvar_no_supabase_forca_ssl_e_persiste_dados(monkeypatch):
     assert chamadas["sslmode"] == "require"
 
     assert any(
-        "CREATE TABLE IF NOT EXISTS tbl_mitre_mapping" in query
-        for query in conexao.cursor_obj.queries
-    )
-
-    assert any(
         "TRUNCATE TABLE tbl_mitre_mapping" in query
         for query in conexao.cursor_obj.queries
     )
 
     assert valores_recebidos["valores"] == dados
-    assert conexao.commits == 3
+    assert conexao.commits == 2
     assert conexao.cursor_obj.closed is True
     assert conexao.closed is True

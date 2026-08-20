@@ -165,20 +165,6 @@ def salvar_no_supabase(
     )
     cursor = conn.cursor()
 
-    print("🛠️ Criando a tabela 'tbl_mitre_mapping' no Supabase...")
-    # Criamos a tabela estruturada já contendo o campo de procedimentos
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS tbl_mitre_mapping (
-        mitre_id VARCHAR(15),
-        mitre_tecnica VARCHAR(200) NOT NULL,
-        mitre_tatica VARCHAR(150) NOT NULL,
-        descricao TEXT,
-        procedimentos TEXT,
-        PRIMARY KEY (mitre_id, mitre_tatica)
-    );
-    """)
-    conn.commit()
-
     # Limpa dados anteriores para evitar duplicações e garantir dados frescos do MITRE
     print("🧹 Limpando registros antigos de inteligência...")
     cursor.execute("TRUNCATE TABLE tbl_mitre_mapping;")

@@ -15,6 +15,18 @@ class AlertQueryFilters:
     limit: int = 100
 
 
+@dataclass(frozen=True)
+class AlertCursor:
+    created_at: datetime
+    alert_id: str
+
+
+@dataclass(frozen=True)
+class AlertPage:
+    items: tuple[Alert, ...]
+    next_cursor: AlertCursor | None = None
+
+
 @runtime_checkable
 class AlertReader(Protocol):
     """Contrato para componentes capazes de consultar alertas SOC."""
@@ -29,4 +41,13 @@ class AlertReader(Protocol):
 
     def search(self, filters: AlertQueryFilters) -> list[Alert]:
         """Consulta alertas utilizando filtros operacionais."""
+        ...
+
+    def search_page(
+        self,
+        filters: AlertQueryFilters,
+        *,
+        cursor: AlertCursor | None = None,
+    ) -> AlertPage:
+        """Consulta uma página determinística de alertas."""
         ...

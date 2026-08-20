@@ -8,6 +8,7 @@
 -- NOLOGIN roles represent capabilities only.
 -- Runtime identities must be associated with these roles outside this repository.
 -- ----------------------------------------------------------------------------
+BEGIN;
 
 DO $$
 BEGIN
@@ -54,19 +55,34 @@ ALTER TABLE tbl_mitre_mapping ENABLE ROW LEVEL SECURITY;
 
 -- ----------------------------------------------------------------------------
 -- 3. REMOVE BROAD ACCESS
--- Explicitly remove access inherited through PostgreSQL's PUBLIC role.
+-- Explicitly remove privileges inherited through PUBLIC and default Supabase
+-- API roles. Application access is granted only to dedicated capabilities.
 -- ----------------------------------------------------------------------------
 
-REVOKE ALL ON TABLE tbl_clientes FROM PUBLIC;
-REVOKE ALL ON TABLE tbl_contas FROM PUBLIC;
-REVOKE ALL ON TABLE tbl_transacoes FROM PUBLIC;
-REVOKE ALL ON TABLE tbl_logs_seguranca FROM PUBLIC;
-REVOKE ALL ON TABLE tbl_auditoria_acessos FROM PUBLIC;
-REVOKE ALL ON TABLE tbl_mitre_mapping FROM PUBLIC;
-REVOKE ALL ON TABLE v_analise_investigacao_soc FROM PUBLIC;
+REVOKE ALL ON TABLE tbl_clientes
+    FROM PUBLIC, anon, authenticated;
+
+REVOKE ALL ON TABLE tbl_contas
+    FROM PUBLIC, anon, authenticated;
+
+REVOKE ALL ON TABLE tbl_transacoes
+    FROM PUBLIC, anon, authenticated;
+
+REVOKE ALL ON TABLE tbl_logs_seguranca
+    FROM PUBLIC, anon, authenticated;
+
+REVOKE ALL ON TABLE tbl_auditoria_acessos
+    FROM PUBLIC, anon, authenticated;
+
+REVOKE ALL ON TABLE tbl_mitre_mapping
+    FROM PUBLIC, anon, authenticated;
+
+REVOKE ALL ON TABLE v_analise_investigacao_soc
+    FROM PUBLIC, anon, authenticated;
+
 REVOKE ALL
     ON SEQUENCE tbl_auditoria_acessos_id_auditoria_seq
-    FROM PUBLIC;
+    FROM PUBLIC, anon, authenticated;
 
 
 -- ----------------------------------------------------------------------------
@@ -117,10 +133,13 @@ GRANT SELECT
 
 
 -- ----------------------------------------------------------------------------
--- 7. AUDIT RLS POLICIES
--- Operational pipelines may append audit records but cannot inspect or modify
--- historical audit data. Auditors receive read-only visibility.
+-- 7. RLS POLICIES
+-- Policies are recreated explicitly so this security script can be reapplied
+-- safely and remains the canonical definition of the authorization model.
 -- ----------------------------------------------------------------------------
+
+DROP POLICY IF EXISTS soc_pipeline_insert_audit
+    ON tbl_auditoria_acessos;
 
 CREATE POLICY soc_pipeline_insert_audit
     ON tbl_auditoria_acessos
@@ -128,11 +147,19 @@ CREATE POLICY soc_pipeline_insert_audit
     TO soc_pipeline
     WITH CHECK (true);
 
+
+DROP POLICY IF EXISTS soc_auditor_read_audit
+    ON tbl_auditoria_acessos;
+
 CREATE POLICY soc_auditor_read_audit
     ON tbl_auditoria_acessos
     FOR SELECT
     TO soc_auditor
     USING (true);
+
+
+DROP POLICY IF EXISTS soc_pipeline_read_mitre
+    ON tbl_mitre_mapping;
 
 CREATE POLICY soc_pipeline_read_mitre
     ON tbl_mitre_mapping
@@ -140,8 +167,14 @@ CREATE POLICY soc_pipeline_read_mitre
     TO soc_pipeline
     USING (true);
 
+
+DROP POLICY IF EXISTS threat_intel_writer_insert_mitre
+    ON tbl_mitre_mapping;
+
 CREATE POLICY threat_intel_writer_insert_mitre
     ON tbl_mitre_mapping
     FOR INSERT
     TO threat_intel_writer
     WITH CHECK (true);
+
+COMMIT;

@@ -64,40 +64,36 @@ class SqliteAlertReader:
         ):
             raise ValueError("created_from não pode ser posterior a created_to")
 
-        conditions: list[str] = []
-        params: list[object] = []
+        created_from = (
+            filters.created_from.isoformat()
+            if filters.created_from is not None
+            else None
+        )
 
-        if filters.severity is not None:
-            conditions.append("severity = ?")
-            params.append(filters.severity)
-
-        if filters.created_from is not None:
-            conditions.append("created_at >= ?")
-            params.append(filters.created_from.isoformat())
-
-        if filters.created_to is not None:
-            conditions.append("created_at <= ?")
-            params.append(filters.created_to.isoformat())
-
-        where_clause = ""
-
-        if conditions:
-            where_clause = "WHERE " + " AND ".join(conditions)
-
-        params.append(filters.limit)
-
-        query = f"""
-            SELECT payload_json
-            FROM alerts
-            {where_clause}
-            ORDER BY created_at DESC, alert_id DESC
-            LIMIT ?
-        """
+        created_to = (
+            filters.created_to.isoformat() if filters.created_to is not None else None
+        )
 
         with sqlite3.connect(self.path) as connection:
             rows = connection.execute(
-                query,
-                params,
+                """
+                SELECT payload_json
+                FROM alerts
+                WHERE (? IS NULL OR severity = ?)
+                AND (? IS NULL OR created_at >= ?)
+                AND (? IS NULL OR created_at <= ?)
+                ORDER BY created_at DESC, alert_id DESC
+                LIMIT ?
+                """,
+                (
+                    filters.severity,
+                    filters.severity,
+                    created_from,
+                    created_from,
+                    created_to,
+                    created_to,
+                    filters.limit,
+                ),
             ).fetchall()
 
         return [alert_from_json(row[0]) for row in rows]

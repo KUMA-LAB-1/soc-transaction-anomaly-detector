@@ -1,5 +1,5 @@
 from src.alerts.contract import Alert
-from src.alerts.query import AlertReader
+from src.alerts.query import AlertQueryFilters, AlertReader
 
 
 class FakeAlertReader:
@@ -7,6 +7,12 @@ class FakeAlertReader:
         return None
 
     def list_recent(self, *, limit: int = 100) -> list[Alert]:
+        return []
+
+    def search(
+        self,
+        filters: AlertQueryFilters,
+    ) -> list[Alert]:
         return []
 
 

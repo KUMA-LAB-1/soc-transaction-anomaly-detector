@@ -18,7 +18,7 @@ DOTENV_PATH = BASE_DIR / ".env"
 
 # 1. Carrega as variáveis de ambiente
 load_dotenv(dotenv_path=DOTENV_PATH)
-DATABASE_URL = os.getenv("DATABASE_URL")
+MITRE_DATABASE_URL = os.getenv("MITRE_DATABASE_URL")
 
 
 # URL oficial do MITRE ATT&CK Enterprise (formato STIX/JSON)
@@ -150,11 +150,11 @@ def salvar_no_supabase(
     dados_tecnicas: list[tuple],
     database_url: str | None = None,
 ) -> None:
-    database_url = database_url or DATABASE_URL
+    database_url = database_url or MITRE_DATABASE_URL
 
     if not database_url:
         raise ValueError(
-            f"DATABASE_URL não encontrada. Caminho configurado: {DOTENV_PATH}"
+            f"MITRE_DATABASE_URL não encontrada. Caminho configurado: {DOTENV_PATH}"
         )
 
     print("🔌 Conectando ao PostgreSQL (Supabase)...")

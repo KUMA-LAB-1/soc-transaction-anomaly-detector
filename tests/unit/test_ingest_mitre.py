@@ -177,10 +177,10 @@ def test_baixar_e_processar_mitre_rejeita_status_http_invalido(
         raise AssertionError("Era esperado RuntimeError para resposta HTTP inválida")
 
 
-def test_salvar_no_supabase_rejeita_database_url_ausente(monkeypatch):
+def test_salvar_no_supabase_rejeita_mitre_database_url_ausente(monkeypatch):
     monkeypatch.setattr(
         ingest_mitre,
-        "DATABASE_URL",
+        "MITRE_DATABASE_URL",
         None,
     )
 
@@ -190,9 +190,11 @@ def test_salvar_no_supabase_rejeita_database_url_ausente(monkeypatch):
             database_url=None,
         )
     except ValueError as exc:
-        assert "DATABASE_URL não encontrada" in str(exc)
+        assert "MITRE_DATABASE_URL não encontrada" in str(exc)
     else:
-        raise AssertionError("Era esperado ValueError sem DATABASE_URL")
+        raise AssertionError(
+            "Era esperado ValueError sem MITRE_DATABASE_URL"
+        )
 
 
 def test_salvar_no_supabase_nao_cria_schema(monkeypatch):

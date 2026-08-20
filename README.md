@@ -309,7 +309,13 @@ para um arquivo `.env` na raiz do projeto:
 .env
 ```
 
-Depois configure a variável `DATABASE_URL` com a conexão PostgreSQL/Supabase apropriada ao ambiente.
+Depois configure as credenciais de banco de acordo com a responsabilidade de cada componente:
+
+- `SOC_DATABASE_URL`: conexão utilizada pelo runtime principal do pipeline SOC, associada a uma identidade PostgreSQL com a capability `soc_pipeline`;
+- `MITRE_DATABASE_URL`: conexão utilizada exclusivamente pela rotina de ingestão do MITRE ATT&CK, associada a uma identidade PostgreSQL com a capability `threat_intel_writer`;
+- `SOC_PIPELINE_USER`: identidade lógica registrada nos eventos de auditoria do pipeline.
+
+Essa separação aplica o princípio de menor privilégio, evitando que o pipeline operacional e a rotina de ingestão de inteligência de ameaças compartilhem uma credencial de banco com permissões excessivas.
 
 > O arquivo `.env` não deve ser versionado. Utilize `.env.example` apenas como referência de configuração.
 

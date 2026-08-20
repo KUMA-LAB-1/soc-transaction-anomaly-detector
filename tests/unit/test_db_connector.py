@@ -4,30 +4,30 @@ from src import db_connector
 from src.db_connector import DBConnector
 
 
-def test_get_engine_rejeita_database_url_ausente(monkeypatch):
+def test_get_engine_rejeita_soc_database_url_ausente(monkeypatch):
     monkeypatch.setattr(
         db_connector,
-        "DATABASE_URL",
+        "SOC_DATABASE_URL",
         None,
     )
 
     with pytest.raises(
         ValueError,
-        match="DATABASE_URL não encontrada",
+        match="SOC_DATABASE_URL não encontrada",
     ):
         DBConnector.get_engine()
 
 
-def test_get_raw_connection_rejeita_database_url_ausente(monkeypatch):
+def test_get_raw_connection_rejeita_soc_database_url_ausente(monkeypatch):
     monkeypatch.setattr(
         db_connector,
-        "DATABASE_URL",
+        "SOC_DATABASE_URL",
         None,
     )
 
     with pytest.raises(
         ValueError,
-        match="DATABASE_URL não encontrada",
+        match="SOC_DATABASE_URL não encontrada",
     ):
         DBConnector.get_raw_connection()
 
@@ -35,7 +35,7 @@ def test_get_raw_connection_rejeita_database_url_ausente(monkeypatch):
 def test_get_engine_forca_sslmode_require(monkeypatch):
     monkeypatch.setattr(
         db_connector,
-        "DATABASE_URL",
+        "SOC_DATABASE_URL",
         "postgresql://usuario:senha@host:5432/banco",
     )
 
@@ -65,7 +65,7 @@ def test_get_engine_forca_sslmode_require(monkeypatch):
 def test_get_raw_connection_forca_sslmode_require(monkeypatch):
     monkeypatch.setattr(
         db_connector,
-        "DATABASE_URL",
+        "SOC_DATABASE_URL",
         "postgresql://usuario:senha@host:5432/banco",
     )
 
@@ -93,7 +93,7 @@ def test_get_raw_connection_forca_sslmode_require(monkeypatch):
 def test_get_engine_propaga_erro_de_criacao(monkeypatch, capsys):
     monkeypatch.setattr(
         db_connector,
-        "DATABASE_URL",
+        "SOC_DATABASE_URL",
         "postgresql://teste",
     )
 
@@ -121,7 +121,7 @@ def test_get_engine_propaga_erro_de_criacao(monkeypatch, capsys):
 def test_get_raw_connection_propaga_erro(monkeypatch, capsys):
     monkeypatch.setattr(
         db_connector,
-        "DATABASE_URL",
+        "SOC_DATABASE_URL",
         "postgresql://teste",
     )
 

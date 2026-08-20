@@ -10,10 +10,14 @@
 -- ----------------------------------------------------------------------------
 CREATE TABLE tbl_clientes (
     id_cliente SERIAL PRIMARY KEY,
+    cliente_pseudonimo UUID NOT NULL DEFAULT gen_random_uuid(),
     nome_completo VARCHAR(150) NOT NULL,
     cpf VARCHAR(14) NOT NULL,
     telefone VARCHAR(20) NOT NULL,
     data_cadastro TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT uq_tbl_clientes_pseudonimo
+        UNIQUE (cliente_pseudonimo),
 
     CONSTRAINT uq_tbl_clientes_cpf
         UNIQUE (cpf)

@@ -66,7 +66,7 @@ CREATE TABLE tbl_transacoes (
 
     CONSTRAINT fk_tbl_transacoes_conta_origem
         FOREIGN KEY (id_conta_origem)
-        REFERENCES tbl_contas(id_conta),
+        REFERENCES tbl_contas(id_conta)
         ON DELETE RESTRICT,
 
     CONSTRAINT ck_tbl_transacoes_tipo

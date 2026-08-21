@@ -95,6 +95,43 @@ GRANT SELECT
     ON v_analise_investigacao_soc
     TO soc_pipeline;
 
+-- Minimal underlying privileges required by the SECURITY INVOKER view.
+-- Direct personal identifiers remain inaccessible to the SOC runtime.
+
+GRANT SELECT (
+    id_cliente,
+    cliente_pseudonimo
+)
+ON tbl_clientes
+TO soc_pipeline;
+
+GRANT SELECT (
+    id_conta,
+    id_cliente
+)
+ON tbl_contas
+TO soc_pipeline;
+
+GRANT SELECT (
+    id_transacao,
+    id_conta_origem,
+    tipo_transacao,
+    valor_transacao,
+    data_hora_transacao,
+    status_transacao
+)
+ON tbl_transacoes
+TO soc_pipeline;
+
+GRANT SELECT (
+    id_cliente,
+    data_hora_acesso,
+    localizacao_estimada,
+    evento_tipo
+)
+ON tbl_logs_seguranca
+TO soc_pipeline;
+
 GRANT SELECT
     ON tbl_mitre_mapping
     TO soc_pipeline;
@@ -164,6 +201,45 @@ DROP POLICY IF EXISTS "Authenticated users can read MITRE mappings"
 -- Policies are recreated explicitly so this security script can be reapplied
 -- safely and remains the canonical definition of the authorization model.
 -- ----------------------------------------------------------------------------
+
+DROP POLICY IF EXISTS soc_pipeline_read_clientes
+    ON tbl_clientes;
+
+CREATE POLICY soc_pipeline_read_clientes
+    ON tbl_clientes
+    FOR SELECT
+    TO soc_pipeline
+    USING (true);
+
+
+DROP POLICY IF EXISTS soc_pipeline_read_contas
+    ON tbl_contas;
+
+CREATE POLICY soc_pipeline_read_contas
+    ON tbl_contas
+    FOR SELECT
+    TO soc_pipeline
+    USING (true);
+
+
+DROP POLICY IF EXISTS soc_pipeline_read_transacoes
+    ON tbl_transacoes;
+
+CREATE POLICY soc_pipeline_read_transacoes
+    ON tbl_transacoes
+    FOR SELECT
+    TO soc_pipeline
+    USING (true);
+
+
+DROP POLICY IF EXISTS soc_pipeline_read_logs
+    ON tbl_logs_seguranca;
+
+CREATE POLICY soc_pipeline_read_logs
+    ON tbl_logs_seguranca
+    FOR SELECT
+    TO soc_pipeline
+    USING (true);
 
 DROP POLICY IF EXISTS soc_pipeline_insert_audit
     ON tbl_auditoria_acessos;

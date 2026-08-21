@@ -227,9 +227,19 @@ na camada de repository.
 
 ---
 
-### 8. Resolução da identidade pseudonimizada
+### 8. Identidade pseudonimizada
 
-Algumas features históricas dependem da identificação lógica do cliente.
+O dataset consumido pelo pipeline possui uma identidade pseudonimizada canônica:
+
+```text
+cliente_pseudonimo
+```
+
+Essa coluna faz parte do contrato obrigatório do dataset SOC e é exposta pela view:
+
+```text
+v_analise_investigacao_soc
+```
 
 O módulo:
 
@@ -237,28 +247,21 @@ O módulo:
 src/data/columns.py
 ```
 
-resolve dinamicamente a coluna disponível entre:
+valida a presença de `cliente_pseudonimo` antes que componentes dependentes utilizem a identidade lógica do cliente.
 
-```text
-cliente_pseudonimo
-cliente_anonimizado
-cliente_anonimado
-```
+Datasets que não contenham essa coluna são considerados incompatíveis com o contrato esperado pelo pipeline e devem falhar explicitamente, em vez de receber aliases legados ou identidades genéricas criadas em tempo de execução.
 
-Caso nenhuma delas esteja presente, é criada a coluna padrão:
+Essa abordagem mantém um único contrato de identidade entre:
 
-```text
-cliente_pseudonimo
-```
+- banco de dados;
+- camada de acesso aos dados;
+- feature engineering;
+- geração de alertas;
+- reporting.
 
-com o valor:
+A identidade pseudonimizada é persistida na origem dos dados e propagada pelo pipeline sem expor identificadores pessoais diretos na view utilizada pela rotina de análise.
 
-```text
-Usuário Anonimizado
-```
-
-Esse mecanismo permite que o pipeline continue operando mesmo quando datasets
-compatíveis utilizam pequenas variações no nome da coluna de identificação.
+Esse modelo evita comportamentos silenciosos de compatibilidade com estruturas antigas e torna incompatibilidades de schema explicitamente detectáveis durante a execução.
 
 ---
 

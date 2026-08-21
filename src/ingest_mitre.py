@@ -18,7 +18,7 @@ DOTENV_PATH = BASE_DIR / ".env"
 
 # 1. Carrega as variáveis de ambiente
 load_dotenv(dotenv_path=DOTENV_PATH)
-DATABASE_URL = os.getenv("DATABASE_URL")
+MITRE_DATABASE_URL = os.getenv("MITRE_DATABASE_URL")
 
 
 # URL oficial do MITRE ATT&CK Enterprise (formato STIX/JSON)
@@ -150,11 +150,11 @@ def salvar_no_supabase(
     dados_tecnicas: list[tuple],
     database_url: str | None = None,
 ) -> None:
-    database_url = database_url or DATABASE_URL
+    database_url = database_url or MITRE_DATABASE_URL
 
     if not database_url:
         raise ValueError(
-            f"DATABASE_URL não encontrada. Caminho configurado: {DOTENV_PATH}"
+            f"MITRE_DATABASE_URL não encontrada. Caminho configurado: {DOTENV_PATH}"
         )
 
     print("🔌 Conectando ao PostgreSQL (Supabase)...")
@@ -165,38 +165,34 @@ def salvar_no_supabase(
     )
     cursor = conn.cursor()
 
-    print("🛠️ Criando a tabela 'tbl_mitre_mapping' no Supabase...")
-    # Criamos a tabela estruturada já contendo o campo de procedimentos
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS tbl_mitre_mapping (
-        mitre_id VARCHAR(15),
-        mitre_tecnica VARCHAR(200) NOT NULL,
-        mitre_tatica VARCHAR(150) NOT NULL,
-        descricao TEXT,
-        procedimentos TEXT,
-        PRIMARY KEY (mitre_id, mitre_tatica)
-    );
-    """)
-    conn.commit()
-
-    # Limpa dados anteriores para evitar duplicações e garantir dados frescos do MITRE
+    # Substitui o dataset MITRE de forma atômica.
+    # Se a inserção falhar, o TRUNCATE também será revertido.
     print("🧹 Limpando registros antigos de inteligência...")
     cursor.execute("TRUNCATE TABLE tbl_mitre_mapping;")
-    conn.commit()
 
-    # Inserção em lote (Bulk Insert) otimizada
     query = """
-        INSERT INTO tbl_mitre_mapping (mitre_id, mitre_tecnica, mitre_tatica, descricao, procedimentos)
-        VALUES %s
-        ON CONFLICT (mitre_id, mitre_tatica) DO NOTHING;
+        INSERT INTO tbl_mitre_mapping (
+            mitre_id,
+            mitre_tecnica,
+            mitre_tatica,
+            descricao,
+            procedimentos
+        )
+        VALUES %s;
     """
 
     print(
-        "💾 Gravando dados de Inteligência de Ameaças (Threat Intel) no banco de dados..."
+        "💾 Gravando dados de Inteligência de Ameaças "
+        "(Threat Intel) no banco de dados..."
     )
-    execute_values(cursor, query, dados_tecnicas)
-    conn.commit()
 
+    execute_values(
+        cursor,
+        query,
+        dados_tecnicas,
+    )
+
+    conn.commit()
     cursor.close()
     conn.close()
     print(

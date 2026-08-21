@@ -105,12 +105,7 @@ def criar_alerta(
         created_at=created_at_final,
         event=AlertEvent(
             transaction_id=registro.get("id_transacao"),
-            customer_pseudonym=str(
-                registro.get(
-                    "cliente_pseudonimo",
-                    "Usuário Anonimizado",
-                )
-            ),
+            customer_pseudonym=str(registro["cliente_pseudonimo"]),
             transaction_type=str(registro["tipo_transacao"]),
             transaction_value=float(registro["valor_transacao"]),
             transaction_timestamp=transaction_timestamp,

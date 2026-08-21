@@ -427,7 +427,7 @@ Por isso, a seleção atual representa o melhor resultado para esta base, não u
 - MITRE ATT&CK;
 - pseudonimização e auditoria.
 
-### ⏳ v2.0.0 — DevSecOps
+### ✅ v2.0.0 — DevSecOps
 
 - testes automatizados;
 - análise estática;
@@ -435,7 +435,9 @@ Por isso, a seleção atual representa o melhor resultado para esta base, não u
 - Docker;
 - GitHub Actions;
 - scan de segurança;
-- pipeline CI/CD.
+- pipeline CI/CD;
+- hardening do PostgreSQL/Supabase com RLS e least privilege;
+- separação de identidades e permissões por responsabilidade.
 
 ### 🔮 v3.0.0 — Projeto final
 

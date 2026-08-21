@@ -84,6 +84,7 @@ Seleção automática do melhor detector
 A arquitetura de banco aplica separação de responsabilidades entre o runtime do SOC, a ingestão de Threat Intelligence e os componentes de auditoria.
 
 O runtime utiliza uma view operacional minimizada e uma identidade PostgreSQL dedicada, enquanto a ingestão do MITRE ATT&CK utiliza uma credencial independente com permissões específicas. Essa separação reduz a exposição de dados e aplica o princípio de menor privilégio.
+
 ---
 
 ## 📂 Estrutura do repositório

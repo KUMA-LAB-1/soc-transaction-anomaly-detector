@@ -192,9 +192,7 @@ def test_salvar_no_supabase_rejeita_mitre_database_url_ausente(monkeypatch):
     except ValueError as exc:
         assert "MITRE_DATABASE_URL não encontrada" in str(exc)
     else:
-        raise AssertionError(
-            "Era esperado ValueError sem MITRE_DATABASE_URL"
-        )
+        raise AssertionError("Era esperado ValueError sem MITRE_DATABASE_URL")
 
 
 def test_salvar_no_supabase_nao_cria_schema(monkeypatch):

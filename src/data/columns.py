@@ -1,4 +1,4 @@
-﻿import pandas as pd
+import pandas as pd
 
 COLUNA_CLIENTE_PADRAO = "cliente_pseudonimo"
 
@@ -12,8 +12,7 @@ def resolver_coluna_cliente(df: pd.DataFrame) -> str:
     """
     if COLUNA_CLIENTE_PADRAO not in df.columns:
         raise ValueError(
-            "Dataset SOC inválido: coluna obrigatória "
-            "'cliente_pseudonimo' ausente."
+            "Dataset SOC inválido: coluna obrigatória 'cliente_pseudonimo' ausente."
         )
 
     return COLUNA_CLIENTE_PADRAO

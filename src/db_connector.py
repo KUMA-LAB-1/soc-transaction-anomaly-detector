@@ -36,10 +36,7 @@ class DBConnector:
                 connect_args=connect_args,
             )
         except Exception as e:
-            print(
-                "❌ Falha crítica ao criar o Engine do SQLAlchemy "
-                f"(SSL): {e}"
-            )
+            print(f"❌ Falha crítica ao criar o Engine do SQLAlchemy (SSL): {e}")
             raise
 
     @staticmethod
@@ -57,10 +54,7 @@ class DBConnector:
                 sslmode="require",
             )
         except Exception as e:
-            print(
-                "❌ Falha crítica ao conectar via Psycopg2 "
-                f"(SSL): {e}"
-            )
+            print(f"❌ Falha crítica ao conectar via Psycopg2 (SSL): {e}")
             raise
 
 
@@ -71,17 +65,11 @@ if __name__ == "__main__":
         engine = DBConnector.get_engine()
 
         with engine.connect():
-            print(
-                "🚀 [OK] Canal encriptado via SQLAlchemy "
-                "estabelecido com sucesso!"
-            )
+            print("🚀 [OK] Canal encriptado via SQLAlchemy estabelecido com sucesso!")
 
         raw_conn = DBConnector.get_raw_connection()
         raw_conn.close()
 
-        print(
-            "🚀 [OK] Canal de conexão direta "
-            "(Psycopg2 + SSL) validado com sucesso!"
-        )
+        print("🚀 [OK] Canal de conexão direta (Psycopg2 + SSL) validado com sucesso!")
     except Exception as e:
         print(f"❌ Handshake de segurança falhou: {e}")

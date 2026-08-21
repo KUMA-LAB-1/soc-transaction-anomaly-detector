@@ -274,6 +274,6 @@ def test_salvar_no_supabase_forca_ssl_e_persiste_dados(monkeypatch):
     )
 
     assert valores_recebidos["valores"] == dados
-    assert conexao.commits == 2
+    assert conexao.commits == 1
     assert conexao.cursor_obj.closed is True
     assert conexao.closed is True

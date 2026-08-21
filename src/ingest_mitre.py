@@ -165,24 +165,34 @@ def salvar_no_supabase(
     )
     cursor = conn.cursor()
 
-    # Limpa dados anteriores para evitar duplicações e garantir dados frescos do MITRE
+    # Substitui o dataset MITRE de forma atômica.
+    # Se a inserção falhar, o TRUNCATE também será revertido.
     print("🧹 Limpando registros antigos de inteligência...")
     cursor.execute("TRUNCATE TABLE tbl_mitre_mapping;")
-    conn.commit()
 
-    # Inserção em lote (Bulk Insert) otimizada
     query = """
-        INSERT INTO tbl_mitre_mapping (mitre_id, mitre_tecnica, mitre_tatica, descricao, procedimentos)
-        VALUES %s
-        ON CONFLICT (mitre_id, mitre_tatica) DO NOTHING;
+        INSERT INTO tbl_mitre_mapping (
+            mitre_id,
+            mitre_tecnica,
+            mitre_tatica,
+            descricao,
+            procedimentos
+        )
+        VALUES %s;
     """
 
     print(
-        "💾 Gravando dados de Inteligência de Ameaças (Threat Intel) no banco de dados..."
+        "💾 Gravando dados de Inteligência de Ameaças "
+        "(Threat Intel) no banco de dados..."
     )
-    execute_values(cursor, query, dados_tecnicas)
-    conn.commit()
 
+    execute_values(
+        cursor,
+        query,
+        dados_tecnicas,
+    )
+
+    conn.commit()
     cursor.close()
     conn.close()
     print(

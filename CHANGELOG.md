@@ -73,12 +73,6 @@ Todas as alterações relevantes deste projeto serão documentadas neste arquivo
 
 ## [1.0.0] - Entrega do módulo de Análise de Dados
 
-# Changelog
-
-Todas as alterações relevantes deste projeto serão documentadas neste arquivo.
-
-## [1.0.0] - Entrega do módulo de Análise de Dados
-
 ### Adicionado
 
 - Integração com PostgreSQL e Supabase.

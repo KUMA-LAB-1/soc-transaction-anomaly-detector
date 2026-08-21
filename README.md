@@ -184,6 +184,7 @@ O runtime utiliza uma view operacional minimizada e uma identidade PostgreSQL de
 ```
 ---
 A estrutura reflete a modularização introduzida na v2.0.0, separando responsabilidades de dados, Machine Learning, Threat Intelligence, geração e persistência de alertas, reporting, segurança e testes.
+
 ---
 
 ## 🔎 Engenharia de features
@@ -259,6 +260,7 @@ O critério utilizado foi:
 4. menor tempo de execução.
 
 O Elliptic Envelope apresentou F1-score, recall e precision equivalentes aos do Isolation Forest no conjunto sintético utilizado. Como esses critérios permaneceram empatados, a seleção automática foi definida pelo menor tempo de execução.
+
 ---
 
 ## 📑 Documentação

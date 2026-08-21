@@ -3,7 +3,8 @@
 -- Dataset mínimo e pseudonimizado consumido pelo pipeline de detecção.
 -- ============================================================================
 
-CREATE OR REPLACE VIEW v_analise_investigacao_soc AS
+CREATE OR REPLACE VIEW v_analise_investigacao_soc
+WITH (security_invoker = true) AS
 SELECT
     c.cliente_pseudonimo,
     t.id_transacao,

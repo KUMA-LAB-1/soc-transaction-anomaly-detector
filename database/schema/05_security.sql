@@ -133,7 +133,34 @@ GRANT SELECT
 
 
 -- ----------------------------------------------------------------------------
--- 7. RLS POLICIES
+-- 7. LEGACY POLICY CLEANUP
+-- Remove policies created by previous iterations of the database security model.
+-- These statements are intentionally safe to reapply.
+-- ----------------------------------------------------------------------------
+
+DROP POLICY IF EXISTS admin_full_access_clientes
+    ON tbl_clientes;
+
+DROP POLICY IF EXISTS admin_full_access_contas
+    ON tbl_contas;
+
+DROP POLICY IF EXISTS admin_full_access_transacoes
+    ON tbl_transacoes;
+
+DROP POLICY IF EXISTS admin_full_access_logs
+    ON tbl_logs_seguranca;
+
+DROP POLICY IF EXISTS admin_full_access_auditoria
+    ON tbl_auditoria_acessos;
+
+DROP POLICY IF EXISTS "Allow public read"
+    ON tbl_mitre_mapping;
+
+DROP POLICY IF EXISTS "Authenticated users can read MITRE mappings"
+    ON tbl_mitre_mapping;
+
+-- ----------------------------------------------------------------------------
+-- 8. RLS POLICIES
 -- Policies are recreated explicitly so this security script can be reapplied
 -- safely and remains the canonical definition of the authorization model.
 -- ----------------------------------------------------------------------------

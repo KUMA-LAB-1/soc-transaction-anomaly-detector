@@ -357,7 +357,7 @@ python src/ingest_mitre.py
 ### 7. Executar o detector
 
 ```bash
-python src/security_detector.py
+python -m src.security_detector
 ```
 
 Os resultados serão gerados na pasta `reports`.

@@ -1,7 +1,7 @@
 # Variáveis de ambiente e credenciais
 .env
-docs/.env
 *.env
+.env.*
 !.env.example
 
 # Python
@@ -28,6 +28,7 @@ desktop.ini
 .pytest_cache/
 .coverage
 htmlcov/
+.ruff_cache/
 
 # Logs
 *.log
@@ -40,3 +41,8 @@ htmlcov/
 *.tmp
 *.bak
 ~$*
+
+# Artefatos gerados localmente pelo pipeline
+reports/*
+!reports/resultado_multimodelo/
+!reports/resultado_multimodelo/**

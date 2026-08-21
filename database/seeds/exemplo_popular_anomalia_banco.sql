@@ -13,6 +13,7 @@ DECLARE
     v_ip_suspeito TEXT;
     v_dispositivo_novo TEXT;
     v_vetor_ataque INT;
+    v_tentativas INT;
 BEGIN
     -- Loop para gerar 500 registros randômicos adicionais (IDs de 201 a 700)
     FOR v_i IN 201..700 LOOP
@@ -27,10 +28,40 @@ BEGIN
         -- Variância ampla de valores altos (R$ 15.000 a R$ 120.000)
         v_valor_anomalo := ROUND((15000 + (random() ^ 1.8) * 105000)::numeric, 2);
         
-        -- Sorteia data/hora nos últimos 60 dias (com foco em horários de risco)
-        v_hora_madrugada := (CURRENT_TIMESTAMP - (random() * INTERVAL '60 days'))::date 
-                            + (INTERVAL '1 hour' * floor(random() * 24)::int) 
-                            + (INTERVAL '1 minute' * floor(random() * 59)::int);
+-- Sorteia um horário dentro dos mesmos 60 dias do baseline, mas evita
+-- proximidade temporal com transações normais do mesmo cliente.
+--
+-- A margem de 3 horas impede que os logs anômalos, gerados até 30 minutos
+-- antes da transação anômala, contaminem a janela de correlação de 2 horas
+-- das transações baseline.
+v_tentativas := 0;
+
+LOOP
+    v_hora_madrugada :=
+        (CURRENT_TIMESTAMP - (random() * INTERVAL '60 days'))::date
+        + (INTERVAL '1 hour' * floor(random() * 24)::int)
+        + (INTERVAL '1 minute' * floor(random() * 59)::int);
+
+    v_tentativas := v_tentativas + 1;
+
+    EXIT WHEN NOT EXISTS (
+        SELECT 1
+        FROM tbl_transacoes AS t
+        JOIN tbl_contas AS cont
+            ON cont.id_conta = t.id_conta_origem
+        WHERE cont.id_cliente = v_conta.id_cliente
+          AND t.status_transacao = 'Concluída'
+          AND t.data_hora_transacao
+              BETWEEN v_hora_madrugada - INTERVAL '3 hours'
+                  AND v_hora_madrugada + INTERVAL '3 hours'
+    );
+
+    IF v_tentativas >= 100 THEN
+        RAISE EXCEPTION
+            'Não foi possível encontrar janela temporal isolada para cliente %',
+            v_conta.id_cliente;
+    END IF;
+END LOOP;
 
         -- Pool expandido de IPs maliciosos / IPs de infraestrutura de borda
         v_ip_suspeito := (ARRAY[

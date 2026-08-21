@@ -297,36 +297,56 @@ pip install -r requirements.txt
 
 ### 4. Configurar a conexão
 
-Copie:
+Copie o arquivo de exemplo:
 
 ```text
 .env.example
 ```
 
-para:
+para um arquivo `.env` na raiz do projeto:
 
 ```text
-docs/.env
+.env
 ```
 
-Depois preencha a variável:
+Depois configure as credenciais de banco de acordo com a responsabilidade de cada componente:
 
-```env
-DATABASE_URL=postgresql://postgres.HOST:SENHA@aws-1-us-west-2.pooler.supabase.com:6543/postgres?sslmode=require
-```
+- `SOC_DATABASE_URL`: conexão utilizada pelo runtime principal do pipeline SOC, associada a uma identidade PostgreSQL com a capability `soc_pipeline`;
+- `MITRE_DATABASE_URL`: conexão utilizada exclusivamente pela rotina de ingestão do MITRE ATT&CK, associada a uma identidade PostgreSQL com a capability `threat_intel_writer`;
+- `SOC_PIPELINE_USER`: identidade lógica registrada nos eventos de auditoria do pipeline.
+
+Essa separação aplica o princípio de menor privilégio, evitando que o pipeline operacional e a rotina de ingestão de inteligência de ameaças compartilhem uma credencial de banco com permissões excessivas.
+
+> O arquivo `.env` não deve ser versionado. Utilize `.env.example` apenas como referência de configuração.
 
 ### 5. Preparar o banco
 
-Execute os scripts SQL na ordem indicada pelos números:
+Execute os scripts de `database/schema/` nesta ordem:
 
 ```text
+00_extensions.sql
 01_schema.sql
-06_security_policies.sql
-07_view_seguranca.sql
-08_hardening_e_correlacao.sql
+02_threat_intelligence.sql
+03_audit.sql
+04_soc_view.sql
+05_security.sql
 ```
 
-Depois execute o script de população da base.
+Depois carregue os dados sintéticos em `database/seeds/`, começando por:
+
+```text
+01_base_entities.sql
+```
+
+Em seguida, execute os seeds de transações normais e anômalas.
+
+As consultas disponíveis em:
+
+```text
+database/queries/forensic_investigation.sql
+```
+
+são destinadas a investigação forense manual e privilegiada e não fazem parte do fluxo normal de inicialização do banco.
 
 ### 6. Importar o MITRE ATT&CK
 
@@ -337,7 +357,7 @@ python src/ingest_mitre.py
 ### 7. Executar o detector
 
 ```bash
-python src/security_detector.py
+python -m src.security_detector
 ```
 
 Os resultados serão gerados na pasta `reports`.
@@ -407,7 +427,7 @@ Por isso, a seleção atual representa o melhor resultado para esta base, não u
 - MITRE ATT&CK;
 - pseudonimização e auditoria.
 
-### ⏳ v2.0.0 — DevSecOps
+### ✅ v2.0.0 — DevSecOps
 
 - testes automatizados;
 - análise estática;
@@ -415,7 +435,9 @@ Por isso, a seleção atual representa o melhor resultado para esta base, não u
 - Docker;
 - GitHub Actions;
 - scan de segurança;
-- pipeline CI/CD.
+- pipeline CI/CD;
+- hardening do PostgreSQL/Supabase com RLS e least privilege;
+- separação de identidades e permissões por responsabilidade.
 
 ### 🔮 v3.0.0 — Projeto final
 

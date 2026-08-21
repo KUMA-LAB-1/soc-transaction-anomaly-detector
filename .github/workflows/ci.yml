@@ -1,0 +1,206 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - feature/devsecops
+
+  pull_request:
+    branches:
+      - main
+      - feature/devsecops
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality + Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --locked --group lint --group test --group security
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Bandit SAST
+        run: uv run bandit -c pyproject.toml -r src
+
+      - name: Dependency vulnerability audit
+        run: uv run pip-audit
+
+      - name: Run unit tests with coverage gate
+        run: uv run pytest tests/unit
+
+  integration:
+    name: Integration Smoke
+    runs-on: ubuntu-latest
+    needs: quality
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - name: Sync dependencies
+        run: uv sync --locked --group test
+
+      - name: Run pipeline smoke test
+        run: uv run pytest tests/integration/test_pipeline_smoke.py -v --no-cov
+
+  secrets:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository with full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Install Gitleaks 8.18.4
+        run: |
+          curl -sSfL \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz \
+            -o /tmp/gitleaks_8.18.4_linux_x64.tar.gz
+
+          curl -sSfL \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_checksums.txt \
+            -o /tmp/gitleaks_8.18.4_checksums.txt
+
+          cd /tmp
+
+          grep "gitleaks_8.18.4_linux_x64.tar.gz" \
+            gitleaks_8.18.4_checksums.txt \
+            | sha256sum -c -
+
+          tar -xzf gitleaks_8.18.4_linux_x64.tar.gz gitleaks
+
+          sudo install gitleaks /usr/local/bin/gitleaks
+
+          gitleaks version
+
+      - name: Scan Git history for secrets
+        run: gitleaks detect --source . --redact --verbose
+
+  sbom:
+    name: Software Bill of Materials
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - name: Sync dependencies
+        run: uv sync --locked --group security
+
+      - name: Generate CycloneDX SBOM
+        run: |
+          mkdir -p artifacts
+
+          uv run cyclonedx-py environment \
+            --pyproject pyproject.toml \
+            --output-reproducible \
+            --output-format JSON \
+            --output-file artifacts/sbom.cdx.json
+
+      - name: Upload CycloneDX SBOM
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: cyclonedx-sbom
+          path: artifacts/sbom.cdx.json
+          if-no-files-found: error
+
+  container:
+    name: Container Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Build hardened container image
+        run: docker build -t soc-anomaly-detector:ci .
+
+      - name: Verify non-root runtime
+        run: |
+          test "$(docker run --rm --entrypoint whoami soc-anomaly-detector:ci)" = "kuma"
+
+      - name: Verify runtime secret exclusion
+        run: |
+          docker run --rm \
+            --entrypoint sh \
+            soc-anomaly-detector:ci \
+            -c "test ! -f /app/.env"
+
+      - name: Generate Trivy vulnerability report
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: soc-anomaly-detector:ci
+          format: json
+          output: trivy-report.json
+          exit-code: "0"
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          scanners: vuln
+
+      - name: Upload Trivy vulnerability report
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: trivy-container-report
+          path: trivy-report.json
+          if-no-files-found: error
+
+      - name: Scan image for fixable HIGH/CRITICAL vulnerabilities
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: soc-anomaly-detector:ci
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          scanners: vuln

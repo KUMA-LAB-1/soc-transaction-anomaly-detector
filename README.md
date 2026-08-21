@@ -1,29 +1,30 @@
 # 🛡️ SOC Transaction Anomaly Detector
 
-Projeto de análise de dados e detecção de anomalias em transações financeiras desenvolvido durante o Bootcamp **Bradesco - GenAI, Dados & Cyber**.
+Projeto de detecção de anomalias em transações financeiras orientado a apoio de investigação em SOC, desenvolvido a partir do Bootcamp **Bradesco - GenAI, Dados & Cyber**.
 
-Esta versão corresponde à entrega do módulo:
+A versão `v2.0.0` amplia a prova de conceito original com uma arquitetura modular, controles de segurança em PostgreSQL/Supabase, automação de testes e qualidade, persistência de alertas, integração com MITRE ATT&CK e práticas de DevSecOps.
 
-> **Análise de Dados com Python: da preparação à aplicação em segurança**
-
-O sistema integra Python, PostgreSQL, Machine Learning e conceitos de Segurança Cibernética para identificar transações com comportamento fora do padrão, comparar diferentes detectores e gerar um relatório técnico voltado para análise em um SOC.
-
----
+O sistema combina Python, PostgreSQL, Machine Learning e Segurança Cibernética para analisar comportamento transacional, correlacionar sinais de segurança, comparar detectores e produzir artefatos técnicos para apoio à triagem e investigação.
 
 ## 📌 Objetivo
 
 O objetivo do projeto é construir um pipeline capaz de:
 
-- carregar transações armazenadas em PostgreSQL;
+- carregar transações a partir de PostgreSQL/Supabase;
 - validar, limpar e preparar os dados;
-- criar variáveis comportamentais;
-- detectar padrões anômalos;
-- comparar algoritmos de Machine Learning;
-- estimar a severidade dos eventos;
-- correlacionar sinais de segurança com o MITRE ATT&CK;
-- gerar gráficos, métricas e relatório executivo.
+- criar features comportamentais;
+- executar classificação supervisionada para triagem;
+- executar detectores não supervisionados de anomalia;
+- comparar resultados e selecionar automaticamente o detector mais adequado segundo critérios definidos no pipeline;
+- estimar severidade de risco;
+- correlacionar sinais com MITRE ATT&CK;
+- gerar alertas SOC estruturados;
+- persistir alertas opcionalmente em JSONL ou SQLite;
+- registrar auditoria de acesso ao dataset operacional;
+- gerar gráficos, métricas, CSV, JSON e relatório PDF;
+- executar verificações automatizadas de qualidade e segurança por meio do pipeline DevSecOps.
 
----
+O projeto permanece uma **prova de conceito baseada em dados sintéticos** e não deve ser interpretado como sistema de detecção de fraude pronto para produção.
 
 ## 🧪 Natureza dos dados
 
@@ -49,7 +50,7 @@ Nos modelos não supervisionados, o status da transação não participa do trei
 PostgreSQL / Supabase
         │
         ▼
-View de investigação do SOC
+View operacional de investigação do SOC
         │
         ▼
 Validação e preparação dos dados
@@ -57,54 +58,131 @@ Validação e preparação dos dados
         ▼
 Engenharia de features
         │
-        ├── Classificador de triagem
-        ├── Detectores de anomalia
+        ├── Classificador supervisionado de triagem
+        ├── Detectores não supervisionados / novelty detection
         └── Regressão de severidade
                 │
                 ▼
 Comparação de métricas
                 │
                 ▼
-Seleção do melhor detector
+Seleção automática do melhor detector
                 │
-                ▼
-Correlação MITRE ATT&CK
-                │
-                ▼
-Gráficos, JSON, CSV e relatório PDF
+                ├──────────────────────┐
+                ▼                      ▼
+       Correlação MITRE ATT&CK    Geração de alertas SOC
+                │                      │
+                │                Persistência opcional
+                │                  JSONL / SQLite
+                │                      │
+                └───────────┬──────────┘
+                            ▼
+                  Gráficos, métricas,
+                  JSON, CSV e PDF
 ```
+---
+A arquitetura de banco aplica separação de responsabilidades entre o runtime do SOC, a ingestão de Threat Intelligence e os componentes de auditoria.
 
+O runtime utiliza uma view operacional minimizada e uma identidade PostgreSQL dedicada, enquanto a ingestão do MITRE ATT&CK utiliza uma credencial independente com permissões específicas. Essa separação reduz a exposição de dados e aplica o princípio de menor privilégio.
 ---
 
 ## 📂 Estrutura do repositório
 
 ```text
 .
+├── .github/
+│   ├── dependabot.yml
+│   └── workflows/
+│       └── ci.yml
+│
 ├── src/
-│   ├── security_detector.py
+│   ├── alerts/
+│   │   ├── bootstrap.py
+│   │   ├── config.py
+│   │   ├── contract.py
+│   │   ├── engine.py
+│   │   ├── factory.py
+│   │   ├── jsonl_repository.py
+│   │   ├── query.py
+│   │   ├── repository.py
+│   │   ├── serialization.py
+│   │   ├── sqlite_query.py
+│   │   └── sqlite_repository.py
+│   │
+│   ├── data/
+│   │   ├── columns.py
+│   │   ├── repository.py
+│   │   └── validation.py
+│   │
+│   ├── features/
+│   │   └── engineering.py
+│   │
+│   ├── models/
+│   │   ├── anomaly_detection.py
+│   │   ├── classification.py
+│   │   ├── evaluation.py
+│   │   └── regression.py
+│   │
+│   ├── reporting/
+│   │   ├── charts.py
+│   │   ├── metrics.py
+│   │   └── pdf_report.py
+│   │
+│   ├── threat_intel/
+│   │   └── mitre.py
+│   │
 │   ├── db_connector.py
-│   └── ingest_mitre.py
+│   ├── ingest_mitre.py
+│   └── security_detector.py
 │
 ├── database/
-│   ├── schema/
 │   ├── queries/
+│   │   └── forensic_investigation.sql
+│   ├── schema/
+│   │   ├── 00_extensions.sql
+│   │   ├── 01_schema.sql
+│   │   ├── 02_threat_intelligence.sql
+│   │   ├── 03_audit.sql
+│   │   ├── 04_soc_view.sql
+│   │   └── 05_security.sql
 │   └── seeds/
+│       ├── 01_base_entities.sql
+│       ├── exemplo_popular_normal_banco.sql
+│       └── exemplo_popular_anomalia_banco.sql
+│
+├── docs/
+│   ├── architecture/
+│   │   ├── ml-models.md
+│   │   ├── overview.md
+│   │   └── pipeline.md
+│   └── devsecops/
+│       ├── ci-pipeline.md
+│       ├── container-security.md
+│       ├── overview.md
+│       ├── security-controls.md
+│       └── supply-chain.md
 │
 ├── reports/
 │   └── resultado_multimodelo/
 │
-├── docs/
-│   └── .env.example    
-├── README.md
-├── CHANGELOG.md
-├── requirements.txt
+├── tests/
+│   ├── integration/
+│   └── unit/
+│
+├── .dockerignore
+├── .env.example
+├── .gitattributes
 ├── .gitignore
-│ 
-├── LICENSE
-    └── MIT License
-
+├── CHANGELOG.md
+├── Dockerfile
+├── README.md
+├── pyproject.toml
+├── requirements.txt
+├── uv.lock
+└── LICENSE
 ```
-
+---
+A estrutura reflete a modularização introduzida na v2.0.0, separando responsabilidades de dados, Machine Learning, Threat Intelligence, geração e persistência de alertas, reporting, segurança e testes.
 ---
 
 ## 🔎 Engenharia de features
@@ -161,10 +239,10 @@ Os detectores utilizaram o mesmo conjunto de features e foram avaliados com o me
 
 | Modelo | Anomalias | Precision | Recall | F1-score | ROC-AUC | Tempo |
 |---|---:|---:|---:|---:|---:|---:|
-| Elliptic Envelope | 315 | **1,000** | **0,420** | **0,592** | **0,9995** | 0,116 s |
-| Isolation Forest | 315 | 0,917 | 0,385 | 0,543 | 0,9808 | 0,279 s |
-| One-Class SVM | 315 | 0,771 | 0,324 | 0,456 | 0,7185 | **0,059 s** |
-| Local Outlier Factor | 296 | 0,466 | 0,184 | 0,264 | 0,5654 | 0,090 s |
+| Elliptic Envelope | 225 | **0,996** | **0,448** | **0,618** | **0,9992** | 0,096 s |
+| Isolation Forest | 225 | **0,996** | **0,448** | **0,618** | 0,9989 | 0,234 s |
+| One-Class SVM | 224 | 0,875 | 0,392 | 0,541 | 0,7431 | **0,040 s** |
+| Local Outlier Factor | 208 | 0,587 | 0,244 | 0,345 | 0,5938 | 0,047 s |
 
 ### Modelo selecionado
 
@@ -179,8 +257,7 @@ O critério utilizado foi:
 3. maior precision;
 4. menor tempo de execução.
 
-O Elliptic Envelope apresentou o maior F1-score e precision igual a 1,0 no conjunto sintético utilizado.
-
+O Elliptic Envelope apresentou F1-score, recall e precision equivalentes aos do Isolation Forest no conjunto sintético utilizado. Como esses critérios permaneceram empatados, a seleção automática foi definida pelo menor tempo de execução.
 ---
 
 ## 📑 Documentação
@@ -224,27 +301,33 @@ O classificador de triagem atingiu ROC-AUC próximo de `0,99`.
 
 ![Importância das features](reports/resultado_multimodelo/importancia_features_classificador.png)
 
-A feature `zscore_valor_cliente` concentrou aproximadamente 92,3% da importância do classificador.
+A feature `zscore_valor_cliente` concentrou aproximadamente 98,7% da importância do classificador na execução final da v2.0.0.
 
-Esse resultado indica que a separação entre transações normais e suspeitas no conjunto sintético está fortemente relacionada ao desvio do valor em relação ao histórico do cliente.
+Esse resultado indica que, no conjunto sintético utilizado, a separação entre transações normais e suspeitas está fortemente associada ao desvio do valor da transação em relação ao histórico do cliente.
 
-Embora o resultado seja positivo para a prova de conceito, ele também representa uma limitação: o modelo pode estar excessivamente dependente de uma única variável.
+Embora o desempenho seja positivo para a prova de conceito, essa concentração também representa uma limitação experimental: o classificador apresenta forte dependência de uma única variável, o que reduz a diversidade dos sinais utilizados na decisão.
 
 ---
 
 ## 🛡️ Segurança e privacidade
 
-O projeto aplica medidas como:
+A v2.0.0 aplica controles de segurança em diferentes camadas do projeto:
 
-- conexão SSL obrigatória com o banco;
-- credenciais armazenadas fora do código;
-- pseudonimização dos clientes;
-- auditoria de acesso;
-- políticas de segurança no PostgreSQL;
-- correlação entre transações e eventos de segurança;
-- minimização da exposição de dados nos relatórios.
+- conexão SSL obrigatória com PostgreSQL/Supabase;
+- credenciais mantidas fora do código por meio de variáveis de ambiente;
+- separação de identidades PostgreSQL por responsabilidade;
+- princípio de menor privilégio;
+- Row Level Security (RLS);
+- revogação de privilégios padrão desnecessários;
+- view operacional minimizada para o runtime do SOC;
+- pseudonimização persistente dos clientes;
+- auditoria de acessos ao dataset;
+- separação entre runtime do SOC, ingestão MITRE ATT&CK e auditoria;
+- consultas forenses privilegiadas isoladas do fluxo operacional;
+- minimização da exposição de dados nos relatórios;
+- secret scanning, análise estática, auditoria de dependências e scan de container no pipeline de CI/CD.
 
-Os dados utilizados são sintéticos e não representam clientes ou operações reais.
+Os dados utilizados são sintéticos e não representam clientes, contas ou operações reais.
 
 ---
 
@@ -269,17 +352,38 @@ O mapeamento é utilizado como apoio à investigação e não representa confirm
 ### 1. Clonar o repositório
 
 ```bash
-git clone https://github.com/SEU_USUARIO/soc-transaction-anomaly-detector.git
+git clone https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector.git
 cd soc-transaction-anomaly-detector
 ```
 
-### 2. Criar o ambiente virtual
+### 2. Preparar o ambiente Python
+
+A versão 2.0.0 utiliza Python 3.12.
+
+#### Opção recomendada: `uv`
+
+Com o `uv` instalado:
+
+```bash
+uv sync
+```
+
+Esse comando cria ou sincroniza o ambiente virtual do projeto a partir de `pyproject.toml` e `uv.lock`, preservando as versões resolvidas para a v2.0.0.
+
+Para executar comandos dentro desse ambiente, utilize:
+
+```bash
+uv run <comando>
+```
+
+#### Alternativa: `venv` + `pip`
 
 No Windows:
 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
 No Linux ou macOS:
@@ -287,27 +391,14 @@ No Linux ou macOS:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-```
-
-### 3. Instalar as dependências
-
-```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configurar a conexão
+O arquivo `requirements.txt` permanece disponível como alternativa simplificada para instalação das dependências de runtime.
 
-Copie o arquivo de exemplo:
+### 3. Configurar as variáveis de ambiente
 
-```text
-.env.example
-```
-
-para um arquivo `.env` na raiz do projeto:
-
-```text
-.env
-```
+Copie `.env.example` para um arquivo `.env` na raiz do projeto.
 
 Depois configure as credenciais de banco de acordo com a responsabilidade de cada componente:
 
@@ -317,9 +408,17 @@ Depois configure as credenciais de banco de acordo com a responsabilidade de cad
 
 Essa separação aplica o princípio de menor privilégio, evitando que o pipeline operacional e a rotina de ingestão de inteligência de ameaças compartilhem uma credencial de banco com permissões excessivas.
 
+Além das credenciais de banco, a persistência de alertas pode ser configurada por meio de:
+
+- `ALERT_STORAGE`: backend de persistência dos alertas;
+- `ALERT_JSONL_PATH`: caminho utilizado para persistência em JSONL;
+- demais opções de armazenamento documentadas no `.env.example`.
+
+Por padrão, `ALERT_STORAGE=none`, permitindo executar o pipeline sem persistir alertas localmente.
+
 > O arquivo `.env` não deve ser versionado. Utilize `.env.example` apenas como referência de configuração.
 
-### 5. Preparar o banco
+### 4. Preparar o banco
 
 Execute os scripts de `database/schema/` nesta ordem:
 
@@ -348,19 +447,37 @@ database/queries/forensic_investigation.sql
 
 são destinadas a investigação forense manual e privilegiada e não fazem parte do fluxo normal de inicialização do banco.
 
-### 6. Importar o MITRE ATT&CK
+### 5. Importar o MITRE ATT&CK
+
+Com `uv`:
+
+```bash
+uv run python src/ingest_mitre.py
+```
+
+Ou, com o ambiente virtual já ativado:
 
 ```bash
 python src/ingest_mitre.py
 ```
 
-### 7. Executar o detector
+### 6. Executar o detector
+
+Com `uv`:
+
+```bash
+uv run python -m src.security_detector
+```
+
+Ou, com o ambiente virtual já ativado:
 
 ```bash
 python -m src.security_detector
 ```
 
-Os resultados serão gerados na pasta `reports`.
+Os artefatos de execução são gerados em `reports/`.
+
+O snapshot público utilizado na documentação e no README é mantido em `reports/resultado_multimodelo/`.
 
 ---
 

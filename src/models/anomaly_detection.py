@@ -10,8 +10,17 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import OneClassSVM
 
 from .evaluation import avaliar_detector
+from .validation import dividir_holdout_temporal
 
 CONTAMINATION_TETO_PRATICO = 0.15
+
+ESTRATEGIA_IN_SAMPLE = "in_sample"
+ESTRATEGIA_TEMPORAL = "temporal"
+
+ESTRATEGIAS_VALIDACAO = {
+    ESTRATEGIA_IN_SAMPLE,
+    ESTRATEGIA_TEMPORAL,
+}
 
 FEATURES_ANOMALIA = [
     "valor_transacao",
@@ -30,15 +39,14 @@ STATUS_SUSPEITOS = [
 ]
 
 
-def executar_detectores_anomalia(df: pd.DataFrame) -> dict:
+def executar_detectores_anomalia(
+    df: pd.DataFrame,
+    *,
+    estrategia_validacao: str = ESTRATEGIA_IN_SAMPLE,
+) -> dict:
     """Executa os detectores de anomalia usando uma configuração comum."""
-    taxa_suspeita_real = df["status_transacao"].isin(STATUS_SUSPEITOS).mean()
-
-    contamination_estimado = float(np.clip(taxa_suspeita_real, 0.02, 0.30))
-    contamination = min(
-        contamination_estimado,
-        CONTAMINATION_TETO_PRATICO,
-    )
+    if estrategia_validacao not in ESTRATEGIAS_VALIDACAO:
+        raise ValueError("estrategia_validacao deve ser 'in_sample' ou 'temporal'.")
 
     features = [coluna for coluna in FEATURES_ANOMALIA if coluna in df.columns]
 
@@ -46,7 +54,52 @@ def executar_detectores_anomalia(df: pd.DataFrame) -> dict:
 
     y_real = df["status_transacao"].isin(STATUS_SUSPEITOS).astype(int)
 
-    n_vizinhos = max(5, min(35, len(X) - 1))
+    taxa_suspeita_real = float(y_real.mean())
+
+    if estrategia_validacao == ESTRATEGIA_TEMPORAL:
+        indices_treino, indices_avaliacao = dividir_holdout_temporal(
+            df,
+            test_size=0.25,
+        )
+
+        X_treino = X.iloc[indices_treino]
+        X_avaliacao = X.iloc[indices_avaliacao]
+
+        y_treino = y_real.iloc[indices_treino]
+        y_avaliacao = y_real.iloc[indices_avaliacao]
+
+        taxa_referencia_contamination = float(y_treino.mean())
+    else:
+        indices_treino = np.arange(len(df))
+        indices_avaliacao = np.arange(len(df))
+
+        X_treino = X
+        X_avaliacao = X
+
+        y_avaliacao = y_real
+
+        taxa_referencia_contamination = taxa_suspeita_real
+
+    contamination_estimado = float(
+        np.clip(
+            taxa_referencia_contamination,
+            0.02,
+            0.30,
+        )
+    )
+
+    contamination = min(
+        contamination_estimado,
+        CONTAMINATION_TETO_PRATICO,
+    )
+
+    n_vizinhos = max(
+        5,
+        min(
+            35,
+            len(X_treino) - 1,
+        ),
+    )
 
     detectores = {
         "isolation_forest": IsolationForest(
@@ -105,20 +158,22 @@ def executar_detectores_anomalia(df: pd.DataFrame) -> dict:
         inicio = time.perf_counter()
 
         try:
-            modelo.fit(X)
+            modelo.fit(X_treino)
 
-            predicao_original = modelo.predict(X)
-            score_original = modelo.decision_function(X)
-
+            predicao_original = modelo.predict(X_avaliacao)
+            score_original = modelo.decision_function(X_avaliacao)
             segundos = time.perf_counter() - inicio
 
             avaliacao = avaliar_detector(
-                y_real=y_real,
+                y_real=y_avaliacao,
                 predicao_original=predicao_original,
                 score_original=score_original,
             )
 
             resultado = {
+                "estrategia_validacao": estrategia_validacao,
+                "n_treino": len(X_treino),
+                "n_avaliacao": len(X_avaliacao),
                 "modelo": nome,
                 "status": "ok",
                 "features": features,
@@ -133,7 +188,8 @@ def executar_detectores_anomalia(df: pd.DataFrame) -> dict:
                 "tempo_segundos": float(segundos),
                 "nota": (
                     "Modelo não supervisionado/novelty detection. "
-                    "status_transacao foi usado somente para auditoria comparativa."
+                    "status_transacao é usado nesta etapa para calibrar "
+                    "contamination e para auditoria retrospectiva."
                 ),
             }
 
@@ -161,6 +217,11 @@ def executar_detectores_anomalia(df: pd.DataFrame) -> dict:
         "resultados": resultados,
         "modelos": modelos,
         "predicoes": predicoes,
+        "estrategia_validacao": estrategia_validacao,
+        "indices_treino": indices_treino,
+        "indices_avaliacao": indices_avaliacao,
+        "n_treino": len(X_treino),
+        "n_avaliacao": len(X_avaliacao),
         "taxa_suspeita_real": float(taxa_suspeita_real),
         "contamination_estimado": contamination_estimado,
         "contamination": contamination,

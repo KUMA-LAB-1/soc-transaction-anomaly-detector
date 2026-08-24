@@ -2,7 +2,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.models.validation import dividir_holdout_temporal
+from src.models.validation import (
+    criar_folds_temporais,
+    dividir_holdout_temporal,
+)
 
 
 def criar_dataset_temporal() -> pd.DataFrame:
@@ -175,3 +178,182 @@ def test_holdout_temporal_rejeita_timestamp_invalido():
 
     with pytest.raises(ValueError):
         dividir_holdout_temporal(df)
+
+
+def test_cv_temporal_cria_quantidade_esperada_de_folds():
+    df = pd.DataFrame(
+        {
+            "data_hora_transacao": pd.date_range(
+                "2026-01-01",
+                periods=20,
+                freq="h",
+            )
+        }
+    )
+
+    folds = criar_folds_temporais(
+        df,
+        n_splits=3,
+    )
+
+    assert len(folds) == 3
+
+
+def test_cv_temporal_usa_janela_de_treino_expansiva():
+    df = pd.DataFrame(
+        {
+            "data_hora_transacao": pd.date_range(
+                "2026-01-01",
+                periods=20,
+                freq="h",
+            )
+        }
+    )
+
+    folds = criar_folds_temporais(
+        df,
+        n_splits=3,
+    )
+
+    tamanhos_treino = [len(indices_treino) for indices_treino, _ in folds]
+
+    assert tamanhos_treino == sorted(tamanhos_treino)
+    assert len(set(tamanhos_treino)) == len(tamanhos_treino)
+
+
+def test_cv_temporal_treina_sempre_antes_do_teste():
+    df = pd.DataFrame(
+        {
+            "data_hora_transacao": [
+                "2026-08-04 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-06 10:00:00",
+                "2026-08-02 10:00:00",
+                "2026-08-05 10:00:00",
+                "2026-08-03 10:00:00",
+                "2026-08-07 10:00:00",
+                "2026-08-08 10:00:00",
+            ]
+        }
+    )
+
+    folds = criar_folds_temporais(
+        df,
+        n_splits=3,
+    )
+
+    timestamps = pd.to_datetime(df["data_hora_transacao"])
+
+    for treino, teste in folds:
+        assert timestamps.iloc[treino].max() <= timestamps.iloc[teste].min()
+
+
+def test_cv_temporal_retorna_indices_do_dataframe_original():
+    df = pd.DataFrame(
+        {
+            "data_hora_transacao": [
+                "2026-08-04 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-03 10:00:00",
+                "2026-08-02 10:00:00",
+                "2026-08-05 10:00:00",
+                "2026-08-06 10:00:00",
+            ]
+        }
+    )
+
+    folds = criar_folds_temporais(
+        df,
+        n_splits=2,
+    )
+
+    primeiro_treino, primeiro_teste = folds[0]
+
+    assert primeiro_treino.tolist() == [1, 3]
+    assert primeiro_teste.tolist() == [2, 0]
+
+
+def test_cv_temporal_respeita_gap():
+    df = pd.DataFrame(
+        {
+            "data_hora_transacao": pd.date_range(
+                "2026-01-01",
+                periods=12,
+                freq="h",
+            )
+        }
+    )
+
+    folds_sem_gap = criar_folds_temporais(
+        df,
+        n_splits=3,
+        gap=0,
+    )
+
+    folds_com_gap = criar_folds_temporais(
+        df,
+        n_splits=3,
+        gap=1,
+    )
+
+    for (treino_sem_gap, _), (treino_com_gap, _) in zip(
+        folds_sem_gap,
+        folds_com_gap,
+        strict=True,
+    ):
+        assert len(treino_com_gap) == len(treino_sem_gap) - 1
+
+
+@pytest.mark.parametrize(
+    "n_splits",
+    [
+        0,
+        1,
+        -1,
+    ],
+)
+def test_cv_temporal_rejeita_numero_invalido_de_folds(n_splits):
+    df = criar_dataset_temporal()
+
+    with pytest.raises(
+        ValueError,
+        match="n_splits deve ser pelo menos 2",
+    ):
+        criar_folds_temporais(
+            df,
+            n_splits=n_splits,
+        )
+
+
+def test_cv_temporal_rejeita_gap_negativo():
+    df = criar_dataset_temporal()
+
+    with pytest.raises(
+        ValueError,
+        match="gap não pode ser negativo",
+    ):
+        criar_folds_temporais(
+            df,
+            gap=-1,
+        )
+
+
+def test_cv_temporal_rejeita_dataset_pequeno_demais():
+    df = pd.DataFrame(
+        {
+            "data_hora_transacao": [
+                "2026-08-01 10:00:00",
+                "2026-08-01 11:00:00",
+                "2026-08-01 12:00:00",
+            ]
+        }
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="não possui registros suficientes",
+    ):
+        criar_folds_temporais(
+            df,
+            n_splits=3,
+        )

@@ -2,8 +2,37 @@ import math
 
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import TimeSeriesSplit
 
 COLUNA_TEMPO_PADRAO = "data_hora_transacao"
+
+
+def _ordenar_indices_temporais(
+    df: pd.DataFrame,
+    coluna_tempo: str,
+) -> np.ndarray:
+    """Retorna posições do DataFrame ordenadas cronologicamente."""
+    if coluna_tempo not in df.columns:
+        raise ValueError(f"Dataset sem a coluna temporal obrigatória '{coluna_tempo}'.")
+
+    timestamps = pd.to_datetime(
+        df[coluna_tempo],
+        errors="raise",
+    )
+
+    return (
+        pd.DataFrame(
+            {
+                "_posicao": np.arange(len(df)),
+                "_timestamp": timestamps.to_numpy(),
+            }
+        )
+        .sort_values(
+            "_timestamp",
+            kind="stable",
+        )["_posicao"]
+        .to_numpy()
+    )
 
 
 def dividir_holdout_temporal(
@@ -21,29 +50,12 @@ def dividir_holdout_temporal(
     if not 0 < test_size < 1:
         raise ValueError("test_size deve estar entre 0 e 1.")
 
-    if coluna_tempo not in df.columns:
-        raise ValueError(f"Dataset sem a coluna temporal obrigatória '{coluna_tempo}'.")
-
     if len(df) < 2:
         raise ValueError("Holdout temporal exige pelo menos 2 registros.")
 
-    timestamps = pd.to_datetime(
-        df[coluna_tempo],
-        errors="raise",
-    )
-
-    ordem = (
-        pd.DataFrame(
-            {
-                "_posicao": np.arange(len(df)),
-                "_timestamp": timestamps.to_numpy(),
-            }
-        )
-        .sort_values(
-            "_timestamp",
-            kind="stable",
-        )["_posicao"]
-        .to_numpy()
+    ordem = _ordenar_indices_temporais(
+        df,
+        coluna_tempo,
     )
 
     n_teste = max(
@@ -61,3 +73,45 @@ def dividir_holdout_temporal(
     indices_teste = ordem[n_treino:]
 
     return indices_treino, indices_teste
+
+
+def criar_folds_temporais(
+    df: pd.DataFrame,
+    *,
+    n_splits: int = 3,
+    gap: int = 0,
+    coluna_tempo: str = COLUNA_TEMPO_PADRAO,
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Cria folds temporais com janela de treino expansiva."""
+    if n_splits < 2:
+        raise ValueError("n_splits deve ser pelo menos 2.")
+
+    if gap < 0:
+        raise ValueError("gap não pode ser negativo.")
+
+    if len(df) <= n_splits:
+        raise ValueError(
+            "Dataset não possui registros suficientes para os folds temporais."
+        )
+
+    ordem = _ordenar_indices_temporais(
+        df,
+        coluna_tempo,
+    )
+
+    splitter = TimeSeriesSplit(
+        n_splits=n_splits,
+        gap=gap,
+    )
+
+    folds = []
+
+    for treino_ordenado, teste_ordenado in splitter.split(ordem):
+        folds.append(
+            (
+                ordem[treino_ordenado],
+                ordem[teste_ordenado],
+            )
+        )
+
+    return folds

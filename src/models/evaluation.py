@@ -35,17 +35,21 @@ def avaliar_detector(
     }
 
 
-def selecionar_melhor_detector(
+def selecionar_melhor_detector_benchmark(
     resultados_validos: list[dict],
 ) -> dict:
-    """Seleciona o melhor detector pelos critérios definidos pelo projeto.
+    """Seleciona o melhor detector no benchmark retrospectivo.
 
     Critérios, nesta ordem:
     1. maior F1-score;
     2. maior recall;
     3. maior precision;
     4. menor tempo de execução.
+
+    A seleção representa desempenho retrospectivo contra os labels
+    disponíveis e não constitui, por si só, promoção operacional.
     """
+
     if not resultados_validos:
         raise RuntimeError(
             "Nenhum detector de anomalia conseguiu concluir o treinamento."
@@ -60,3 +64,10 @@ def selecionar_melhor_detector(
             -resultado["tempo_segundos"],
         ),
     )
+
+
+def selecionar_melhor_detector(
+    resultados_validos: list[dict],
+) -> dict:
+    """Compatibilidade com a API anterior."""
+    return selecionar_melhor_detector_benchmark(resultados_validos)

@@ -7,27 +7,47 @@ def criar_features(df: pd.DataFrame) -> pd.DataFrame:
     """Cria features históricas e sinais utilizados pelos modelos do SOC."""
     col_cliente = resolver_coluna_cliente(df)
 
-    df = df.sort_values([col_cliente, "data_hora_transacao"]).reset_index(drop=True)
+    df["data_hora_transacao"] = pd.to_datetime(df["data_hora_transacao"])
 
-    grupo_cliente = df.groupby(col_cliente, group_keys=False)["valor_transacao"]
+    # Ordem cronológica global. O cliente é usado apenas como critério
+    # determinístico de desempate quando duas transações possuem o mesmo horário.
+    df = df.sort_values(
+        ["data_hora_transacao", col_cliente],
+        kind="stable",
+    ).reset_index(drop=True)
 
-    df["media_historica_cliente"] = grupo_cliente.apply(
+    grupo_cliente = df.groupby(col_cliente)["valor_transacao"]
+
+    # Histórico individual do cliente.
+    # shift(1) garante que a transação atual nunca participe do próprio baseline.
+    df["media_historica_cliente"] = grupo_cliente.transform(
         lambda serie: serie.shift(1).expanding().mean()
     )
 
-    df["desvio_historico_cliente"] = grupo_cliente.apply(
+    df["desvio_historico_cliente"] = grupo_cliente.transform(
         lambda serie: serie.shift(1).expanding().std()
     )
 
     df["qtd_transacoes_anteriores"] = df.groupby(col_cliente).cumcount()
 
-    media_global = df["valor_transacao"].mean()
-    desvio_global = df["valor_transacao"].std() or 1.0
+    # Fallback global também estritamente causal.
+    # Apenas transações cronologicamente anteriores podem participar dele.
+    historico_global = df["valor_transacao"].shift(1)
 
-    df["media_historica_cliente"] = df["media_historica_cliente"].fillna(media_global)
+    media_global_historica = historico_global.expanding().mean()
+    desvio_global_historico = historico_global.expanding().std()
+
+    df["media_historica_cliente"] = (
+        df["media_historica_cliente"]
+        .fillna(media_global_historica)
+        .fillna(df["valor_transacao"])
+    )
 
     df["desvio_historico_cliente"] = (
-        df["desvio_historico_cliente"].fillna(desvio_global).replace(0, 0.01)
+        df["desvio_historico_cliente"]
+        .fillna(desvio_global_historico)
+        .fillna(1.0)
+        .replace(0, 0.01)
     )
 
     df["zscore_valor_cliente"] = (

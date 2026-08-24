@@ -3,6 +3,62 @@ import pandas as pd
 from src.features.engineering import criar_features
 
 
+def test_features_historicas_nao_usam_eventos_futuros():
+    df_passado = pd.DataFrame(
+        {
+            "cliente_pseudonimo": [
+                "cliente-a",
+                "cliente-b",
+                "cliente-a",
+            ],
+            "valor_transacao": [
+                100.0,
+                200.0,
+                120.0,
+            ],
+            "data_hora_transacao": [
+                "2026-08-15 10:00:00",
+                "2026-08-15 10:30:00",
+                "2026-08-15 11:00:00",
+            ],
+        }
+    )
+
+    df_com_futuro = pd.concat(
+        [
+            df_passado,
+            pd.DataFrame(
+                {
+                    "cliente_pseudonimo": ["cliente-b"],
+                    "valor_transacao": [1_000_000.0],
+                    "data_hora_transacao": [
+                        "2026-08-15 12:00:00",
+                    ],
+                }
+            ),
+        ],
+        ignore_index=True,
+    )
+
+    resultado_passado = criar_features(df_passado)
+    resultado_com_futuro = criar_features(df_com_futuro)
+
+    colunas_historicas = [
+        "media_historica_cliente",
+        "desvio_historico_cliente",
+        "qtd_transacoes_anteriores",
+        "zscore_valor_cliente",
+    ]
+
+    pd.testing.assert_frame_equal(
+        resultado_passado[colunas_historicas].reset_index(drop=True),
+        resultado_com_futuro[colunas_historicas]
+        .iloc[: len(resultado_passado)]
+        .reset_index(drop=True),
+        check_dtype=False,
+    )
+
+
 def criar_dataset_base():
     return pd.DataFrame(
         {

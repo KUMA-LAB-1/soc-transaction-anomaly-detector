@@ -8,6 +8,8 @@ from sklearn.metrics import (
 from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from sklearn.tree import DecisionTreeClassifier
 
+from .validation import criar_folds_temporais, dividir_holdout_temporal
+
 FEATURES_BASE_CLASSIFICACAO = [
     "hora",
     "media_historica_cliente",
@@ -26,9 +28,24 @@ STATUS_SUSPEITOS = [
     "Bloqueada por Suspeita",
 ]
 
+ESTRATEGIA_RANDOM = "random"
+ESTRATEGIA_TEMPORAL = "temporal"
 
-def treinar_classificador_triagem(df: pd.DataFrame) -> dict:
+ESTRATEGIAS_VALIDACAO = {
+    ESTRATEGIA_RANDOM,
+    ESTRATEGIA_TEMPORAL,
+}
+
+
+def treinar_classificador_triagem(
+    df: pd.DataFrame,
+    *,
+    estrategia_validacao: str = ESTRATEGIA_RANDOM,
+) -> dict:
     """Treina e avalia o classificador supervisionado de triagem do SOC."""
+    if estrategia_validacao not in ESTRATEGIAS_VALIDACAO:
+        raise ValueError("estrategia_validacao deve ser 'random' ou 'temporal'.")
+
     df_class = pd.get_dummies(
         df,
         columns=["tipo_transacao"],
@@ -46,15 +63,26 @@ def treinar_classificador_triagem(df: pd.DataFrame) -> dict:
 
     y = df_class["status_transacao"].isin(STATUS_SUSPEITOS).astype(int)
 
-    estratificar = y if y.nunique() > 1 else None
+    if estrategia_validacao == ESTRATEGIA_TEMPORAL:
+        indices_treino, indices_teste = dividir_holdout_temporal(
+            df_class,
+            test_size=0.25,
+        )
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
-        test_size=0.25,
-        random_state=42,
-        stratify=estratificar,
-    )
+        X_train = X.iloc[indices_treino]
+        X_test = X.iloc[indices_teste]
+        y_train = y.iloc[indices_treino]
+        y_test = y.iloc[indices_teste]
+    else:
+        estratificar = y if y.nunique() > 1 else None
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            X,
+            y,
+            test_size=0.25,
+            random_state=42,
+            stratify=estratificar,
+        )
 
     modelo = DecisionTreeClassifier(
         max_depth=4,
@@ -83,7 +111,29 @@ def treinar_classificador_triagem(df: pd.DataFrame) -> dict:
 
     cv_scores = []
 
-    if y.nunique() > 1 and y.value_counts().min() >= 3:
+    if estrategia_validacao == ESTRATEGIA_TEMPORAL:
+        folds_temporais = criar_folds_temporais(
+            df_class,
+            n_splits=3,
+        )
+
+        folds_validos = [
+            (indices_treino, indices_teste)
+            for indices_treino, indices_teste in folds_temporais
+            if y.iloc[indices_treino].nunique() > 1
+            and y.iloc[indices_teste].nunique() > 1
+        ]
+
+        if folds_validos:
+            cv_scores = cross_val_score(
+                modelo,
+                X,
+                y,
+                cv=folds_validos,
+                scoring="roc_auc",
+            ).tolist()
+
+    elif y.nunique() > 1 and y.value_counts().min() >= 3:
         skf = StratifiedKFold(
             n_splits=3,
             shuffle=True,
@@ -107,6 +157,7 @@ def treinar_classificador_triagem(df: pd.DataFrame) -> dict:
         proba_suspeita = np.full(len(X_full), valor_constante)
 
     metricas = {
+        "estrategia_validacao": estrategia_validacao,
         "n_treino": len(X_train),
         "n_teste": len(X_test),
         "classes_no_treino": classes_no_treino,

@@ -321,9 +321,9 @@ class SecurityDetector:
 
     def _gerar_alertas(self, df: pd.DataFrame) -> list[Alert]:
         """Transforma registros analíticos elegíveis em alertas SOC estruturados."""
-        if self.melhor_detector is None:
+        if self.detector_operacional is None:
             raise RuntimeError(
-                "melhor detector deve ser definido antes da geração de alertas"
+                "detector operacional deve ser definido antes da geração de alertas"
             )
 
         evidencias_observadas = {
@@ -345,7 +345,7 @@ class SecurityDetector:
 
             alerta = criar_alerta(
                 registro,
-                detector=self.melhor_detector,
+                detector=self.detector_operacional,
                 aviso_amostra_pequena=self.aviso_amostra_pequena,
                 evidencias_observadas=evidencias_observadas,
             )
@@ -375,7 +375,7 @@ class SecurityDetector:
         return gerar_relatorio_pdf(
             df_analisado=df_analisado,
             metricas=self.metricas,
-            melhor_detector=self.melhor_detector,
+            melhor_detector=self.detector_operacional,
             aviso_amostra_pequena=self.aviso_amostra_pequena,
             engine=self.engine,
         )

@@ -155,7 +155,8 @@ def test_persistir_alertas_delega_cada_alerta_ao_repository(monkeypatch):
 
 def test_gerar_alertas_cria_alerta_apenas_para_registro_elegivel(monkeypatch):
     detector = criar_detector(monkeypatch)
-    detector.melhor_detector = "isolation_forest"
+    detector.detector_operacional = "isolation_forest"
+    detector.melhor_detector = "detector_legado"
 
     alertas = detector._gerar_alertas(criar_dataframe_alertas())
 
@@ -172,7 +173,7 @@ def test_gerar_alertas_cria_alerta_apenas_para_registro_elegivel(monkeypatch):
 
 def test_gerar_alertas_retorna_lista_vazia_sem_registros_elegiveis(monkeypatch):
     detector = criar_detector(monkeypatch)
-    detector.melhor_detector = "isolation_forest"
+    detector.detector_operacional = "isolation_forest"
 
     df = criar_dataframe_alertas()
 
@@ -187,7 +188,7 @@ def test_gerar_alertas_retorna_lista_vazia_sem_registros_elegiveis(monkeypatch):
 
 def test_gerar_alertas_propaga_aviso_amostra_pequena(monkeypatch):
     detector = criar_detector(monkeypatch)
-    detector.melhor_detector = "isolation_forest"
+    detector.detector_operacional = "isolation_forest"
     detector.aviso_amostra_pequena = True
 
     alertas = detector._gerar_alertas(criar_dataframe_alertas())
@@ -198,7 +199,7 @@ def test_gerar_alertas_propaga_aviso_amostra_pequena(monkeypatch):
 
 def test_gerar_alertas_preserva_evidencias_observadas(monkeypatch):
     detector = criar_detector(monkeypatch)
-    detector.melhor_detector = "isolation_forest"
+    detector.detector_operacional = "isolation_forest"
 
     df = criar_dataframe_alertas().drop(
         columns=[
@@ -222,12 +223,12 @@ def test_gerar_alertas_preserva_evidencias_observadas(monkeypatch):
     )
 
 
-def test_gerar_alertas_exige_melhor_detector(monkeypatch):
+def test_gerar_alertas_exige_detector_operacional(monkeypatch):
     detector = criar_detector(monkeypatch)
 
     with pytest.raises(
         RuntimeError,
-        match="melhor detector deve ser definido",
+        match="detector operacional deve ser definido",
     ):
         detector._gerar_alertas(criar_dataframe_alertas())
 
@@ -515,7 +516,8 @@ def test_gerar_pdf_report_delega_para_reporting(monkeypatch):
     detector = criar_detector(monkeypatch)
 
     detector.metricas = {"teste": 123}
-    detector.melhor_detector = "elliptic_envelope"
+    detector.detector_operacional = "elliptic_envelope"
+    detector.melhor_detector = "detector_legado"
     detector.aviso_amostra_pequena = False
 
     df = pd.DataFrame(

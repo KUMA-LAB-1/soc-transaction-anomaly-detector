@@ -12,7 +12,9 @@ from sklearn.svm import OneClassSVM
 from .evaluation import avaliar_detector
 from .validation import dividir_holdout_temporal
 
+CONTAMINATION_PISO_PRATICO = 0.02
 CONTAMINATION_TETO_PRATICO = 0.15
+CONTAMINATION_PADRAO = CONTAMINATION_TETO_PRATICO
 
 ESTRATEGIA_IN_SAMPLE = "in_sample"
 ESTRATEGIA_TEMPORAL = "temporal"
@@ -43,10 +45,20 @@ def executar_detectores_anomalia(
     df: pd.DataFrame,
     *,
     estrategia_validacao: str = ESTRATEGIA_IN_SAMPLE,
+    contamination: float = CONTAMINATION_PADRAO,
 ) -> dict:
     """Executa os detectores de anomalia usando uma configuração comum."""
     if estrategia_validacao not in ESTRATEGIAS_VALIDACAO:
         raise ValueError("estrategia_validacao deve ser 'in_sample' ou 'temporal'.")
+
+    contamination = float(contamination)
+
+    if (
+        not np.isfinite(contamination)
+        or contamination < CONTAMINATION_PISO_PRATICO
+        or contamination > CONTAMINATION_TETO_PRATICO
+    ):
+        raise ValueError("contamination deve estar entre 0.02 e 0.15.")
 
     features = [coluna for coluna in FEATURES_ANOMALIA if coluna in df.columns]
 
@@ -65,10 +77,8 @@ def executar_detectores_anomalia(
         X_treino = X.iloc[indices_treino]
         X_avaliacao = X.iloc[indices_avaliacao]
 
-        y_treino = y_real.iloc[indices_treino]
         y_avaliacao = y_real.iloc[indices_avaliacao]
 
-        taxa_referencia_contamination = float(y_treino.mean())
     else:
         indices_treino = np.arange(len(df))
         indices_avaliacao = np.arange(len(df))
@@ -77,21 +87,6 @@ def executar_detectores_anomalia(
         X_avaliacao = X
 
         y_avaliacao = y_real
-
-        taxa_referencia_contamination = taxa_suspeita_real
-
-    contamination_estimado = float(
-        np.clip(
-            taxa_referencia_contamination,
-            0.02,
-            0.30,
-        )
-    )
-
-    contamination = min(
-        contamination_estimado,
-        CONTAMINATION_TETO_PRATICO,
-    )
 
     n_vizinhos = max(
         5,
@@ -177,7 +172,7 @@ def executar_detectores_anomalia(
                 "modelo": nome,
                 "status": "ok",
                 "features": features,
-                "contamination_estimado": contamination_estimado,
+                "contamination_configurado": contamination,
                 "contamination_usado": contamination,
                 "qtd_anomalias": int(avaliacao["y_pred"].sum()),
                 "taxa_anomalias": float(avaliacao["y_pred"].mean()),
@@ -188,8 +183,8 @@ def executar_detectores_anomalia(
                 "tempo_segundos": float(segundos),
                 "nota": (
                     "Modelo não supervisionado/novelty detection. "
-                    "status_transacao é usado nesta etapa para calibrar "
-                    "contamination e para auditoria retrospectiva."
+                    "status_transacao é usado somente para auditoria retrospectiva "
+                    "e não configura os detectores."
                 ),
             }
 
@@ -223,6 +218,6 @@ def executar_detectores_anomalia(
         "n_treino": len(X_treino),
         "n_avaliacao": len(X_avaliacao),
         "taxa_suspeita_real": float(taxa_suspeita_real),
-        "contamination_estimado": contamination_estimado,
+        "contamination_configurado": contamination,
         "contamination": contamination,
     }

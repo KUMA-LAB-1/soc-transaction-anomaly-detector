@@ -33,7 +33,7 @@ from .db_connector import DBConnector
 from .features.engineering import criar_features
 from .models.anomaly_detection import executar_detectores_anomalia
 from .models.classification import treinar_classificador_triagem
-from .models.evaluation import selecionar_melhor_detector
+from .models.evaluation import selecionar_melhor_detector_benchmark
 from .models.regression import treinar_regressao_severidade
 from .reporting.charts import (
     gerar_grafico_comparacao,
@@ -71,8 +71,15 @@ class SecurityDetector:
         self.modelo_classificacao = None
         self.modelo_agrupamento = None
         self.modelos_anomalia = {}
+
+        self.melhor_detector_benchmark = None
+        self.detector_operacional = None
+
+        # Compatibilidade temporária com consumidores da API anterior.
         self.melhor_detector = None
+
         self.modelo_regressao = None
+
         self.metricas = {}
         self.aviso_amostra_pequena = False
         self.alertas: list[Alert] = []
@@ -219,18 +226,36 @@ class SecurityDetector:
             )
 
         validos = [r for r in resultados if r.get("status") == "ok"]
-        melhor = selecionar_melhor_detector(validos)
 
-        self.melhor_detector = melhor["modelo"]
-        self.modelo_agrupamento = self.modelos_anomalia[self.melhor_detector]
+        melhor_benchmark = selecionar_melhor_detector_benchmark(validos)
+
+        self.melhor_detector_benchmark = melhor_benchmark["modelo"]
+
+        # Política transitória: enquanto a seleção operacional explícita
+        # não for introduzida, o detector operacional acompanha o
+        # vencedor do benchmark para preservar o comportamento atual.
+        self.detector_operacional = self.melhor_detector_benchmark
+
+        # Alias temporário de compatibilidade com consumidores existentes.
+        self.melhor_detector = self.detector_operacional
+
+        self.modelo_agrupamento = self.modelos_anomalia[self.detector_operacional]
 
         # Mantém compatibilidade com o restante do pipeline e com o PDF.
-        df["anomalia_score"] = df[f"anomalia_{self.melhor_detector}"]
-        df["anomalia_score_bruto"] = df[f"score_anomalia_{self.melhor_detector}"]
+        df["anomalia_score"] = df[f"anomalia_{self.detector_operacional}"]
+        df["anomalia_score_bruto"] = df[f"score_anomalia_{self.detector_operacional}"]
 
         self.metricas["comparacao_detectores"] = {
-            "criterio_selecao": "maior F1; desempate por recall, precision e menor tempo",
+            "criterio_selecao": (
+                "maior F1; desempate por recall, precision e menor tempo"
+            ),
+            "criterio_benchmark": (
+                "maior F1; desempate por recall, precision e menor tempo"
+            ),
             "melhor_modelo": self.melhor_detector,
+            "melhor_modelo_benchmark": self.melhor_detector_benchmark,
+            "detector_operacional": self.detector_operacional,
+            "politica_operacional": "temporariamente_alinhado_ao_benchmark",
             "resultados": resultados,
         }
 
@@ -251,7 +276,10 @@ class SecurityDetector:
             )
 
         gerar_grafico_comparacao(comparacao)
-        print(f"\n   🏆 Detector selecionado para o relatório: {self.melhor_detector}")
+
+        print(f"\n   🏆 Melhor detector no benchmark: {self.melhor_detector_benchmark}")
+        print(f"   ⚙️ Detector operacional: {self.detector_operacional}")
+
         return df
 
     def _treinar_regressao(self, df: pd.DataFrame) -> pd.DataFrame:

@@ -841,7 +841,7 @@ def test_comparar_detectores_integra_execucao_e_escolhe_vencedor(
     )
 
     monkeypatch.setattr(
-        "src.security_detector.selecionar_melhor_detector",
+        "src.security_detector.selecionar_melhor_detector_benchmark",
         lambda resultados: resultados[1],
     )
 
@@ -874,6 +874,23 @@ def test_comparar_detectores_integra_execucao_e_escolhe_vencedor(
 
     assert detector.melhor_detector == "modelo_b"
     assert detector.modelo_agrupamento is modelo_b
+
+    assert detector.melhor_detector_benchmark == "modelo_b"
+    assert detector.detector_operacional == "modelo_b"
+
+    assert (
+        detector.metricas["comparacao_detectores"]["melhor_modelo_benchmark"]
+        == "modelo_b"
+    )
+
+    assert (
+        detector.metricas["comparacao_detectores"]["detector_operacional"] == "modelo_b"
+    )
+
+    assert (
+        detector.metricas["comparacao_detectores"]["politica_operacional"]
+        == "temporariamente_alinhado_ao_benchmark"
+    )
 
     assert resultado["anomalia_score"].tolist() == [-1, -1]
     assert resultado["anomalia_score_bruto"].tolist() == [-0.4, -0.8]
@@ -941,7 +958,7 @@ def test_comparar_detectores_registra_modelo_com_erro(monkeypatch):
     )
 
     monkeypatch.setattr(
-        "src.security_detector.selecionar_melhor_detector",
+        "src.security_detector.selecionar_melhor_detector_benchmark",
         lambda resultados: resultados[0],
     )
 
@@ -971,3 +988,5 @@ def test_comparar_detectores_registra_modelo_com_erro(monkeypatch):
     assert detector.metricas["modelo_erro"]["status"] == "erro"
     assert detector.metricas["modelo_erro"]["erro"] == "falha simulada"
     assert detector.melhor_detector == "modelo_ok"
+    assert detector.melhor_detector_benchmark == "modelo_ok"
+    assert detector.detector_operacional == "modelo_ok"

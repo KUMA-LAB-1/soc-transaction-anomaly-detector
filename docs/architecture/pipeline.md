@@ -17,7 +17,9 @@ delegando responsabilidades específicas aos módulos especializados.
 
 ## 2. Visão geral do fluxo
 
-O pipeline completo pode ser representado, de forma simplificada, como:
+A execução completa é coordenada pelo `SecurityDetector`.
+
+De forma simplificada, o pipeline segue a seguinte ordem operacional:
 
 ```text
 PostgreSQL / Supabase
@@ -26,58 +28,186 @@ PostgreSQL / Supabase
 Carregamento do dataset
         │
         ▼
-Preparação temporal
+Validação e preparação
         │
         ▼
 Feature Engineering
         │
-        ├─────────────────────────────┐
-        │                             │
-        ▼                             ▼
-Classificação supervisionada    Detecção de anomalias
-        │                             │
-        │                       ┌─────┼─────┬──────────┐
-        │                       ▼     ▼     ▼          ▼
-        │                      IF    LOF   OCSVM     Elliptic
-        │                       │     │     │        Envelope
-        │                       └─────┴─────┴──────────┘
-        │                             │
-        │                             ▼
-        │                     Avaliação comparativa
-        │                             │
-        │                             ▼
-        │                     Seleção do detector
-        │                             │
-        └──────────────┬──────────────┘
-                       │
-                       ▼
-                Regressão de
-                 severidade
-                       │
-                       ▼
-              Persistência de
-                  métricas
-                       │
-                       ▼
-               Dataset analisado
-                       │
-                       ▼
-             Reporting / evidências
-                       │
-              ┌────────┼─────────┐
-              ▼        ▼         ▼
-           gráficos   PDF      artifacts
-                        │
-                        ▼
-                MITRE ATT&CK
-                 enrichment
+        ▼
+Classificação supervisionada
+        │
+        ▼
+Detecção de anomalias
+        │
+        ├───────────────────────────────────────┐
+        │                                       │
+        ▼                                       ▼
+Benchmark retrospectivo                 Política operacional
+        │                                       │
+        ▼                                       ▼
+melhor_detector_benchmark      detector_operacional_configurado
+                                                │
+                                                ▼
+                                      validação fail-closed
+                                                │
+                                                ▼
+                                      detector_operacional
+                                                │
+                                                ▼
+                              anomalia_score / anomalia_score_bruto
+        │
+        ▼
+Regressão de severidade
+        │
+        ▼
+Geração de alertas
+        │
+        ▼
+Persistência de alertas
+        │
+        ▼
+Persistência de métricas
+        │
+        ▼
+Dataset analisado
+        │
+        ▼
+Reporting / evidências
+        │
+   ┌────┼──────────┐
+   ▼    ▼          ▼
+gráficos PDF    artifacts
+          │
+          ▼
+     MITRE ATT&CK
+      enrichment
 ```
 
+A sequência acima representa a ordem de orquestração do pipeline.
+
+Ela não significa que classificação, detecção de anomalias e regressão formem
+uma cadeia de dependência entre modelos.
+
+As três abordagens utilizam perspectivas analíticas distintas:
+
+```text
+Classificação
+      │
+      ▼
+proba_suspeita
+
+
+Anomaly Detection
+      │
+      ▼
+resultados individuais
+      │
+      ├── benchmark retrospectivo
+      │
+      └── detector operacional
+              │
+              ▼
+      anomalia_score
+      anomalia_score_bruto
+
+
+Regressão
+      │
+      ▼
+score_risco_predito
+```
+
+A regressão de severidade não utiliza automaticamente a saída da classificação
+ou da detecção de anomalias como feature.
+
 O enriquecimento MITRE ATT&CK pertence à camada de geração de evidências e
-reporting. Ele não participa do treinamento ou da seleção dos modelos
-analíticos.
+reporting. Ele não participa do treinamento, do benchmark ou da política
+operacional dos modelos analíticos.
+
+### Benchmark e política operacional
+
+Na detecção de anomalias, duas decisões são tratadas separadamente.
+
+O benchmark responde:
+
+```text
+qual detector apresentou o melhor desempenho retrospectivo
+contra a referência histórica disponível?
+```
+
+A política operacional responde:
+
+```text
+qual detector explicitamente configurado está autorizado
+a produzir o sinal canônico utilizado pelo pipeline?
+```
+
+Portanto:
+
+```text
+melhor_detector_benchmark
+            │
+            ▼
+resultado experimental / retrospectivo
+
+            ≠
+
+detector_operacional
+            │
+            ▼
+sinal canônico do pipeline
+```
+
+O vencedor do benchmark não é promovido automaticamente para uso operacional.
+
+O detector operacional precisa estar entre os modelos que concluíram sua
+execução com sucesso. Caso contrário, o pipeline falha explicitamente em vez de
+utilizar silenciosamente outro detector.
+
+### Estratégias de validação disponíveis na V3
+
+A camada de modelos suporta estratégias alternativas de validação:
+
+```text
+Classificação
+├── random   [padrão atual]
+└── temporal [opt-in]
+
+Regressão
+├── random   [padrão atual]
+└── temporal [opt-in]
+
+Anomaly Detection
+├── in_sample [padrão atual]
+└── temporal  [opt-in]
+```
+
+O `SecurityDetector` atualmente chama esses módulos sem substituir suas
+estratégias padrão.
+
+Portanto, a infraestrutura temporal está implementada e disponível, mas não é
+ativada automaticamente pelo fluxo operacional padrão.
+
+Quando a estratégia temporal é utilizada, a implementação preserva separação
+causal entre passado e futuro.
+
+Entre as propriedades dessa validação estão:
+
+- holdout cronológico;
+- validação cruzada temporal expansiva para classificação e regressão;
+- tratamento de timestamps empatados como blocos temporais indivisíveis;
+- exigência de fronteira estrita entre treino e teste;
+- preservação de `gap` como quantidade de registros;
+- falha explícita quando uma fronteira temporal válida não pode ser formada.
+
+A propriedade fundamental é:
+
+```text
+max(timestamp_treino) < min(timestamp_teste)
+```
 
 ---
+
 ## Parte I — Entrada, preparação e feature engineering
 
 ### 3. Ponto de entrada
@@ -493,7 +623,30 @@ utilizadas.
 
 ### 14. Divisão treino/teste
 
-O dataset é dividido em:
+O classificador suporta duas estratégias de validação:
+
+```text
+random   [padrão atual]
+temporal [opt-in]
+```
+
+A estratégia é definida pelo parâmetro:
+
+```python
+estrategia_validacao
+```
+
+da função:
+
+```python
+treinar_classificador_triagem()
+```
+
+### Estratégia `random`
+
+No modo padrão, o conjunto é dividido utilizando `train_test_split`.
+
+A proporção atual é:
 
 ```text
 75% treino
@@ -506,11 +659,97 @@ com:
 random_state = 42
 ```
 
-Quando existem múltiplas classes, a divisão utiliza estratificação.
+Quando o target possui mais de uma classe, a divisão utiliza estratificação para
+preservar melhor a proporção das classes entre treino e teste.
+
+Conceitualmente:
+
+```text
+dataset
+   │
+   ▼
+divisão aleatória estratificada
+   │
+   ├───────────────┐
+   ▼               ▼
+treino            teste
+75%               25%
+```
+
+Quando apenas uma classe está disponível, a execução continua sem
+estratificação e essa limitação é tratada explicitamente pelas etapas
+posteriores.
+
+### Estratégia `temporal`
+
+Quando a estratégia temporal é ativada, o classificador utiliza:
+
+```python
+dividir_holdout_temporal()
+```
+
+com:
+
+```text
+test_size = 0.25
+```
+
+Nesse modo não ocorre embaralhamento aleatório.
+
+A divisão procura representar:
+
+```text
+passado
+   │
+   ▼
+treino
+   │
+   ▼
+futuro
+   │
+   ▼
+teste
+```
+
+Os índices retornados pela estratégia temporal são aplicados posicionalmente ao
+conjunto de features e ao target.
+
+A fronteira temporal deve respeitar:
+
+```text
+max(timestamp_treino) < min(timestamp_teste)
+```
+
+Registros com timestamps idênticos não são separados artificialmente entre
+treino e teste quando os dados não oferecem informação adicional capaz de
+estabelecer uma ordem causal.
+
+Se uma fronteira temporal válida não puder ser formada, a operação falha
+explicitamente em vez de inventar uma ordenação causal.
+
+O `SecurityDetector` atualmente chama o classificador sem substituir
+`estrategia_validacao`.
+
+Portanto:
+
+```text
+fluxo operacional padrão
+          │
+          ▼
+        random
+
+capacidade disponível na V3
+          │
+          ▼
+       temporal
+```
 
 ---
 
 ### 15. Avaliação da classificação
+
+Depois do treinamento, o classificador é avaliado no conjunto reservado para
+teste.
 
 Entre as métricas produzidas estão:
 
@@ -522,11 +761,116 @@ F1 da classe suspeita
 matriz de confusão
 ```
 
-Quando a distribuição das classes permite, também é executada validação
-cruzada estratificada de três folds utilizando ROC-AUC.
+Também é gerado um `classification_report` para as classes:
 
-Caso apenas uma classe esteja presente no treino, o pipeline sinaliza a
-limitação e continua a execução.
+```text
+0 = não suspeita
+1 = suspeita
+```
+
+A implementação utiliza:
+
+```text
+zero_division = 0
+```
+
+para manter comportamento definido quando alguma métrica não puder ser
+calculada normalmente por ausência de predições de determinada classe.
+
+### Validação cruzada no modo `random`
+
+Quando a estratégia padrão `random` é utilizada, o pipeline mantém validação
+cruzada estratificada de três folds utilizando:
+
+```text
+ROC-AUC
+```
+
+como métrica de avaliação.
+
+Essa avaliação complementa o holdout treino/teste e fornece uma segunda
+perspectiva sobre a estabilidade do classificador.
+
+### Validação cruzada no modo `temporal`
+
+Quando:
+
+```text
+estrategia_validacao = temporal
+```
+
+os folds são construídos por:
+
+```python
+criar_folds_temporais()
+```
+
+com:
+
+```text
+n_splits = 3
+```
+
+A validação utiliza janelas de treino expansivas.
+
+Conceitualmente:
+
+```text
+Fold 1
+treino ─────────► teste
+
+Fold 2
+treino ─────────────────► teste
+
+Fold 3
+treino ─────────────────────────► teste
+```
+
+Antes de utilizar um fold na avaliação ROC-AUC, o classificador verifica se
+existe diversidade de classes tanto no conjunto de treino quanto no conjunto de
+teste.
+
+Somente folds que atendem simultaneamente:
+
+```text
+mais de uma classe no treino
+            +
+mais de uma classe no teste
+```
+
+participam da validação cruzada.
+
+Isso evita calcular ROC-AUC em uma janela temporal que não possui a diversidade
+mínima necessária para essa métrica.
+
+Quando existem folds temporais válidos, a avaliação utiliza:
+
+```text
+scoring = roc_auc
+```
+
+Os resultados são armazenados em:
+
+```text
+cv_scores
+```
+
+e resumidos nas métricas do modelo.
+
+Entre os metadados preservados também estão:
+
+```text
+estrategia_validacao
+n_treino
+n_teste
+classes_no_treino
+roc_auc_teste
+roc_auc_cv_media
+```
+
+Quando não existem folds válidos para a validação cruzada temporal,
+`roc_auc_cv_media` pode permanecer indisponível em vez de produzir uma métrica
+enganosa.
 
 ---
 
@@ -594,34 +938,72 @@ Valores ausentes são preenchidos com zero antes da execução.
 
 ### 19. Contamination
 
-O pipeline estima inicialmente a proporção histórica de transações suspeitas:
+A camada de detecção de anomalias recebe `contamination` como uma configuração
+explícita.
+
+A implementação atual define:
+
+```text
+CONTAMINATION_PISO_PRATICO = 0.02
+CONTAMINATION_TETO_PRATICO = 0.15
+CONTAMINATION_PADRAO = 0.15
+```
+
+Assim, o valor informado deve permanecer dentro do intervalo:
+
+```text
+0.02 <= contamination <= 0.15
+```
+
+Quando nenhum valor é fornecido explicitamente, a execução utiliza:
+
+```text
+contamination = 0.15
+```
+
+O fluxo atual é:
+
+```text
+contamination configurado
+          │
+          ▼
+validação entre 0.02 e 0.15
+          │
+          ▼
+configuração comum dos detectores
+```
+
+Separadamente, o pipeline calcula:
 
 ```text
 taxa_suspeita_real
 ```
 
-A estimativa de `contamination` é limitada inicialmente ao intervalo:
+a partir da referência histórica derivada de `status_transacao`.
 
-```text
-2% ≤ contamination_estimado ≤ 30%
-```
+Essa informação possui finalidade retrospectiva e é preservada para métricas,
+auditoria e comparação.
 
-Em seguida, é aplicado um teto operacional adicional:
-
-```text
-CONTAMINATION_TETO_PRATICO = 15%
-```
+Ela não determina o valor de `contamination`.
 
 Portanto:
 
 ```text
-contamination =
-    min(contamination_estimado, 0.15)
+contamination
+      │
+      ▼
+configuração dos modelos
+
+      ≠
+
+taxa_suspeita_real
+      │
+      ▼
+auditoria retrospectiva
 ```
 
-Esse limite evita que datasets de desenvolvimento com proporções
-artificialmente altas de eventos suspeitos façam os detectores classificarem
-uma parcela excessiva das observações como anômalas.
+Essa separação impede que a proporção dos labels históricos ou a composição de
+um dataset sintético configure implicitamente os detectores não supervisionados.
 
 ---
 
@@ -633,9 +1015,16 @@ O `IsolationForest` é configurado atualmente com:
 n_estimators = 300
 random_state = 42
 n_jobs = -1
+contamination = valor configurado
 ```
 
-e utiliza o `contamination` calculado pelo pipeline.
+O parâmetro `contamination` é recebido da política explícita da camada de
+detecção e já foi validado antes da criação do modelo.
+
+O `IsolationForest` não utiliza `status_transacao` durante o treinamento.
+
+Os labels históricos participam somente da avaliação retrospectiva realizada
+depois das predições.
 
 ---
 
@@ -656,8 +1045,22 @@ A implementação utiliza:
 novelty = True
 ```
 
-e ajusta dinamicamente a quantidade de vizinhos de acordo com o tamanho do
-dataset.
+Essa configuração permite utilizar o detector por meio da interface de predição
+depois do treinamento.
+
+A quantidade de vizinhos é ajustada dinamicamente de acordo com o tamanho do
+conjunto utilizado para treino.
+
+O detector recebe o mesmo valor explícito de:
+
+```text
+contamination
+```
+
+utilizado pela política comum de detecção.
+
+Esse valor não é derivado de `status_transacao` nem de
+`taxa_suspeita_real`.
 
 ---
 
@@ -672,13 +1075,35 @@ StandardScaler
 OneClassSVM
 ```
 
-Configuração atual:
+A configuração atual é:
 
 ```text
 kernel = rbf
 gamma = scale
 nu = contamination
 ```
+
+Para esse detector, o valor configurado como `contamination` pela camada comum
+é utilizado como parâmetro:
+
+```text
+nu
+```
+
+Portanto:
+
+```text
+contamination configurado
+          │
+          ▼
+         nu
+```
+
+A normalização é aplicada antes do modelo porque o `OneClassSVM` é sensível às
+diferenças de escala entre as features.
+
+Assim como nos demais detectores, os labels históricos não participam dessa
+configuração.
 
 ---
 
@@ -693,7 +1118,24 @@ StandardScaler
 EllipticEnvelope
 ```
 
-com o mesmo `contamination` utilizado pelos demais detectores.
+A configuração relevante é:
+
+```text
+contamination = valor configurado
+random_state = 42
+support_fraction = None
+```
+
+O mesmo valor explícito de `contamination` validado pela camada comum é
+fornecido ao modelo.
+
+O `EllipticEnvelope` representa uma abordagem baseada em distribuição e
+covariância, distinta das demais técnicas presentes no conjunto.
+
+`status_transacao` não participa da configuração do detector.
+
+A referência histórica é utilizada somente depois das predições para avaliação
+retrospectiva.
 
 ---
 
@@ -702,21 +1144,34 @@ com o mesmo `contamination` utilizado pelos demais detectores.
 Os quatro detectores são treinados sem utilizar `status_transacao` como feature
 de entrada.
 
-Depois das predições, entretanto, o status histórico é convertido para uma
-referência binária e utilizado para auditoria comparativa.
+O target histórico também não determina o valor configurado de
+`contamination`.
 
-Essa distinção é importante:
+Depois das predições, `status_transacao` é convertido para uma referência
+binária e utilizado exclusivamente na avaliação retrospectiva dos detectores.
+
+A separação é:
 
 ```text
 status_transacao
       │
       ├── NÃO entra nas features dos detectores
       │
-      └── É usado posteriormente para avaliar as predições
+      ├── NÃO configura contamination
+      │
+      └── É usado posteriormente para auditoria
+          e métricas comparativas
 ```
 
-Portanto, as métricas contra o status histórico não transformam os detectores
-em modelos supervisionados.
+Essa arquitetura preserva a natureza não supervisionada ou de novelty detection
+dos algoritmos utilizados.
+
+Ao mesmo tempo, permite comparar seus resultados com a referência histórica
+disponível no dataset.
+
+Essas métricas devem ser interpretadas como concordância retrospectiva com os
+labels disponíveis, e não como prova absoluta de capacidade de detectar fraude
+real.
 
 ---
 
@@ -784,15 +1239,23 @@ erro explícito.
 
 ---
 
-### 28. Seleção do melhor detector
+### 28. Benchmark e política operacional
 
-A função:
+Depois da execução, somente os detectores cujo resultado possui:
 
-```python
-selecionar_melhor_detector()
+```text
+status = ok
 ```
 
-utiliza a seguinte prioridade:
+participam do benchmark retrospectivo.
+
+A função utilizada é:
+
+```python
+selecionar_melhor_detector_benchmark()
+```
+
+Os critérios são aplicados nesta ordem:
 
 ```text
 1. maior F1
@@ -816,41 +1279,143 @@ F1
              │
              └── empate
                    ▼
-             menor tempo
+              menor tempo
 ```
 
-O detector vencedor é armazenado em:
+O vencedor é registrado em:
 
 ```text
-melhor_detector
+melhor_detector_benchmark
 ```
 
-e sua instância fica disponível por meio de:
+Esse valor representa exclusivamente o melhor resultado no benchmark
+retrospectivo contra os labels históricos disponíveis.
+
+Ele não define automaticamente qual modelo produzirá o sinal operacional.
+
+A política operacional segue uma trilha independente:
+
+```text
+detector_operacional_configurado
+              │
+              ▼
+está entre os detectores executados
+       com sucesso?
+          │           │
+         sim         não
+          │           │
+          ▼           ▼
+detector_operacional  RuntimeError
+```
+
+O padrão atual de configuração operacional é:
+
+```text
+isolation_forest
+```
+
+Quando o detector configurado está disponível, ele é ativado em:
+
+```text
+detector_operacional
+```
+
+A instância correspondente também é referenciada por:
 
 ```text
 modelo_agrupamento
 ```
 
+A arquitetura pode ser resumida como:
+
+```text
+resultados válidos
+        │
+        ├───────────────────────┐
+        │                       │
+        ▼                       ▼
+benchmark retrospectivo    política operacional
+        │                       │
+        ▼                       ▼
+melhor_detector_benchmark  detector_operacional_configurado
+                                │
+                                ▼
+                         validação fail-closed
+                                │
+                                ▼
+                         detector_operacional
+```
+
+Se o detector operacional configurado falhar ou não estiver disponível entre os
+modelos válidos, a execução é interrompida explicitamente.
+
+O vencedor do benchmark não é utilizado como fallback silencioso.
+
+O atributo legado:
+
+```text
+melhor_detector
+```
+
+permanece temporariamente como alias de compatibilidade e recebe o mesmo valor
+de `detector_operacional`.
+
+Ele não representa mais a fonte canônica da decisão operacional.
+
 ---
 
 ### 29. Resultado dos detectores
 
-Para cada detector executado com sucesso, o `DataFrame` recebe:
+Para cada detector executado com sucesso, o `DataFrame` recebe colunas
+específicas:
 
 ```text
 anomalia_<detector>
 score_anomalia_<detector>
 ```
 
-Depois da seleção, o detector vencedor também alimenta as colunas de
-compatibilidade:
+Essas colunas preservam os resultados individuais utilizados para comparação,
+auditoria e investigação.
+
+Separadamente, o detector operacional validado alimenta as colunas canônicas:
 
 ```text
 anomalia_score
 anomalia_score_bruto
 ```
 
-Os modelos são persistidos em:
+Portanto:
+
+```text
+resultados individuais
+        │
+        ▼
+anomalia_<detector>
+score_anomalia_<detector>
+        │
+        ▼
+benchmark / auditoria
+
+
+detector_operacional
+        │
+        ▼
+anomalia_score
+anomalia_score_bruto
+        │
+        ▼
+consumidores operacionais
+```
+
+As colunas canônicas não representam necessariamente o detector com maior
+pontuação no benchmark.
+
+Elas representam o detector aprovado pela política operacional explícita.
+
+Essa distinção permite alterar, comparar ou experimentar detectores sem promover
+automaticamente um modelo para o caminho operacional.
+
+Os modelos treinados são persistidos em:
 
 ```text
 reports/models/<detector>.joblib
@@ -867,10 +1432,50 @@ reports/comparacao_detectores.csv
 reports/comparacao_detectores.json
 ```
 
-Também é produzido um gráfico comparativo.
+Também é produzido um gráfico comparativo dos detectores válidos.
 
-Isso permite analisar posteriormente não apenas o detector vencedor, mas o
-desempenho relativo dos algoritmos avaliados.
+As evidências preservam duas dimensões distintas:
+
+```text
+benchmark retrospectivo
+          │
+          ▼
+desempenho comparativo
+
+
+política operacional
+          │
+          ▼
+detector efetivamente utilizado
+```
+
+Entre as informações registradas pela comparação estão:
+
+```text
+criterio_benchmark
+melhor_modelo_benchmark
+detector_operacional_configurado
+detector_operacional
+politica_operacional
+resultados individuais
+```
+
+Campos legados ainda podem permanecer temporariamente na estrutura de métricas
+para compatibilidade com consumidores anteriores.
+
+Eles não alteram a separação canônica entre benchmark e política operacional.
+
+Os arquivos de comparação permitem reconstruir posteriormente:
+
+- quais detectores concluíram com sucesso;
+- quais métricas cada detector produziu;
+- qual modelo venceu o benchmark retrospectivo;
+- qual detector estava configurado para operação;
+- qual detector foi efetivamente ativado.
+
+Essa separação melhora a rastreabilidade das decisões do pipeline e impede que
+ranking experimental e política operacional sejam tratados como o mesmo
+conceito.
 
 ---
 
@@ -932,7 +1537,28 @@ falhas_login_recentes
 
 ### 34. Treinamento e avaliação
 
-Assim como na classificação, a divisão utilizada é:
+A regressão de severidade suporta duas estratégias de validação:
+
+```text
+random   [padrão atual]
+temporal [opt-in]
+```
+
+A estratégia é definida pelo parâmetro:
+
+```python
+estrategia_validacao
+```
+
+da função:
+
+```python
+treinar_regressao_severidade()
+```
+
+### Estratégia `random`
+
+No modo padrão, a divisão treino/teste utiliza:
 
 ```text
 75% treino
@@ -945,7 +1571,53 @@ com:
 random_state = 42
 ```
 
-São calculadas:
+A validação cruzada utiliza cinco folds.
+
+Essa estratégia preserva compatibilidade com o comportamento anterior do
+pipeline.
+
+### Estratégia `temporal`
+
+Quando a estratégia temporal é ativada, o holdout utiliza:
+
+```python
+dividir_holdout_temporal()
+```
+
+com:
+
+```text
+test_size = 0.25
+```
+
+A validação cruzada utiliza:
+
+```python
+criar_folds_temporais()
+```
+
+com:
+
+```text
+n_splits = 5
+```
+
+Os folds seguem uma janela de treino expansiva e preservam a separação causal
+entre observações passadas e futuras.
+
+Folds são utilizados na validação cruzada somente quando possuem tamanho
+suficiente para a avaliação configurada.
+
+A propriedade temporal exigida é:
+
+```text
+max(timestamp_treino) < min(timestamp_teste)
+```
+
+Timestamps empatados não são divididos artificialmente entre treino e teste
+quando não existe informação adicional que estabeleça uma ordem causal.
+
+Para ambas as estratégias são calculadas métricas como:
 
 ```text
 R²
@@ -953,11 +1625,18 @@ MAE
 RMSE
 ```
 
-Também é realizada validação cruzada com cinco folds.
+A execução também registra a média e a dispersão dos resultados de validação
+cruzada quando folds válidos estão disponíveis.
 
 R² negativo em validação cruzada é tratado explicitamente como sinal de baixa
 capacidade de generalização, situação especialmente relevante em datasets
 pequenos.
+
+O `SecurityDetector` atualmente chama a regressão sem substituir
+`estrategia_validacao`.
+
+Portanto, `random` continua sendo o modo utilizado pelo fluxo operacional padrão,
+enquanto `temporal` é uma capacidade opt-in da V3.
 
 ---
 
@@ -1093,17 +1772,66 @@ delega a produção do relatório para:
 gerar_relatorio_pdf()
 ```
 
-recebendo:
+A camada recebe informações como:
 
 ```text
 dataset analisado
-melhor detector
+métricas consolidadas
+detector operacional
 indicador de amostra pequena
 engine de banco de dados
 ```
 
-A camada de reporting utiliza essas informações para consolidar evidências
-analíticas e contexto adicional.
+Na interface atual de reporting, o parâmetro que recebe o detector ainda possui
+o nome legado:
+
+```text
+melhor_detector
+```
+
+Entretanto, o `SecurityDetector` fornece explicitamente:
+
+```text
+self.detector_operacional
+```
+
+como valor desse parâmetro.
+
+Portanto:
+
+```text
+parâmetro legado do PDF
+melhor_detector
+        │
+        ▼
+valor efetivamente fornecido
+detector_operacional
+```
+
+O relatório não recebe automaticamente
+`self.melhor_detector_benchmark` como detector principal.
+
+Essa distinção preserva a separação arquitetural entre:
+
+```text
+benchmark retrospectivo
+          │
+          ▼
+melhor_detector_benchmark
+
+          ≠
+
+política operacional
+          │
+          ▼
+detector_operacional
+```
+
+A camada de reporting utiliza o detector operacional, as métricas e o dataset
+analisado para consolidar evidências e contexto adicional.
+
+O nome `melhor_detector` na interface de reporting é mantido temporariamente por
+compatibilidade e pode ser revisado em uma evolução futura da API.
 
 ---
 
@@ -1178,12 +1906,60 @@ Quando o classificador encontra apenas uma classe no conjunto de treino:
 
 ### 43. Falha de detector
 
-Uma falha individual em um algoritmo de anomaly detection não impede
-automaticamente a execução dos demais.
+Uma falha individual em um algoritmo de anomaly detection não interrompe
+automaticamente a execução dos demais detectores.
 
-A falha é registrada junto às métricas do detector.
+Cada detector é executado de forma isolada e seu resultado registra:
 
-Somente a ausência de qualquer detector válido impede a seleção final.
+```text
+status = ok
+```
+
+ou:
+
+```text
+status = erro
+```
+
+junto das informações relevantes da execução.
+
+Os detectores concluídos com sucesso continuam disponíveis para comparação
+retrospectiva.
+
+Entretanto, existem duas condições distintas de falha global.
+
+A primeira ocorre quando nenhum detector conclui com sucesso:
+
+```text
+nenhum detector válido
+        │
+        ▼
+benchmark impossível
+        │
+        ▼
+RuntimeError
+```
+
+A segunda ocorre quando existem detectores válidos, mas o detector
+explicitamente configurado para operação não está entre eles:
+
+```text
+detectores válidos existem
+          │
+          ▼
+detector_operacional_configurado
+não está disponível
+          │
+          ▼
+RuntimeError
+```
+
+Nesse segundo caso, o vencedor do benchmark não é promovido automaticamente
+como fallback.
+
+Essa política fail-closed impede que uma falha operacional altere
+silenciosamente qual detector está autorizado a produzir o sinal canônico do
+pipeline.
 
 ---
 
@@ -1207,13 +1983,30 @@ existência de fraude ou incidente.
 
 Uma forma resumida de apresentar o projeto é:
 
-> O sistema carrega transações, constrói features comportamentais e contextuais,
-> executa uma classificação supervisionada de triagem e compara quatro
-> detectores de anomalia não supervisionados. Os detectores são avaliados contra
-> o status histórico para fins de auditoria, e o melhor é selecionado por F1,
-> recall, precision e tempo de execução. Em paralelo, uma regressão estima uma
-> severidade contínua de risco. Os resultados são persistidos e utilizados na
-> geração de evidências e de um relatório enriquecido com MITRE ATT&CK.
+> O sistema carrega transações, constrói features comportamentais e contextuais
+> e executa três perspectivas analíticas: classificação supervisionada, detecção
+> de anomalias multi-detector e regressão de severidade. Os detectores de
+> anomalia são avaliados retrospectivamente contra o status histórico para fins
+> de benchmark, mas o vencedor dessa comparação não é promovido automaticamente
+> para operação. O detector operacional é definido explicitamente e validado
+> antes de produzir o sinal canônico utilizado por alertas e reporting. Os
+> resultados, métricas e evidências são persistidos e o relatório pode ser
+> enriquecido com contexto MITRE ATT&CK.
+
+Essa explicação preserva quatro distinções importantes:
+
+```text
+classificação supervisionada
+             ≠
+detecção de anomalias
+
+benchmark retrospectivo
+             ≠
+política operacional
+```
+
+Também evita interpretar `proba_suspeita`, `anomalia_score` ou
+`score_risco_predito` automaticamente como probabilidade real de fraude.
 
 ---
 
@@ -1271,25 +2064,74 @@ transações.
 
 ### 48. Por que múltiplos detectores?
 
-Algoritmos de anomaly detection fazem hipóteses diferentes sobre os dados.
+Algoritmos de anomaly detection fazem hipóteses diferentes sobre a estrutura dos
+dados.
 
-Por isso, o projeto não assume antecipadamente que um único detector será
-sempre superior.
+Por isso, o projeto executa múltiplas abordagens:
 
-A estratégia implementada é:
+```text
+Isolation Forest
+Local Outlier Factor
+One-Class SVM
+Elliptic Envelope
+```
+
+Os resultados são preservados individualmente e comparados retrospectivamente.
+
+O fluxo experimental é:
 
 ```text
 executar
-   ↓
+   │
+   ▼
 medir
-   ↓
+   │
+   ▼
 comparar
-   ↓
-selecionar
+   │
+   ▼
+benchmark
 ```
 
-A escolha torna-se uma decisão observável e registrada, em vez de uma
-preferência fixa escondida no código.
+Esse benchmark permite observar qual detector apresentou o melhor desempenho
+contra a referência histórica disponível segundo os critérios definidos pelo
+projeto.
+
+Entretanto:
+
+```text
+vencedor do benchmark
+          │
+          ▼
+evidência experimental
+
+          ≠
+
+detector operacional
+          │
+          ▼
+política explícita
+```
+
+A escolha operacional não é delegada automaticamente ao ranking.
+
+O detector utilizado pelo pipeline é configurado explicitamente e validado
+contra os modelos que concluíram sua execução com sucesso.
+
+Essa separação permite experimentar e comparar novos detectores sem alterar
+silenciosamente o comportamento operacional da solução.
+
+Também cria uma base para evoluções futuras como:
+
+```text
+model challengers
+promotion policy
+model registry
+backtesting
+monitoramento de drift
+```
+
+sem misturar experimentação com decisão operacional.
 
 ---
 
@@ -1317,34 +2159,81 @@ permitindo que ambas evoluam independentemente.
 
 ### 50. Resumo operacional
 
-O fluxo completo pode ser lembrado pela sequência:
+O fluxo principal pode ser lembrado pela sequência:
 
 ```text
 CARREGAR
-   ↓
-PREPARAR
-   ↓
+   │
+   ▼
+VALIDAR / PREPARAR
+   │
+   ▼
 CRIAR FEATURES
-   ↓
+   │
+   ▼
 CLASSIFICAR
-   ↓
-DETECTAR
-   ↓
-COMPARAR
-   ↓
-SELECIONAR
-   ↓
-ESTIMAR SEVERIDADE
-   ↓
-REGISTRAR MÉTRICAS
-   ↓
-GERAR EVIDÊNCIAS
-   ↓
-ENRIQUECER COM MITRE
+   │
+   ▼
+EXECUTAR DETECTORES
+   │
+   ▼
+COMPARAR NO BENCHMARK
+   │
+   ├──────────────────────────────┐
+   │                              │
+   ▼                              ▼
+REGISTRAR VENCEDOR          VALIDAR DETECTOR
+DO BENCHMARK                OPERACIONAL
+                                  │
+                                  ▼
+                           ATIVAR DETECTOR
+                             OPERACIONAL
+                                  │
+                                  ▼
+                         PRODUZIR SINAL CANÔNICO
+                                  │
+                                  ▼
+                         ESTIMAR SEVERIDADE
+                                  │
+                                  ▼
+                          GERAR ALERTAS
+                                  │
+                                  ▼
+                         PERSISTIR ALERTAS
+                                  │
+                                  ▼
+                         REGISTRAR MÉTRICAS
+                                  │
+                                  ▼
+                         GERAR EVIDÊNCIAS
+                                  │
+                                  ▼
+                         ENRIQUECER COM MITRE
 ```
 
-Essa sequência representa o caminho principal percorrido pelos dados durante a
-execução atual do projeto.
+O diagrama representa a ordem conceitual das responsabilidades do pipeline.
+
+A comparação entre detectores produz um resultado de benchmark.
+
+A validação do detector operacional produz uma decisão operacional distinta.
+
+Portanto:
+
+```text
+COMPARAR
+   │
+   ▼
+benchmark
+
+não significa
+
+COMPARAR
+   │
+   ▼
+promover automaticamente
+```
+
+Essa separação é uma propriedade central da arquitetura V3.
 
 ---
 

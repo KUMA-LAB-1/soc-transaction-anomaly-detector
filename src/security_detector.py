@@ -48,6 +48,8 @@ from .reporting.pdf_report import gerar_relatorio_pdf
 # estatisticamente confiáveis ainda.
 MIN_AMOSTRAS_TREINO_CONFIAVEL = 60
 
+DETECTOR_OPERACIONAL_PADRAO = "isolation_forest"
+
 # Teto operacional de contamination — 30% de tudo marcado como anômalo não é
 # acionável na prática, mesmo que a taxa histórica real diga isso (geralmente
 # sinal de dataset de teste com seeds de ataque desproporcionais).
@@ -59,6 +61,7 @@ class SecurityDetector:
         self,
         engine: Engine | None = None,
         alert_repository: AlertRepository | None = None,
+        detector_operacional: str = DETECTOR_OPERACIONAL_PADRAO,
     ) -> None:
         if engine is None:
             engine = DBConnector.get_engine()
@@ -73,6 +76,8 @@ class SecurityDetector:
         self.modelos_anomalia = {}
 
         self.melhor_detector_benchmark = None
+
+        self.detector_operacional_configurado = detector_operacional
         self.detector_operacional = None
 
         # Compatibilidade temporária com consumidores da API anterior.
@@ -231,10 +236,16 @@ class SecurityDetector:
 
         self.melhor_detector_benchmark = melhor_benchmark["modelo"]
 
-        # Política transitória: enquanto a seleção operacional explícita
-        # não for introduzida, o detector operacional acompanha o
-        # vencedor do benchmark para preservar o comportamento atual.
-        self.detector_operacional = self.melhor_detector_benchmark
+        modelos_validos = {resultado["modelo"] for resultado in validos}
+
+        if self.detector_operacional_configurado not in modelos_validos:
+            raise RuntimeError(
+                "Detector operacional configurado não está disponível "
+                "entre os detectores executados com sucesso: "
+                f"{self.detector_operacional_configurado}"
+            )
+
+        self.detector_operacional = self.detector_operacional_configurado
 
         # Alias temporário de compatibilidade com consumidores existentes.
         self.melhor_detector = self.detector_operacional
@@ -254,8 +265,9 @@ class SecurityDetector:
             ),
             "melhor_modelo": self.melhor_detector,
             "melhor_modelo_benchmark": self.melhor_detector_benchmark,
+            "detector_operacional_configurado": self.detector_operacional_configurado,
             "detector_operacional": self.detector_operacional,
-            "politica_operacional": "temporariamente_alinhado_ao_benchmark",
+            "politica_operacional": "configuracao_explicita",
             "resultados": resultados,
         }
 

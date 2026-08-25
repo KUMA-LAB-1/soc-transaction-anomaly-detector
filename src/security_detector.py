@@ -50,11 +50,6 @@ MIN_AMOSTRAS_TREINO_CONFIAVEL = 60
 
 DETECTOR_OPERACIONAL_PADRAO = "isolation_forest"
 
-# Teto operacional de contamination — 30% de tudo marcado como anômalo não é
-# acionável na prática, mesmo que a taxa histórica real diga isso (geralmente
-# sinal de dataset de teste com seeds de ataque desproporcionais).
-CONTAMINATION_TETO_PRATICO = 0.15
-
 
 class SecurityDetector:
     def __init__(

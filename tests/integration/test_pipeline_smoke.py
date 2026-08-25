@@ -93,7 +93,7 @@ def test_pipeline_completo_smoke(
     assert detector.modelo_regressao is not None
     assert detector.modelo_agrupamento is not None
 
-    assert detector.melhor_detector in {
+    assert detector.detector_operacional in {
         "isolation_forest",
         "local_outlier_factor",
         "one_class_svm",

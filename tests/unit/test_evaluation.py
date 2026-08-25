@@ -2,7 +2,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.models.evaluation import avaliar_detector, selecionar_melhor_detector
+from src.models.evaluation import (
+    avaliar_detector,
+    selecionar_melhor_detector,
+    selecionar_melhor_detector_benchmark,
+)
 
 
 def test_avaliar_detector_perfeito():
@@ -24,7 +28,7 @@ def test_avaliar_detector_perfeito():
     assert resultado["y_pred"].tolist() == [0, 0, 1, 1]
 
 
-def test_selecionar_melhor_detector_prioriza_f1():
+def test_selecionar_melhor_detector_benchmark_prioriza_f1():
     resultados = [
         {
             "modelo": "modelo_a",
@@ -42,12 +46,12 @@ def test_selecionar_melhor_detector_prioriza_f1():
         },
     ]
 
-    melhor = selecionar_melhor_detector(resultados)
+    melhor = selecionar_melhor_detector_benchmark(resultados)
 
     assert melhor["modelo"] == "modelo_b"
 
 
-def test_selecionar_melhor_detector_desempata_por_tempo():
+def test_selecionar_melhor_detector_benchmark_desempata_por_tempo():
     resultados = [
         {
             "modelo": "lento",
@@ -65,11 +69,35 @@ def test_selecionar_melhor_detector_desempata_por_tempo():
         },
     ]
 
-    melhor = selecionar_melhor_detector(resultados)
+    melhor = selecionar_melhor_detector_benchmark(resultados)
 
     assert melhor["modelo"] == "rapido"
 
 
-def test_selecionar_melhor_detector_rejeita_lista_vazia():
+def test_selecionar_melhor_detector_benchmark_rejeita_lista_vazia():
     with pytest.raises(RuntimeError):
-        selecionar_melhor_detector([])
+        selecionar_melhor_detector_benchmark([])
+
+
+def test_selecionar_melhor_detector_mantem_compatibilidade():
+    resultados = [
+        {
+            "modelo": "modelo_a",
+            "f1_vs_status_real": 0.70,
+            "recall_vs_status_real": 0.80,
+            "precision_vs_status_real": 0.90,
+            "tempo_segundos": 0.1,
+        },
+        {
+            "modelo": "modelo_b",
+            "f1_vs_status_real": 0.90,
+            "recall_vs_status_real": 0.70,
+            "precision_vs_status_real": 0.80,
+            "tempo_segundos": 0.2,
+        },
+    ]
+
+    antigo = selecionar_melhor_detector(resultados)
+    benchmark = selecionar_melhor_detector_benchmark(resultados)
+
+    assert antigo == benchmark

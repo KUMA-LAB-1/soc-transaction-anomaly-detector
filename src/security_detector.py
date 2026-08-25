@@ -33,7 +33,7 @@ from .db_connector import DBConnector
 from .features.engineering import criar_features
 from .models.anomaly_detection import executar_detectores_anomalia
 from .models.classification import treinar_classificador_triagem
-from .models.evaluation import selecionar_melhor_detector
+from .models.evaluation import selecionar_melhor_detector_benchmark
 from .models.regression import treinar_regressao_severidade
 from .reporting.charts import (
     gerar_grafico_comparacao,
@@ -48,10 +48,7 @@ from .reporting.pdf_report import gerar_relatorio_pdf
 # estatisticamente confiáveis ainda.
 MIN_AMOSTRAS_TREINO_CONFIAVEL = 60
 
-# Teto operacional de contamination — 30% de tudo marcado como anômalo não é
-# acionável na prática, mesmo que a taxa histórica real diga isso (geralmente
-# sinal de dataset de teste com seeds de ataque desproporcionais).
-CONTAMINATION_TETO_PRATICO = 0.15
+DETECTOR_OPERACIONAL_PADRAO = "isolation_forest"
 
 
 class SecurityDetector:
@@ -59,6 +56,7 @@ class SecurityDetector:
         self,
         engine: Engine | None = None,
         alert_repository: AlertRepository | None = None,
+        detector_operacional: str = DETECTOR_OPERACIONAL_PADRAO,
     ) -> None:
         if engine is None:
             engine = DBConnector.get_engine()
@@ -71,8 +69,17 @@ class SecurityDetector:
         self.modelo_classificacao = None
         self.modelo_agrupamento = None
         self.modelos_anomalia = {}
+
+        self.melhor_detector_benchmark = None
+
+        self.detector_operacional_configurado = detector_operacional
+        self.detector_operacional = None
+
+        # Compatibilidade temporária com consumidores da API anterior.
         self.melhor_detector = None
+
         self.modelo_regressao = None
+
         self.metricas = {}
         self.aviso_amostra_pequena = False
         self.alertas: list[Alert] = []
@@ -219,18 +226,43 @@ class SecurityDetector:
             )
 
         validos = [r for r in resultados if r.get("status") == "ok"]
-        melhor = selecionar_melhor_detector(validos)
 
-        self.melhor_detector = melhor["modelo"]
-        self.modelo_agrupamento = self.modelos_anomalia[self.melhor_detector]
+        melhor_benchmark = selecionar_melhor_detector_benchmark(validos)
+
+        self.melhor_detector_benchmark = melhor_benchmark["modelo"]
+
+        modelos_validos = {resultado["modelo"] for resultado in validos}
+
+        if self.detector_operacional_configurado not in modelos_validos:
+            raise RuntimeError(
+                "Detector operacional configurado não está disponível "
+                "entre os detectores executados com sucesso: "
+                f"{self.detector_operacional_configurado}"
+            )
+
+        self.detector_operacional = self.detector_operacional_configurado
+
+        # Alias temporário de compatibilidade com consumidores existentes.
+        self.melhor_detector = self.detector_operacional
+
+        self.modelo_agrupamento = self.modelos_anomalia[self.detector_operacional]
 
         # Mantém compatibilidade com o restante do pipeline e com o PDF.
-        df["anomalia_score"] = df[f"anomalia_{self.melhor_detector}"]
-        df["anomalia_score_bruto"] = df[f"score_anomalia_{self.melhor_detector}"]
+        df["anomalia_score"] = df[f"anomalia_{self.detector_operacional}"]
+        df["anomalia_score_bruto"] = df[f"score_anomalia_{self.detector_operacional}"]
 
         self.metricas["comparacao_detectores"] = {
-            "criterio_selecao": "maior F1; desempate por recall, precision e menor tempo",
+            "criterio_selecao": (
+                "maior F1; desempate por recall, precision e menor tempo"
+            ),
+            "criterio_benchmark": (
+                "maior F1; desempate por recall, precision e menor tempo"
+            ),
             "melhor_modelo": self.melhor_detector,
+            "melhor_modelo_benchmark": self.melhor_detector_benchmark,
+            "detector_operacional_configurado": self.detector_operacional_configurado,
+            "detector_operacional": self.detector_operacional,
+            "politica_operacional": "configuracao_explicita",
             "resultados": resultados,
         }
 
@@ -251,7 +283,10 @@ class SecurityDetector:
             )
 
         gerar_grafico_comparacao(comparacao)
-        print(f"\n   🏆 Detector selecionado para o relatório: {self.melhor_detector}")
+
+        print(f"\n   🏆 Melhor detector no benchmark: {self.melhor_detector_benchmark}")
+        print(f"   ⚙️ Detector operacional: {self.detector_operacional}")
+
         return df
 
     def _treinar_regressao(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -293,9 +328,9 @@ class SecurityDetector:
 
     def _gerar_alertas(self, df: pd.DataFrame) -> list[Alert]:
         """Transforma registros analíticos elegíveis em alertas SOC estruturados."""
-        if self.melhor_detector is None:
+        if self.detector_operacional is None:
             raise RuntimeError(
-                "melhor detector deve ser definido antes da geração de alertas"
+                "detector operacional deve ser definido antes da geração de alertas"
             )
 
         evidencias_observadas = {
@@ -317,7 +352,7 @@ class SecurityDetector:
 
             alerta = criar_alerta(
                 registro,
-                detector=self.melhor_detector,
+                detector=self.detector_operacional,
                 aviso_amostra_pequena=self.aviso_amostra_pequena,
                 evidencias_observadas=evidencias_observadas,
             )
@@ -347,7 +382,7 @@ class SecurityDetector:
         return gerar_relatorio_pdf(
             df_analisado=df_analisado,
             metricas=self.metricas,
-            melhor_detector=self.melhor_detector,
+            melhor_detector=self.detector_operacional,
             aviso_amostra_pequena=self.aviso_amostra_pequena,
             engine=self.engine,
         )

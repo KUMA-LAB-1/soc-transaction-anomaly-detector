@@ -127,7 +127,6 @@ def test_analisar_transacoes_persiste_alertas_gerados(monkeypatch):
 def test_persistir_alertas_nao_faz_nada_sem_repository(monkeypatch):
     detector = criar_detector(monkeypatch)
     detector.alertas = [object()]
-
     detector._persistir_alertas()
 
 
@@ -155,7 +154,8 @@ def test_persistir_alertas_delega_cada_alerta_ao_repository(monkeypatch):
 
 def test_gerar_alertas_cria_alerta_apenas_para_registro_elegivel(monkeypatch):
     detector = criar_detector(monkeypatch)
-    detector.melhor_detector = "isolation_forest"
+    detector.detector_operacional = "isolation_forest"
+    detector.melhor_detector = "detector_legado"
 
     alertas = detector._gerar_alertas(criar_dataframe_alertas())
 
@@ -172,7 +172,7 @@ def test_gerar_alertas_cria_alerta_apenas_para_registro_elegivel(monkeypatch):
 
 def test_gerar_alertas_retorna_lista_vazia_sem_registros_elegiveis(monkeypatch):
     detector = criar_detector(monkeypatch)
-    detector.melhor_detector = "isolation_forest"
+    detector.detector_operacional = "isolation_forest"
 
     df = criar_dataframe_alertas()
 
@@ -187,7 +187,7 @@ def test_gerar_alertas_retorna_lista_vazia_sem_registros_elegiveis(monkeypatch):
 
 def test_gerar_alertas_propaga_aviso_amostra_pequena(monkeypatch):
     detector = criar_detector(monkeypatch)
-    detector.melhor_detector = "isolation_forest"
+    detector.detector_operacional = "isolation_forest"
     detector.aviso_amostra_pequena = True
 
     alertas = detector._gerar_alertas(criar_dataframe_alertas())
@@ -198,7 +198,7 @@ def test_gerar_alertas_propaga_aviso_amostra_pequena(monkeypatch):
 
 def test_gerar_alertas_preserva_evidencias_observadas(monkeypatch):
     detector = criar_detector(monkeypatch)
-    detector.melhor_detector = "isolation_forest"
+    detector.detector_operacional = "isolation_forest"
 
     df = criar_dataframe_alertas().drop(
         columns=[
@@ -222,17 +222,21 @@ def test_gerar_alertas_preserva_evidencias_observadas(monkeypatch):
     )
 
 
-def test_gerar_alertas_exige_melhor_detector(monkeypatch):
+def test_gerar_alertas_exige_detector_operacional(monkeypatch):
     detector = criar_detector(monkeypatch)
 
     with pytest.raises(
         RuntimeError,
-        match="melhor detector deve ser definido",
+        match="detector operacional deve ser definido",
     ):
         detector._gerar_alertas(criar_dataframe_alertas())
 
 
-def criar_detector(monkeypatch, alert_repository=None):
+def criar_detector(
+    monkeypatch,
+    alert_repository=None,
+    detector_operacional="isolation_forest",
+):
     """Cria SecurityDetector sem produzir diretórios durante o teste."""
     monkeypatch.setattr(
         "src.security_detector.os.makedirs",
@@ -242,6 +246,7 @@ def criar_detector(monkeypatch, alert_repository=None):
     return SecurityDetector(
         engine=object(),
         alert_repository=alert_repository,
+        detector_operacional=detector_operacional,
     )
 
 
@@ -515,7 +520,8 @@ def test_gerar_pdf_report_delega_para_reporting(monkeypatch):
     detector = criar_detector(monkeypatch)
 
     detector.metricas = {"teste": 123}
-    detector.melhor_detector = "elliptic_envelope"
+    detector.detector_operacional = "elliptic_envelope"
+    detector.melhor_detector = "detector_legado"
     detector.aviso_amostra_pequena = False
 
     df = pd.DataFrame(
@@ -791,31 +797,34 @@ def test_comparar_detectores_integra_execucao_e_escolhe_vencedor(
     monkeypatch,
     tmp_path,
 ):
-    detector = criar_detector(monkeypatch)
+    detector = criar_detector(
+        monkeypatch,
+        detector_operacional="isolation_forest",
+    )
 
-    modelo_a = object()
-    modelo_b = object()
+    modelo_isolation = object()
+    modelo_lof = object()
 
     execucao_fake = {
         "taxa_suspeita_real": 0.2,
         "contamination": 0.15,
         "modelos": {
-            "modelo_a": modelo_a,
-            "modelo_b": modelo_b,
+            "isolation_forest": modelo_isolation,
+            "local_outlier_factor": modelo_lof,
         },
         "predicoes": {
-            "modelo_a": {
+            "isolation_forest": {
                 "predicao_original": [1, -1],
                 "score_original": [0.8, -0.5],
             },
-            "modelo_b": {
+            "local_outlier_factor": {
                 "predicao_original": [-1, -1],
                 "score_original": [-0.4, -0.8],
             },
         },
         "resultados": [
             {
-                "modelo": "modelo_a",
+                "modelo": "isolation_forest",
                 "status": "ok",
                 "qtd_anomalias": 1,
                 "precision_vs_status_real": 0.8,
@@ -824,7 +833,7 @@ def test_comparar_detectores_integra_execucao_e_escolhe_vencedor(
                 "tempo_segundos": 0.1,
             },
             {
-                "modelo": "modelo_b",
+                "modelo": "local_outlier_factor",
                 "status": "ok",
                 "qtd_anomalias": 2,
                 "precision_vs_status_real": 0.9,
@@ -841,7 +850,7 @@ def test_comparar_detectores_integra_execucao_e_escolhe_vencedor(
     )
 
     monkeypatch.setattr(
-        "src.security_detector.selecionar_melhor_detector",
+        "src.security_detector.selecionar_melhor_detector_benchmark",
         lambda resultados: resultados[1],
     )
 
@@ -872,13 +881,30 @@ def test_comparar_detectores_integra_execucao_e_escolhe_vencedor(
 
     resultado = detector._comparar_detectores_anomalia(df)
 
-    assert detector.melhor_detector == "modelo_b"
-    assert detector.modelo_agrupamento is modelo_b
+    assert detector.melhor_detector_benchmark == "local_outlier_factor"
 
-    assert resultado["anomalia_score"].tolist() == [-1, -1]
-    assert resultado["anomalia_score_bruto"].tolist() == [-0.4, -0.8]
+    assert detector.detector_operacional == "isolation_forest"
+    assert detector.melhor_detector == "isolation_forest"
 
-    assert detector.metricas["comparacao_detectores"]["melhor_modelo"] == "modelo_b"
+    assert detector.modelo_agrupamento is modelo_isolation
+
+    assert resultado["anomalia_score"].tolist() == [1, -1]
+    assert resultado["anomalia_score_bruto"].tolist() == [0.8, -0.5]
+
+    assert (
+        detector.metricas["comparacao_detectores"]["melhor_modelo_benchmark"]
+        == "local_outlier_factor"
+    )
+
+    assert (
+        detector.metricas["comparacao_detectores"]["detector_operacional"]
+        == "isolation_forest"
+    )
+
+    assert (
+        detector.metricas["comparacao_detectores"]["politica_operacional"]
+        == "configuracao_explicita"
+    )
 
 
 def test_init_cria_engine_quando_nao_injetada(monkeypatch):
@@ -900,7 +926,10 @@ def test_init_cria_engine_quando_nao_injetada(monkeypatch):
 
 
 def test_comparar_detectores_registra_modelo_com_erro(monkeypatch):
-    detector = criar_detector(monkeypatch)
+    detector = criar_detector(
+        monkeypatch,
+        detector_operacional="modelo_ok",
+    )
 
     modelo_ok = object()
 
@@ -941,7 +970,7 @@ def test_comparar_detectores_registra_modelo_com_erro(monkeypatch):
     )
 
     monkeypatch.setattr(
-        "src.security_detector.selecionar_melhor_detector",
+        "src.security_detector.selecionar_melhor_detector_benchmark",
         lambda resultados: resultados[0],
     )
 
@@ -971,3 +1000,108 @@ def test_comparar_detectores_registra_modelo_com_erro(monkeypatch):
     assert detector.metricas["modelo_erro"]["status"] == "erro"
     assert detector.metricas["modelo_erro"]["erro"] == "falha simulada"
     assert detector.melhor_detector == "modelo_ok"
+    assert detector.melhor_detector_benchmark == "modelo_ok"
+    assert detector.detector_operacional == "modelo_ok"
+
+
+def test_detector_operacional_usa_padrao_explicito(
+    monkeypatch,
+):
+    detector = criar_detector(monkeypatch)
+
+    assert detector.detector_operacional_configurado == "isolation_forest"
+    assert detector.detector_operacional is None
+
+
+def test_detector_operacional_pode_ser_configurado(
+    monkeypatch,
+):
+    detector = criar_detector(
+        monkeypatch,
+        detector_operacional="local_outlier_factor",
+    )
+
+    assert detector.detector_operacional_configurado == "local_outlier_factor"
+    assert detector.detector_operacional is None
+
+
+def test_comparar_detectores_falha_quando_operacional_configurado_nao_executa(
+    monkeypatch,
+):
+    detector = criar_detector(
+        monkeypatch,
+        detector_operacional="isolation_forest",
+    )
+
+    modelo_lof = object()
+
+    execucao_fake = {
+        "taxa_suspeita_real": 0.2,
+        "contamination": 0.15,
+        "modelos": {
+            "local_outlier_factor": modelo_lof,
+        },
+        "predicoes": {
+            "local_outlier_factor": {
+                "predicao_original": [1, -1],
+                "score_original": [0.5, -0.4],
+            },
+        },
+        "resultados": [
+            {
+                "modelo": "isolation_forest",
+                "status": "erro",
+                "erro": "falha simulada",
+                "tempo_segundos": 0.01,
+            },
+            {
+                "modelo": "local_outlier_factor",
+                "status": "ok",
+                "qtd_anomalias": 1,
+                "precision_vs_status_real": 1.0,
+                "recall_vs_status_real": 1.0,
+                "f1_vs_status_real": 1.0,
+                "tempo_segundos": 0.02,
+            },
+        ],
+    }
+
+    monkeypatch.setattr(
+        "src.security_detector.executar_detectores_anomalia",
+        lambda dataframe: execucao_fake,
+    )
+
+    monkeypatch.setattr(
+        "src.security_detector.selecionar_melhor_detector_benchmark",
+        lambda resultados: resultados[0],
+    )
+
+    monkeypatch.setattr(
+        "src.security_detector.joblib.dump",
+        lambda *args, **kwargs: None,
+    )
+
+    monkeypatch.setattr(
+        "src.security_detector.gerar_grafico_detector",
+        lambda **kwargs: None,
+    )
+
+    monkeypatch.setattr(
+        "src.security_detector.gerar_grafico_comparacao",
+        lambda comparacao: None,
+    )
+
+    df = pd.DataFrame(
+        {
+            "valor_transacao": [100, 200],
+        }
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Detector operacional configurado não está disponível",
+    ):
+        detector._comparar_detectores_anomalia(df)
+
+    assert detector.detector_operacional is None
+    assert detector.detector_operacional_configurado == "isolation_forest"

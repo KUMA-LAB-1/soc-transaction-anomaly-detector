@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 from sklearn.linear_model import LinearRegression
 
 from src.models.regression import treinar_regressao_severidade
@@ -27,6 +28,9 @@ def criar_dataset_regressao() -> pd.DataFrame:
 
         registros.append(
             {
+                "data_hora_transacao": (
+                    pd.Timestamp("2026-01-01") + pd.Timedelta(hours=i)
+                ),
                 "status_transacao": status_transacao,
                 "valor_transacao": 100.0 + severidade_indicativa * 10 + i,
                 "hora": i % 24,
@@ -79,6 +83,9 @@ def test_regressao_retorna_metricas_esperadas():
     metricas = resultado["metricas"]
 
     assert set(metricas) == {
+        "estrategia_validacao",
+        "n_treino",
+        "n_teste",
         "r2_teste",
         "mae_teste",
         "rmse_teste",
@@ -86,6 +93,9 @@ def test_regressao_retorna_metricas_esperadas():
         "r2_cv_desvio",
     }
 
+    assert metricas["estrategia_validacao"] == "random"
+    assert metricas["n_treino"] == 30
+    assert metricas["n_teste"] == 10
     assert isinstance(metricas["r2_teste"], float)
     assert isinstance(metricas["mae_teste"], float)
     assert isinstance(metricas["rmse_teste"], float)
@@ -112,3 +122,53 @@ def test_funcao_nao_altera_dataframe_original():
     treinar_regressao_severidade(df)
 
     assert "severidade_real" not in df.columns
+
+
+def test_regressao_mantem_validacao_random_por_padrao():
+    df = criar_dataset_regressao()
+
+    resultado = treinar_regressao_severidade(df)
+
+    assert resultado["metricas"]["estrategia_validacao"] == "random"
+
+
+def test_regressao_suporta_validacao_temporal():
+    df = criar_dataset_regressao()
+
+    resultado = treinar_regressao_severidade(
+        df,
+        estrategia_validacao="temporal",
+    )
+
+    metricas = resultado["metricas"]
+
+    assert metricas["estrategia_validacao"] == "temporal"
+    assert metricas["n_treino"] == 30
+    assert metricas["n_teste"] == 10
+
+
+def test_regressao_temporal_produz_cv_temporal():
+    df = criar_dataset_regressao()
+
+    resultado = treinar_regressao_severidade(
+        df,
+        estrategia_validacao="temporal",
+    )
+
+    metricas = resultado["metricas"]
+
+    assert isinstance(metricas["r2_cv_media"], float)
+    assert isinstance(metricas["r2_cv_desvio"], float)
+
+
+def test_regressao_rejeita_estrategia_desconhecida():
+    df = criar_dataset_regressao()
+
+    with pytest.raises(
+        ValueError,
+        match="estrategia_validacao",
+    ):
+        treinar_regressao_severidade(
+            df,
+            estrategia_validacao="necromancia",
+        )

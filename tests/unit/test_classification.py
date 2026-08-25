@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from src.models.classification import treinar_classificador_triagem
 
@@ -12,6 +13,9 @@ def criar_dataset_classificacao() -> pd.DataFrame:
 
         registros.append(
             {
+                "data_hora_transacao": (
+                    pd.Timestamp("2026-01-01") + pd.Timedelta(hours=i)
+                ),
                 "tipo_transacao": "Pix" if i % 2 == 0 else "Transferência",
                 "status_transacao": (
                     "Bloqueada por Suspeita" if suspeita else "Aprovada"
@@ -108,3 +112,50 @@ def test_dataset_totalmente_suspeito_retorna_probabilidade_constante():
 
     assert resultado["classes_no_treino"] == 1
     assert np.all(resultado["proba_suspeita"] == 1.0)
+
+
+def test_classificador_mantem_validacao_random_por_padrao():
+    df = criar_dataset_classificacao()
+
+    resultado = treinar_classificador_triagem(df)
+
+    assert resultado["metricas"]["estrategia_validacao"] == "random"
+
+
+def test_classificador_suporta_validacao_temporal():
+    df = criar_dataset_classificacao()
+
+    resultado = treinar_classificador_triagem(
+        df,
+        estrategia_validacao="temporal",
+    )
+
+    metricas = resultado["metricas"]
+
+    assert metricas["estrategia_validacao"] == "temporal"
+    assert metricas["n_treino"] == 30
+    assert metricas["n_teste"] == 10
+
+
+def test_classificador_temporal_produz_cv_temporal():
+    df = criar_dataset_classificacao()
+
+    resultado = treinar_classificador_triagem(
+        df,
+        estrategia_validacao="temporal",
+    )
+
+    assert len(resultado["cv_scores"]) > 0
+
+
+def test_classificador_rejeita_estrategia_desconhecida():
+    df = criar_dataset_classificacao()
+
+    with pytest.raises(
+        ValueError,
+        match="estrategia_validacao",
+    ):
+        treinar_classificador_triagem(
+            df,
+            estrategia_validacao="telepatica",
+        )

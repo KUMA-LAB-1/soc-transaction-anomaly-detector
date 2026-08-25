@@ -357,3 +357,169 @@ def test_cv_temporal_rejeita_dataset_pequeno_demais():
             df,
             n_splits=3,
         )
+
+
+def test_holdout_temporal_nao_divide_timestamp_empatado_na_fronteira():
+    df = pd.DataFrame(
+        {
+            "data_hora_transacao": [
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 11:00:00",
+                "2026-08-01 12:00:00",
+            ]
+        }
+    )
+
+    treino, teste = dividir_holdout_temporal(
+        df,
+        test_size=0.5,
+    )
+
+    timestamps = pd.to_datetime(df["data_hora_transacao"])
+
+    assert treino.tolist() == [0, 1, 2, 3]
+    assert teste.tolist() == [4, 5]
+
+    assert timestamps.iloc[treino].max() < timestamps.iloc[teste].min()
+
+
+def test_cv_temporal_nao_divide_timestamp_empatado_na_fronteira():
+    df = pd.DataFrame(
+        {
+            "data_hora_transacao": [
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 11:00:00",
+                "2026-08-01 12:00:00",
+                "2026-08-01 13:00:00",
+            ]
+        }
+    )
+
+    folds = criar_folds_temporais(
+        df,
+        n_splits=2,
+    )
+
+    timestamps = pd.to_datetime(df["data_hora_transacao"])
+
+    primeiro_treino, primeiro_teste = folds[0]
+
+    assert primeiro_treino.tolist() == [0, 1, 2]
+    assert primeiro_teste.tolist() == [3]
+
+    for treino, teste in folds:
+        assert timestamps.iloc[treino].max() < timestamps.iloc[teste].min()
+
+
+def test_holdout_temporal_rejeita_dataset_sem_fronteira_temporal_valida():
+    df = pd.DataFrame(
+        {
+            "data_hora_transacao": [
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+            ]
+        }
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="fronteira temporal válida",
+    ):
+        dividir_holdout_temporal(
+            df,
+            test_size=0.5,
+        )
+
+
+def test_cv_temporal_rejeita_fold_sem_fronteira_temporal_valida():
+    df = pd.DataFrame(
+        {
+            "data_hora_transacao": [
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+            ]
+        }
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="fronteira temporal válida",
+    ):
+        criar_folds_temporais(
+            df,
+            n_splits=2,
+        )
+
+
+def test_cv_temporal_preserva_gap_ao_ajustar_timestamp_empatado():
+    df = pd.DataFrame(
+        {
+            "data_hora_transacao": [
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 11:00:00",
+                "2026-08-01 12:00:00",
+                "2026-08-01 13:00:00",
+            ]
+        }
+    )
+
+    folds = criar_folds_temporais(
+        df,
+        n_splits=2,
+        gap=1,
+    )
+
+    primeiro_treino, primeiro_teste = folds[0]
+
+    timestamps = pd.to_datetime(df["data_hora_transacao"])
+
+    assert primeiro_treino.tolist() == [0, 1, 2, 3]
+    assert primeiro_teste.tolist() == [5]
+
+    assert primeiro_teste[0] - primeiro_treino[-1] - 1 == 1
+
+    assert (
+        timestamps.iloc[primeiro_treino].max() < timestamps.iloc[primeiro_teste].min()
+    )
+
+
+def test_holdout_temporal_desempata_para_menor_fronteira_mais_proxima():
+    df = pd.DataFrame(
+        {
+            "data_hora_transacao": [
+                "2026-08-01 09:00:00",
+                "2026-08-01 09:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 10:00:00",
+                "2026-08-01 11:00:00",
+                "2026-08-01 11:00:00",
+            ]
+        }
+    )
+
+    treino, teste = dividir_holdout_temporal(
+        df,
+        test_size=0.5,
+    )
+
+    timestamps = pd.to_datetime(df["data_hora_transacao"])
+
+    assert treino.tolist() == [0, 1]
+    assert teste.tolist() == [2, 3, 4, 5]
+
+    assert timestamps.iloc[treino].max() < timestamps.iloc[teste].min()

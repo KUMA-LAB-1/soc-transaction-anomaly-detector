@@ -35,6 +35,50 @@ def _ordenar_indices_temporais(
     )
 
 
+def _encontrar_fronteira_temporal_valida(
+    timestamps_ordenados: pd.Series,
+    corte_desejado: int,
+) -> int:
+    """Encontra a fronteira temporal válida mais próxima do corte desejado."""
+    fronteiras_validas = [
+        posicao
+        for posicao in range(1, len(timestamps_ordenados))
+        if timestamps_ordenados.iloc[posicao - 1] < timestamps_ordenados.iloc[posicao]
+    ]
+
+    if not fronteiras_validas:
+        raise ValueError(
+            "Dataset não possui fronteira temporal válida entre timestamps distintos."
+        )
+
+    return min(
+        fronteiras_validas,
+        key=lambda posicao: (
+            abs(posicao - corte_desejado),
+            posicao,
+        ),
+    )
+
+
+def _encontrar_inicio_teste_temporal_valido(
+    timestamps_ordenados: pd.Series,
+    inicio_teste: int,
+    fim_teste: int,
+) -> int:
+    """Encontra o primeiro início causalmente válido na janela de teste."""
+    for posicao in range(inicio_teste, fim_teste):
+        if (
+            posicao > 0
+            and timestamps_ordenados.iloc[posicao - 1]
+            < timestamps_ordenados.iloc[posicao]
+        ):
+            return posicao
+
+    raise ValueError(
+        "Fold temporal não possui fronteira temporal válida dentro da janela de teste."
+    )
+
+
 def dividir_holdout_temporal(
     df: pd.DataFrame,
     *,
@@ -44,8 +88,9 @@ def dividir_holdout_temporal(
     """Divide registros em passado (treino) e futuro (teste).
 
     Os índices retornados são posicionais e podem ser utilizados com ``.iloc``.
-    A ordenação temporal é estável para preservar uma ordem determinística
-    entre registros que possuam o mesmo timestamp.
+    A ordenação temporal é estável e registros com o mesmo timestamp não são
+    divididos entre treino e teste. Quando o corte desejado coincide com um
+    grupo empatado, utiliza-se a fronteira temporal válida mais próxima.
     """
     if not 0 < test_size < 1:
         raise ValueError("test_size deve estar entre 0 e 1.")
@@ -69,6 +114,16 @@ def dividir_holdout_temporal(
             "Holdout temporal não deixou registros suficientes para treino."
         )
 
+    timestamps_ordenados = pd.to_datetime(
+        df.iloc[ordem][coluna_tempo],
+        errors="raise",
+    ).reset_index(drop=True)
+
+    n_treino = _encontrar_fronteira_temporal_valida(
+        timestamps_ordenados,
+        n_treino,
+    )
+
     indices_treino = ordem[:n_treino]
     indices_teste = ordem[n_treino:]
 
@@ -82,7 +137,13 @@ def criar_folds_temporais(
     gap: int = 0,
     coluna_tempo: str = COLUNA_TEMPO_PADRAO,
 ) -> list[tuple[np.ndarray, np.ndarray]]:
-    """Cria folds temporais com janela de treino expansiva."""
+    """Cria folds temporais com janela de treino expansiva.
+
+    Registros com o mesmo timestamp não são divididos entre treino e teste.
+    Quando necessário, o início do teste avança até a primeira fronteira
+    temporal válida dentro da janela original. ``gap`` permanece expresso
+    em número de registros.
+    """
     if n_splits < 2:
         raise ValueError("n_splits deve ser pelo menos 2.")
 
@@ -99,6 +160,11 @@ def criar_folds_temporais(
         coluna_tempo,
     )
 
+    timestamps_ordenados = pd.to_datetime(
+        df.iloc[ordem][coluna_tempo],
+        errors="raise",
+    ).reset_index(drop=True)
+
     splitter = TimeSeriesSplit(
         n_splits=n_splits,
         gap=gap,
@@ -106,11 +172,28 @@ def criar_folds_temporais(
 
     folds = []
 
-    for treino_ordenado, teste_ordenado in splitter.split(ordem):
+    for _, teste_ordenado in splitter.split(ordem):
+        inicio_teste_original = int(teste_ordenado[0])
+        fim_teste_original = int(teste_ordenado[-1]) + 1
+
+        inicio_teste = _encontrar_inicio_teste_temporal_valido(
+            timestamps_ordenados,
+            inicio_teste_original,
+            fim_teste_original,
+        )
+
+        fim_treino = inicio_teste - gap
+
+        treino_ajustado = np.arange(fim_treino)
+        teste_ajustado = np.arange(
+            inicio_teste,
+            fim_teste_original,
+        )
+
         folds.append(
             (
-                ordem[treino_ordenado],
-                ordem[teste_ordenado],
+                ordem[treino_ajustado],
+                ordem[teste_ajustado],
             )
         )
 

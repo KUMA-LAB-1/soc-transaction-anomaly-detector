@@ -4,11 +4,17 @@ import pytest
 
 from src.synthetic.contracts import SyntheticRecord
 from src.synthetic.firewall import projetar_dataset_modelagem
+from src.synthetic.label_policy import OperationalLabelPolicy
 from src.synthetic.scenarios import obter_cenario
 from src.synthetic.statistical import StatisticalGenerator
 
 INICIO = datetime(2026, 1, 1, 0, 0)
 FIM_PADRAO = INICIO + timedelta(days=30)
+
+POLITICA_SEM_RUIDO = OperationalLabelPolicy(
+    probabilidade_falso_positivo=0.0,
+    probabilidade_falso_negativo=0.0,
+)
 
 SINAIS_BOOLEANOS = (
     "dispositivo_novo_flag",
@@ -17,13 +23,20 @@ SINAIS_BOOLEANOS = (
 )
 
 
+def criar_gerador(seed: int) -> StatisticalGenerator:
+    return StatisticalGenerator(
+        seed=seed,
+        label_policy=POLITICA_SEM_RUIDO,
+    )
+
+
 def gerar(
     nome_cenario: str,
     *,
     seed: int = 42,
     quantidade: int = 100,
 ) -> list[SyntheticRecord]:
-    gerador = StatisticalGenerator(seed=seed)
+    gerador = criar_gerador(seed)
 
     return gerador.gerar_registros(
         obter_cenario(nome_cenario),
@@ -230,7 +243,7 @@ def test_timestamps_sao_cronologicos_e_unicos():
     ],
 )
 def test_gerador_rejeita_quantidade_nao_positiva(quantidade):
-    gerador = StatisticalGenerator(seed=42)
+    gerador = criar_gerador(seed=42)
 
     with pytest.raises(ValueError, match="quantidade"):
         gerador.gerar_registros(
@@ -242,7 +255,7 @@ def test_gerador_rejeita_quantidade_nao_positiva(quantidade):
 
 
 def test_multiplos_lotes_no_mesmo_gerador_nao_reutilizam_ids():
-    gerador = StatisticalGenerator(seed=42)
+    gerador = criar_gerador(seed=42)
 
     primeiro_lote = gerador.gerar_registros(
         obter_cenario("baseline"),
@@ -278,7 +291,7 @@ def test_multiplos_lotes_no_mesmo_gerador_nao_reutilizam_ids():
     ],
 )
 def test_gerador_rejeita_quantidade_que_nao_e_inteiro(quantidade):
-    gerador = StatisticalGenerator(seed=42)
+    gerador = criar_gerador(seed=42)
 
     with pytest.raises(ValueError, match="inteiro positivo"):
         gerador.gerar_registros(
@@ -290,7 +303,7 @@ def test_gerador_rejeita_quantidade_que_nao_e_inteiro(quantidade):
 
 
 def test_gerador_respeita_janela_temporal_densa():
-    gerador = StatisticalGenerator(seed=42)
+    gerador = criar_gerador(seed=42)
     fim = INICIO + timedelta(days=1)
 
     registros = gerador.gerar_registros(
@@ -316,7 +329,7 @@ def test_gerador_respeita_janela_temporal_densa():
     ],
 )
 def test_gerador_rejeita_janela_temporal_invalida(fim):
-    gerador = StatisticalGenerator(seed=42)
+    gerador = criar_gerador(seed=42)
 
     with pytest.raises(ValueError, match="fim deve ser posterior"):
         gerador.gerar_registros(
@@ -330,13 +343,13 @@ def test_gerador_rejeita_janela_temporal_invalida(fim):
 def test_mesma_seed_reproduz_exatamente_a_mesma_janela_temporal():
     fim = INICIO + timedelta(days=2)
 
-    primeira_execucao = StatisticalGenerator(seed=777).gerar_registros(
+    primeira_execucao = criar_gerador(seed=777).gerar_registros(
         obter_cenario("credential_attack"),
         quantidade=1000,
         inicio=INICIO,
         fim=fim,
     )
-    segunda_execucao = StatisticalGenerator(seed=777).gerar_registros(
+    segunda_execucao = criar_gerador(seed=777).gerar_registros(
         obter_cenario("credential_attack"),
         quantidade=1000,
         inicio=INICIO,
@@ -349,13 +362,13 @@ def test_mesma_seed_reproduz_exatamente_a_mesma_janela_temporal():
 def test_janela_temporal_preserva_diferenca_de_probabilidade_de_madrugada():
     fim = INICIO + timedelta(days=7)
 
-    baseline = StatisticalGenerator(seed=321).gerar_registros(
+    baseline = criar_gerador(seed=321).gerar_registros(
         obter_cenario("baseline"),
         quantidade=5000,
         inicio=INICIO,
         fim=fim,
     )
-    credential_attack = StatisticalGenerator(seed=321).gerar_registros(
+    credential_attack = criar_gerador(seed=321).gerar_registros(
         obter_cenario("credential_attack"),
         quantidade=5000,
         inicio=INICIO,

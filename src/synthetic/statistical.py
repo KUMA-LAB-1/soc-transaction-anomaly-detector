@@ -3,6 +3,7 @@ from datetime import datetime
 import numpy as np
 
 from .contracts import GenerationTruth, SyntheticRecord
+from .label_policy import OperationalLabelPolicy
 from .scenarios import ScenarioDefinition
 from .temporal import TemporalSampler
 
@@ -13,9 +14,6 @@ TIPOS_TRANSACAO = (
     "Cartão Virtual",
 )
 
-STATUS_NORMAL = "Concluída"
-STATUS_SUSPEITO = "Em Análise"
-
 
 class StatisticalGenerator:
     """Gera registros sintéticos a partir de cenários probabilísticos.
@@ -24,8 +22,13 @@ class StatisticalGenerator:
     independente de banco de dados, persistência e do pipeline operacional.
     """
 
-    def __init__(self, seed: int) -> None:
+    def __init__(
+        self,
+        seed: int,
+        label_policy: OperationalLabelPolicy,
+    ) -> None:
         self.seed = seed
+        self._label_policy = label_policy
         self._rng = np.random.default_rng(seed)
         self._temporal = TemporalSampler(self._rng)
         self._proximo_id_transacao = 1
@@ -100,6 +103,11 @@ class StatisticalGenerator:
             )
         )
 
+        status_transacao = self._label_policy.gerar_status(
+            is_suspicious=cenario.is_suspicious,
+            sorteio=float(self._rng.random()),
+        )
+
         return SyntheticRecord(
             observables={
                 "id_transacao": id_transacao,
@@ -113,9 +121,7 @@ class StatisticalGenerator:
                 "mudanca_localizacao_flag": mudanca_localizacao,
             },
             operational_labels={
-                "status_transacao": (
-                    STATUS_SUSPEITO if cenario.is_suspicious else STATUS_NORMAL
-                ),
+                "status_transacao": status_transacao,
             },
             truth=GenerationTruth(
                 scenario=cenario.name,

@@ -130,6 +130,12 @@ def test_dataset_diagnostics_e_estruturalmente_imutavel():
                 observed_proportion=1.0,
             ),
         ),
+        operational_labels=OperationalLabelDiagnostics(
+            true_positive=0,
+            true_negative=1,
+            false_positive=0,
+            false_negative=0,
+        ),
     )
 
     assert isinstance(diagnostics.scenarios, tuple)
@@ -157,6 +163,12 @@ def test_dataset_diagnostics_rejeita_soma_de_contagens_inconsistente():
                     observed_proportion=0.2,
                 ),
             ),
+            operational_labels=OperationalLabelDiagnostics(
+                true_positive=0,
+                true_negative=10,
+                false_positive=0,
+                false_negative=0,
+            ),
         )
 
 
@@ -179,6 +191,12 @@ def test_dataset_diagnostics_rejeita_proporcao_inconsistente_com_contagem():
                     observed_proportion=0.4,
                 ),
             ),
+            operational_labels=OperationalLabelDiagnostics(
+                true_positive=0,
+                true_negative=10,
+                false_positive=0,
+                false_negative=0,
+            ),
         )
 
 
@@ -196,6 +214,12 @@ def test_dataset_diagnostics_rejeita_scenarios_fora_de_tuple():
                     observed_proportion=1.0,
                 )
             ],
+            operational_labels=OperationalLabelDiagnostics(
+                true_positive=0,
+                true_negative=1,
+                false_positive=0,
+                false_negative=0,
+            ),
         )
 
 
@@ -609,5 +633,22 @@ def test_dataset_diagnostics_rejeita_total_operacional_inconsistente():
                 true_negative=2,
                 false_positive=1,
                 false_negative=1,
+            ),
+        )
+
+
+def test_dataset_diagnostics_exige_diagnostico_operacional():
+    with pytest.raises(
+        TypeError,
+        match="operational_labels",
+    ):
+        DatasetDiagnostics(
+            total_records=1,
+            scenarios=(
+                ScenarioDiagnosticsEntry(
+                    scenario="baseline",
+                    observed_count=1,
+                    observed_proportion=1.0,
+                ),
             ),
         )

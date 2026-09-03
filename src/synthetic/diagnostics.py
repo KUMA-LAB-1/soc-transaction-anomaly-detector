@@ -70,7 +70,7 @@ class OperationalLabelDiagnostics:
 class DatasetDiagnostics:
     total_records: int
     scenarios: tuple[ScenarioDiagnosticsEntry, ...]
-    operational_labels: OperationalLabelDiagnostics | None = None
+    operational_labels: OperationalLabelDiagnostics
 
     def __post_init__(self) -> None:
         if not isinstance(self.scenarios, tuple):
@@ -95,10 +95,7 @@ class DatasetDiagnostics:
                     "sobre total_records."
                 )
 
-        if (
-            self.operational_labels is not None
-            and self.operational_labels.total_classified != self.total_records
-        ):
+        if self.operational_labels.total_classified != self.total_records:
             raise ValueError(
                 "operational_labels.total_classified deve ser igual a total_records."
             )

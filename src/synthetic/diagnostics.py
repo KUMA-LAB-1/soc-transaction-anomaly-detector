@@ -39,6 +39,15 @@ class OperationalLabelDiagnostics:
                 raise ValueError("contagens devem ser maiores ou iguais a zero.")
 
     @property
+    def total_classified(self) -> int:
+        return (
+            self.true_positive
+            + self.true_negative
+            + self.false_positive
+            + self.false_negative
+        )
+
+    @property
     def false_positive_rate(self) -> float | None:
         total_negativos_reais = self.false_positive + self.true_negative
 
@@ -61,6 +70,7 @@ class OperationalLabelDiagnostics:
 class DatasetDiagnostics:
     total_records: int
     scenarios: tuple[ScenarioDiagnosticsEntry, ...]
+    operational_labels: OperationalLabelDiagnostics | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.scenarios, tuple):
@@ -84,6 +94,14 @@ class DatasetDiagnostics:
                     "observed_proportion deve corresponder a observed_count "
                     "sobre total_records."
                 )
+
+        if (
+            self.operational_labels is not None
+            and self.operational_labels.total_classified != self.total_records
+        ):
+            raise ValueError(
+                "operational_labels.total_classified deve ser igual a total_records."
+            )
 
 
 def analyze_synthetic_dataset(
@@ -115,9 +133,12 @@ def analyze_synthetic_dataset(
         for scenario in cenarios_manifesto_ordenados
     )
 
+    operational_labels = analyze_operational_label_confusion(dataset)
+
     return DatasetDiagnostics(
         total_records=total_records,
         scenarios=scenarios,
+        operational_labels=operational_labels,
     )
 
 

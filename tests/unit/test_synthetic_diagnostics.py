@@ -70,6 +70,12 @@ def test_analyze_synthetic_dataset_calcula_distribuicao_observada_dos_cenarios()
                 observed_proportion=0.10,
             ),
         ),
+        operational_labels=OperationalLabelDiagnostics(
+            true_positive=3,
+            true_negative=7,
+            false_positive=0,
+            false_negative=0,
+        ),
     )
 
 
@@ -544,4 +550,64 @@ def test_operational_label_diagnostics_rejeita_bool_como_contagem():
             true_negative=1,
             false_positive=0,
             false_negative=0,
+        )
+
+
+def test_analyze_synthetic_dataset_inclui_diagnostico_operacional():
+    inicio = datetime(2026, 1, 1, 0, 0)
+    fim = datetime(2026, 1, 8, 0, 0)
+
+    dataset = generate_synthetic_dataset(
+        seed=42,
+        quantidade=4,
+        inicio=inicio,
+        fim=fim,
+        misturas=[
+            ScenarioMix(
+                cenario=obter_cenario("baseline"),
+                proporcao=0.50,
+            ),
+            ScenarioMix(
+                cenario=obter_cenario("credential_attack"),
+                proporcao=0.50,
+            ),
+        ],
+        label_policy=OperationalLabelPolicy(
+            probabilidade_falso_positivo=0.0,
+            probabilidade_falso_negativo=0.0,
+        ),
+    )
+
+    diagnostics = analyze_synthetic_dataset(dataset)
+
+    assert diagnostics.operational_labels == OperationalLabelDiagnostics(
+        true_positive=2,
+        true_negative=2,
+        false_positive=0,
+        false_negative=0,
+    )
+    assert diagnostics.operational_labels.total_classified == 4
+    assert diagnostics.operational_labels.total_classified == diagnostics.total_records
+
+
+def test_dataset_diagnostics_rejeita_total_operacional_inconsistente():
+    with pytest.raises(
+        ValueError,
+        match="total_classified deve ser igual a total_records",
+    ):
+        DatasetDiagnostics(
+            total_records=10,
+            scenarios=(
+                ScenarioDiagnosticsEntry(
+                    scenario="baseline",
+                    observed_count=10,
+                    observed_proportion=1.0,
+                ),
+            ),
+            operational_labels=OperationalLabelDiagnostics(
+                true_positive=2,
+                true_negative=2,
+                false_positive=1,
+                false_negative=1,
+            ),
         )

@@ -1,5 +1,6 @@
 from collections import Counter
 from dataclasses import dataclass
+from datetime import datetime
 from math import isclose
 from typing import TYPE_CHECKING
 
@@ -64,6 +65,14 @@ class OperationalLabelDiagnostics:
             return None
 
         return self.false_negative / total_positivos_reais
+
+
+@dataclass(frozen=True, slots=True)
+class TemporalDiagnostics:
+    earliest_timestamp: datetime
+    latest_timestamp: datetime
+    madrugada_count: int
+    madrugada_proportion: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,4 +181,30 @@ def analyze_operational_label_confusion(
         true_negative=true_negative,
         false_positive=false_positive,
         false_negative=false_negative,
+    )
+
+
+def analyze_temporal_distribution(
+    dataset: "GeneratedSyntheticDataset",
+) -> TemporalDiagnostics:
+    timestamps: list[datetime] = []
+
+    for registro in dataset.records:
+        if "data_hora_transacao" not in registro.observables:
+            raise ValueError("observables deve conter data_hora_transacao.")
+
+        timestamp = registro.observables["data_hora_transacao"]
+
+        if not isinstance(timestamp, datetime):
+            raise ValueError("data_hora_transacao deve ser datetime.")
+
+        timestamps.append(timestamp)
+
+    madrugada_count = sum(timestamp.hour < 6 for timestamp in timestamps)
+
+    return TemporalDiagnostics(
+        earliest_timestamp=min(timestamps),
+        latest_timestamp=max(timestamps),
+        madrugada_count=madrugada_count,
+        madrugada_proportion=madrugada_count / len(timestamps),
     )

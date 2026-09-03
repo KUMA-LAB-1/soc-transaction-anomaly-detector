@@ -143,6 +143,14 @@ def analyze_synthetic_dataset(
     operational_labels = analyze_operational_label_confusion(dataset)
     temporal = analyze_temporal_distribution(dataset)
 
+    if (
+        temporal.earliest_timestamp < dataset.manifest.inicio
+        or temporal.latest_timestamp >= dataset.manifest.fim
+    ):
+        raise ValueError(
+            "timestamps observados devem permanecer dentro da janela do manifesto."
+        )
+
     return DatasetDiagnostics(
         total_records=total_records,
         scenarios=scenarios,

@@ -892,3 +892,137 @@ def test_analyze_synthetic_dataset_inclui_diagnostico_temporal():
         madrugada_count=2,
         madrugada_proportion=0.5,
     )
+
+
+def test_analyze_synthetic_dataset_rejeita_timestamp_anterior_ao_manifesto():
+    inicio = datetime(2026, 1, 1, 0, 0)
+    fim = datetime(2026, 1, 2, 0, 0)
+
+    dataset = generate_synthetic_dataset(
+        seed=42,
+        quantidade=1,
+        inicio=inicio,
+        fim=fim,
+        misturas=[
+            ScenarioMix(
+                cenario=obter_cenario("baseline"),
+                proporcao=1.0,
+            ),
+        ],
+        label_policy=OperationalLabelPolicy(
+            probabilidade_falso_positivo=0.0,
+            probabilidade_falso_negativo=0.0,
+        ),
+    )
+
+    registro_corrompido = replace(
+        dataset.records[0],
+        observables={
+            **dataset.records[0].observables,
+            "data_hora_transacao": datetime(
+                2025,
+                12,
+                31,
+                23,
+                59,
+                59,
+                999999,
+            ),
+        },
+    )
+
+    dataset_corrompido = replace(
+        dataset,
+        records=(registro_corrompido,),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="timestamps observados devem permanecer dentro da janela do manifesto",
+    ):
+        analyze_synthetic_dataset(dataset_corrompido)
+
+
+def test_analyze_synthetic_dataset_rejeita_timestamp_igual_ao_fim_do_manifesto():
+    inicio = datetime(2026, 1, 1, 0, 0)
+    fim = datetime(2026, 1, 2, 0, 0)
+
+    dataset = generate_synthetic_dataset(
+        seed=42,
+        quantidade=1,
+        inicio=inicio,
+        fim=fim,
+        misturas=[
+            ScenarioMix(
+                cenario=obter_cenario("baseline"),
+                proporcao=1.0,
+            ),
+        ],
+        label_policy=OperationalLabelPolicy(
+            probabilidade_falso_positivo=0.0,
+            probabilidade_falso_negativo=0.0,
+        ),
+    )
+
+    registro_corrompido = replace(
+        dataset.records[0],
+        observables={
+            **dataset.records[0].observables,
+            "data_hora_transacao": fim,
+        },
+    )
+
+    dataset_corrompido = replace(
+        dataset,
+        records=(registro_corrompido,),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="timestamps observados devem permanecer dentro da janela do manifesto",
+    ):
+        analyze_synthetic_dataset(dataset_corrompido)
+
+
+def test_analyze_synthetic_dataset_aceita_timestamp_igual_ao_inicio_do_manifesto():
+    inicio = datetime(2026, 1, 1, 0, 0)
+    fim = datetime(2026, 1, 2, 0, 0)
+
+    dataset = generate_synthetic_dataset(
+        seed=42,
+        quantidade=1,
+        inicio=inicio,
+        fim=fim,
+        misturas=[
+            ScenarioMix(
+                cenario=obter_cenario("baseline"),
+                proporcao=1.0,
+            ),
+        ],
+        label_policy=OperationalLabelPolicy(
+            probabilidade_falso_positivo=0.0,
+            probabilidade_falso_negativo=0.0,
+        ),
+    )
+
+    registro_controlado = replace(
+        dataset.records[0],
+        observables={
+            **dataset.records[0].observables,
+            "data_hora_transacao": inicio,
+        },
+    )
+
+    dataset_controlado = replace(
+        dataset,
+        records=(registro_controlado,),
+    )
+
+    diagnostics = analyze_synthetic_dataset(dataset_controlado)
+
+    assert diagnostics.temporal == TemporalDiagnostics(
+        earliest_timestamp=inicio,
+        latest_timestamp=inicio,
+        madrugada_count=1,
+        madrugada_proportion=1.0,
+    )

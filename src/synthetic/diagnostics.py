@@ -80,6 +80,7 @@ class DatasetDiagnostics:
     total_records: int
     scenarios: tuple[ScenarioDiagnosticsEntry, ...]
     operational_labels: OperationalLabelDiagnostics
+    temporal: TemporalDiagnostics
 
     def __post_init__(self) -> None:
         if not isinstance(self.scenarios, tuple):
@@ -140,11 +141,13 @@ def analyze_synthetic_dataset(
     )
 
     operational_labels = analyze_operational_label_confusion(dataset)
+    temporal = analyze_temporal_distribution(dataset)
 
     return DatasetDiagnostics(
         total_records=total_records,
         scenarios=scenarios,
         operational_labels=operational_labels,
+        temporal=temporal,
     )
 
 

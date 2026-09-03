@@ -78,6 +78,7 @@ def test_analyze_synthetic_dataset_calcula_distribuicao_observada_dos_cenarios()
             false_positive=0,
             false_negative=0,
         ),
+        temporal=analyze_temporal_distribution(dataset),
     )
 
 
@@ -138,6 +139,12 @@ def test_dataset_diagnostics_e_estruturalmente_imutavel():
             false_positive=0,
             false_negative=0,
         ),
+        temporal=TemporalDiagnostics(
+            earliest_timestamp=datetime(2026, 1, 1, 1, 0),
+            latest_timestamp=datetime(2026, 1, 1, 1, 0),
+            madrugada_count=1,
+            madrugada_proportion=1.0,
+        ),
     )
 
     assert isinstance(diagnostics.scenarios, tuple)
@@ -171,6 +178,12 @@ def test_dataset_diagnostics_rejeita_soma_de_contagens_inconsistente():
                 false_positive=0,
                 false_negative=0,
             ),
+            temporal=TemporalDiagnostics(
+                earliest_timestamp=datetime(2026, 1, 1, 1, 0),
+                latest_timestamp=datetime(2026, 1, 1, 18, 0),
+                madrugada_count=1,
+                madrugada_proportion=0.1,
+            ),
         )
 
 
@@ -199,6 +212,12 @@ def test_dataset_diagnostics_rejeita_proporcao_inconsistente_com_contagem():
                 false_positive=0,
                 false_negative=0,
             ),
+            temporal=TemporalDiagnostics(
+                earliest_timestamp=datetime(2026, 1, 1, 1, 0),
+                latest_timestamp=datetime(2026, 1, 1, 18, 0),
+                madrugada_count=1,
+                madrugada_proportion=0.1,
+            ),
         )
 
 
@@ -221,6 +240,12 @@ def test_dataset_diagnostics_rejeita_scenarios_fora_de_tuple():
                 true_negative=1,
                 false_positive=0,
                 false_negative=0,
+            ),
+            temporal=TemporalDiagnostics(
+                earliest_timestamp=datetime(2026, 1, 1, 1, 0),
+                latest_timestamp=datetime(2026, 1, 1, 1, 0),
+                madrugada_count=1,
+                madrugada_proportion=1.0,
             ),
         )
 
@@ -636,6 +661,12 @@ def test_dataset_diagnostics_rejeita_total_operacional_inconsistente():
                 false_positive=1,
                 false_negative=1,
             ),
+            temporal=TemporalDiagnostics(
+                earliest_timestamp=datetime(2026, 1, 1, 1, 0),
+                latest_timestamp=datetime(2026, 1, 1, 18, 0),
+                madrugada_count=1,
+                madrugada_proportion=0.1,
+            ),
         )
 
 
@@ -652,6 +683,12 @@ def test_dataset_diagnostics_exige_diagnostico_operacional():
                     observed_count=1,
                     observed_proportion=1.0,
                 ),
+            ),
+            temporal=TemporalDiagnostics(
+                earliest_timestamp=datetime(2026, 1, 1, 1, 0),
+                latest_timestamp=datetime(2026, 1, 1, 1, 0),
+                madrugada_count=1,
+                madrugada_proportion=1.0,
             ),
         )
 
@@ -797,3 +834,61 @@ def test_analyze_temporal_distribution_rejeita_timestamp_nao_datetime():
         match="data_hora_transacao deve ser datetime",
     ):
         analyze_temporal_distribution(dataset_corrompido)
+
+
+def test_analyze_synthetic_dataset_inclui_diagnostico_temporal():
+    inicio = datetime(2026, 1, 1, 0, 0)
+    fim = datetime(2026, 1, 2, 0, 0)
+
+    dataset = generate_synthetic_dataset(
+        seed=42,
+        quantidade=4,
+        inicio=inicio,
+        fim=fim,
+        misturas=[
+            ScenarioMix(
+                cenario=obter_cenario("baseline"),
+                proporcao=1.0,
+            ),
+        ],
+        label_policy=OperationalLabelPolicy(
+            probabilidade_falso_positivo=0.0,
+            probabilidade_falso_negativo=0.0,
+        ),
+    )
+
+    timestamps_controlados = (
+        datetime(2026, 1, 1, 1, 0),
+        datetime(2026, 1, 1, 5, 59),
+        datetime(2026, 1, 1, 6, 0),
+        datetime(2026, 1, 1, 18, 30),
+    )
+
+    registros_controlados = tuple(
+        replace(
+            registro,
+            observables={
+                **registro.observables,
+                "data_hora_transacao": timestamp,
+            },
+        )
+        for registro, timestamp in zip(
+            dataset.records,
+            timestamps_controlados,
+            strict=True,
+        )
+    )
+
+    dataset_controlado = replace(
+        dataset,
+        records=registros_controlados,
+    )
+
+    diagnostics = analyze_synthetic_dataset(dataset_controlado)
+
+    assert diagnostics.temporal == TemporalDiagnostics(
+        earliest_timestamp=datetime(2026, 1, 1, 1, 0),
+        latest_timestamp=datetime(2026, 1, 1, 18, 30),
+        madrugada_count=2,
+        madrugada_proportion=0.5,
+    )

@@ -1,7 +1,8 @@
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
-from math import isclose
+from math import isclose, isfinite
+from statistics import median
 from typing import TYPE_CHECKING
 
 from .label_policy import STATUS_NORMAL, STATUS_SUSPEITO
@@ -15,6 +16,13 @@ class ScenarioDiagnosticsEntry:
     scenario: str
     observed_count: int
     observed_proportion: float
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioObservableDiagnosticsEntry:
+    scenario: str
+    record_count: int
+    transaction_value_median: float | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,6 +164,50 @@ def analyze_synthetic_dataset(
         scenarios=scenarios,
         operational_labels=operational_labels,
         temporal=temporal,
+    )
+
+
+def analyze_scenario_observables(
+    dataset: "GeneratedSyntheticDataset",
+) -> tuple[ScenarioObservableDiagnosticsEntry, ...]:
+    cenarios_manifesto_ordenados = tuple(
+        dict.fromkeys(entry.scenario for entry in dataset.manifest.scenarios)
+    )
+
+    valores_por_cenario: dict[str, list[float]] = {
+        scenario: [] for scenario in cenarios_manifesto_ordenados
+    }
+
+    for registro in dataset.records:
+        scenario = registro.truth.scenario
+
+        if "valor_transacao" not in registro.observables:
+            raise ValueError("observables deve conter valor_transacao.")
+
+        valor_transacao = registro.observables["valor_transacao"]
+
+        if isinstance(valor_transacao, bool) or not isinstance(
+            valor_transacao,
+            (int, float),
+        ):
+            raise ValueError("valor_transacao deve ser numerico.")
+
+        if not isfinite(valor_transacao):
+            raise ValueError("valor_transacao deve ser finito.")
+
+        valores_por_cenario[scenario].append(valor_transacao)
+
+    return tuple(
+        ScenarioObservableDiagnosticsEntry(
+            scenario=scenario,
+            record_count=len(valores_por_cenario[scenario]),
+            transaction_value_median=(
+                float(median(valores_por_cenario[scenario]))
+                if valores_por_cenario[scenario]
+                else None
+            ),
+        )
+        for scenario in cenarios_manifesto_ordenados
     )
 
 

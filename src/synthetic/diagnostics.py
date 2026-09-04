@@ -2,7 +2,7 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime
 from math import isclose, isfinite
-from statistics import median
+from statistics import mean, median
 from typing import TYPE_CHECKING
 
 from .label_policy import STATUS_NORMAL, STATUS_SUSPEITO
@@ -23,6 +23,7 @@ class ScenarioObservableDiagnosticsEntry:
     scenario: str
     record_count: int
     transaction_value_median: float | None
+    recent_login_failures_mean: float | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,6 +179,10 @@ def analyze_scenario_observables(
         scenario: [] for scenario in cenarios_manifesto_ordenados
     }
 
+    falhas_login_por_cenario: dict[str, list[int]] = {
+        scenario: [] for scenario in cenarios_manifesto_ordenados
+    }
+
     for registro in dataset.records:
         scenario = registro.truth.scenario
 
@@ -197,6 +202,19 @@ def analyze_scenario_observables(
 
         valores_por_cenario[scenario].append(valor_transacao)
 
+        if "falhas_login_recentes" not in registro.observables:
+            raise ValueError("observables deve conter falhas_login_recentes.")
+
+        falhas_login = registro.observables["falhas_login_recentes"]
+
+        if isinstance(falhas_login, bool) or not isinstance(falhas_login, int):
+            raise ValueError("falhas_login_recentes deve ser inteiro.")
+
+        if falhas_login < 0:
+            raise ValueError("falhas_login_recentes deve ser maior ou igual a zero.")
+
+        falhas_login_por_cenario[scenario].append(falhas_login)
+
     return tuple(
         ScenarioObservableDiagnosticsEntry(
             scenario=scenario,
@@ -204,6 +222,11 @@ def analyze_scenario_observables(
             transaction_value_median=(
                 float(median(valores_por_cenario[scenario]))
                 if valores_por_cenario[scenario]
+                else None
+            ),
+            recent_login_failures_mean=(
+                float(mean(falhas_login_por_cenario[scenario]))
+                if falhas_login_por_cenario[scenario]
                 else None
             ),
         )

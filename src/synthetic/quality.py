@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from itertools import combinations
 
+import numpy as np
+
 from .diagnostics import ScenarioObservableDiagnosticsEntry
 
 
@@ -45,3 +47,45 @@ def analyze_behavior_flag_separation(
         )
         for left, right in combinations(diagnostics, 2)
     )
+
+
+def empirical_cdf_distance(
+    left: tuple[float, ...],
+    right: tuple[float, ...],
+) -> float:
+    left_values = np.sort(np.asarray(left, dtype=float))
+    right_values = np.sort(np.asarray(right, dtype=float))
+
+    if left_values.size == 0 or right_values.size == 0:
+        raise ValueError("amostras não podem ser vazias.")
+
+    if not np.isfinite(left_values).all() or not np.isfinite(right_values).all():
+        raise ValueError("amostras devem conter apenas valores finitos.")
+
+    points = np.unique(
+        np.concatenate(
+            (
+                left_values,
+                right_values,
+            )
+        )
+    )
+
+    left_ecdf = (
+        np.searchsorted(
+            left_values,
+            points,
+            side="right",
+        )
+        / left_values.size
+    )
+    right_ecdf = (
+        np.searchsorted(
+            right_values,
+            points,
+            side="right",
+        )
+        / right_values.size
+    )
+
+    return float(np.max(np.abs(left_ecdf - right_ecdf)))

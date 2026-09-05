@@ -58,3 +58,37 @@ class CustomerBehaviorProfile:
             raise ValueError(
                 f"{name} deve ser numérico, finito e maior ou igual a zero."
             )
+
+
+@dataclass(frozen=True, slots=True)
+class CustomerPopulation:
+    """Representa uma população estável de perfis comportamentais sintéticos."""
+
+    profiles: tuple[CustomerBehaviorProfile, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.profiles, tuple):
+            raise ValueError("profiles deve ser uma tuple.")
+
+        if not self.profiles:
+            raise ValueError("profiles não pode ser vazio.")
+
+        if not all(
+            isinstance(profile, CustomerBehaviorProfile) for profile in self.profiles
+        ):
+            raise ValueError("profiles deve conter apenas CustomerBehaviorProfile.")
+
+        pseudonyms = tuple(profile.customer_pseudonym for profile in self.profiles)
+
+        if len(set(pseudonyms)) != len(pseudonyms):
+            raise ValueError("customer_pseudonym deve ser único na população.")
+
+    def get_profile(
+        self,
+        customer_pseudonym: str,
+    ) -> CustomerBehaviorProfile:
+        for profile in self.profiles:
+            if profile.customer_pseudonym == customer_pseudonym:
+                return profile
+
+        raise ValueError(f"customer_pseudonym desconhecido: {customer_pseudonym}.")

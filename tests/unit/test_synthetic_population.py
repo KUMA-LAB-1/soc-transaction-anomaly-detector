@@ -2,7 +2,10 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from src.synthetic.population import CustomerBehaviorProfile
+from src.synthetic.population import (
+    CustomerBehaviorProfile,
+    CustomerPopulation,
+)
 
 
 def test_customer_behavior_profile_preserva_baseline_do_cliente():
@@ -172,3 +175,126 @@ def test_customer_behavior_profile_rejeita_bool_como_taxa_login():
             transaction_value_sigma=0.65,
             recent_login_failure_rate=True,
         )
+
+
+def _build_customer_profile(
+    customer_pseudonym: str,
+    *,
+    transaction_value_median: float = 180.0,
+    transaction_value_sigma: float = 0.65,
+    recent_login_failure_rate: float = 0.15,
+) -> CustomerBehaviorProfile:
+    return CustomerBehaviorProfile(
+        customer_pseudonym=customer_pseudonym,
+        transaction_value_median=transaction_value_median,
+        transaction_value_sigma=transaction_value_sigma,
+        recent_login_failure_rate=recent_login_failure_rate,
+    )
+
+
+def test_customer_population_preserva_ordem_dos_profiles():
+    primeiro = _build_customer_profile("cliente-001")
+    segundo = _build_customer_profile(
+        "cliente-002",
+        transaction_value_median=450.0,
+    )
+
+    population = CustomerPopulation(
+        profiles=(
+            primeiro,
+            segundo,
+        )
+    )
+
+    assert population.profiles == (
+        primeiro,
+        segundo,
+    )
+
+
+def test_customer_population_rejeita_populacao_vazia():
+    with pytest.raises(
+        ValueError,
+        match="profiles",
+    ):
+        CustomerPopulation(
+            profiles=(),
+        )
+
+
+def test_customer_population_rejeita_profiles_fora_de_tuple():
+    with pytest.raises(
+        ValueError,
+        match="profiles",
+    ):
+        CustomerPopulation(
+            profiles=[],
+        )
+
+
+def test_customer_population_rejeita_elemento_invalido():
+    profile = _build_customer_profile("cliente-001")
+
+    with pytest.raises(
+        ValueError,
+        match="CustomerBehaviorProfile",
+    ):
+        CustomerPopulation(
+            profiles=(
+                profile,
+                "cliente-002",
+            ),
+        )
+
+
+def test_customer_population_rejeita_customer_pseudonym_duplicado():
+    primeiro = _build_customer_profile("cliente-001")
+    duplicado = _build_customer_profile(
+        "cliente-001",
+        transaction_value_median=900.0,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="customer_pseudonym",
+    ):
+        CustomerPopulation(
+            profiles=(
+                primeiro,
+                duplicado,
+            ),
+        )
+
+
+def test_customer_population_retorna_profile_por_pseudonimo():
+    primeiro = _build_customer_profile("cliente-001")
+    segundo = _build_customer_profile(
+        "cliente-002",
+        transaction_value_median=450.0,
+    )
+
+    population = CustomerPopulation(
+        profiles=(
+            primeiro,
+            segundo,
+        )
+    )
+
+    assert population.get_profile("cliente-002") is segundo
+
+
+def test_customer_population_rejeita_lookup_desconhecido():
+    population = CustomerPopulation(profiles=(_build_customer_profile("cliente-001"),))
+
+    with pytest.raises(
+        ValueError,
+        match="cliente-999",
+    ):
+        population.get_profile("cliente-999")
+
+
+def test_customer_population_e_imutavel():
+    population = CustomerPopulation(profiles=(_build_customer_profile("cliente-001"),))
+
+    with pytest.raises(FrozenInstanceError):
+        population.profiles = ()

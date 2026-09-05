@@ -2,11 +2,15 @@ from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from math import isclose, isfinite
+from math import isclose
 from statistics import mean, median
 from typing import TYPE_CHECKING
 
 from .label_policy import STATUS_NORMAL, STATUS_SUSPEITO
+from .observables import (
+    get_recent_login_failures,
+    get_transaction_value,
+)
 
 if TYPE_CHECKING:
     from .dataset import GeneratedSyntheticDataset
@@ -217,33 +221,10 @@ def analyze_scenario_observables(
     for registro in dataset.records:
         scenario = registro.truth.scenario
 
-        if "valor_transacao" not in registro.observables:
-            raise ValueError("observables deve conter valor_transacao.")
-
-        valor_transacao = registro.observables["valor_transacao"]
-
-        if isinstance(valor_transacao, bool) or not isinstance(
-            valor_transacao,
-            (int, float),
-        ):
-            raise ValueError("valor_transacao deve ser numerico.")
-
-        if not isfinite(valor_transacao):
-            raise ValueError("valor_transacao deve ser finito.")
-
+        valor_transacao = get_transaction_value(registro.observables)
         valores_por_cenario[scenario].append(valor_transacao)
 
-        if "falhas_login_recentes" not in registro.observables:
-            raise ValueError("observables deve conter falhas_login_recentes.")
-
-        falhas_login = registro.observables["falhas_login_recentes"]
-
-        if isinstance(falhas_login, bool) or not isinstance(falhas_login, int):
-            raise ValueError("falhas_login_recentes deve ser inteiro.")
-
-        if falhas_login < 0:
-            raise ValueError("falhas_login_recentes deve ser maior ou igual a zero.")
-
+        falhas_login = get_recent_login_failures(registro.observables)
         falhas_login_por_cenario[scenario].append(falhas_login)
 
         dispositivo_novo = _get_required_bool_observable(

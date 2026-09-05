@@ -42,4 +42,7 @@ def test_analyze_scenario_observables_preserva_cenario_sem_registros():
         record_count=0,
         transaction_value_median=None,
         recent_login_failures_mean=None,
+        new_device_proportion=None,
+        limit_change_proportion=None,
+        location_change_proportion=None,
     )

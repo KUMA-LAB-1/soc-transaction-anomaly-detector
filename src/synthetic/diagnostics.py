@@ -1,4 +1,5 @@
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from math import isclose, isfinite
@@ -24,6 +25,9 @@ class ScenarioObservableDiagnosticsEntry:
     record_count: int
     transaction_value_median: float | None
     recent_login_failures_mean: float | None
+    new_device_proportion: float | None
+    limit_change_proportion: float | None
+    location_change_proportion: float | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +124,21 @@ class DatasetDiagnostics:
             )
 
 
+def _get_required_bool_observable(
+    observables: Mapping[str, object],
+    field_name: str,
+) -> bool:
+    if field_name not in observables:
+        raise ValueError(f"observables deve conter {field_name}.")
+
+    value = observables[field_name]
+
+    if not isinstance(value, bool):
+        raise ValueError(f"{field_name} deve ser booleano.")
+
+    return value
+
+
 def analyze_synthetic_dataset(
     dataset: "GeneratedSyntheticDataset",
 ) -> DatasetDiagnostics:
@@ -183,6 +202,18 @@ def analyze_scenario_observables(
         scenario: [] for scenario in cenarios_manifesto_ordenados
     }
 
+    dispositivo_novo_por_cenario: dict[str, list[bool]] = {
+        scenario: [] for scenario in cenarios_manifesto_ordenados
+    }
+
+    alteracao_limite_por_cenario: dict[str, list[bool]] = {
+        scenario: [] for scenario in cenarios_manifesto_ordenados
+    }
+
+    mudanca_localizacao_por_cenario: dict[str, list[bool]] = {
+        scenario: [] for scenario in cenarios_manifesto_ordenados
+    }
+
     for registro in dataset.records:
         scenario = registro.truth.scenario
 
@@ -215,6 +246,27 @@ def analyze_scenario_observables(
 
         falhas_login_por_cenario[scenario].append(falhas_login)
 
+        dispositivo_novo = _get_required_bool_observable(
+            registro.observables,
+            "dispositivo_novo_flag",
+        )
+
+        dispositivo_novo_por_cenario[scenario].append(dispositivo_novo)
+
+        alteracao_limite = _get_required_bool_observable(
+            registro.observables,
+            "alteracao_limite_flag",
+        )
+
+        alteracao_limite_por_cenario[scenario].append(alteracao_limite)
+
+        mudanca_localizacao = _get_required_bool_observable(
+            registro.observables,
+            "mudanca_localizacao_flag",
+        )
+
+        mudanca_localizacao_por_cenario[scenario].append(mudanca_localizacao)
+
     return tuple(
         ScenarioObservableDiagnosticsEntry(
             scenario=scenario,
@@ -227,6 +279,24 @@ def analyze_scenario_observables(
             recent_login_failures_mean=(
                 float(mean(falhas_login_por_cenario[scenario]))
                 if falhas_login_por_cenario[scenario]
+                else None
+            ),
+            new_device_proportion=(
+                sum(dispositivo_novo_por_cenario[scenario])
+                / len(dispositivo_novo_por_cenario[scenario])
+                if dispositivo_novo_por_cenario[scenario]
+                else None
+            ),
+            limit_change_proportion=(
+                sum(alteracao_limite_por_cenario[scenario])
+                / len(alteracao_limite_por_cenario[scenario])
+                if alteracao_limite_por_cenario[scenario]
+                else None
+            ),
+            location_change_proportion=(
+                sum(mudanca_localizacao_por_cenario[scenario])
+                / len(mudanca_localizacao_por_cenario[scenario])
+                if mudanca_localizacao_por_cenario[scenario]
                 else None
             ),
         )

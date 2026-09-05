@@ -4,7 +4,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from .diagnostics import ScenarioObservableDiagnosticsEntry
+from .diagnostics import (
+    ScenarioObservableDiagnosticsEntry,
+    analyze_scenario_observables,
+)
 from .observables import (
     get_recent_login_failures,
     get_transaction_value,
@@ -27,6 +30,17 @@ class ScenarioBehaviorSeparationEntry:
 class ScenarioDistributionSeparationEntry:
     left_scenario: str
     right_scenario: str
+    transaction_value_ecdf_distance: float | None
+    recent_login_failures_ecdf_distance: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioSeparationProfile:
+    left_scenario: str
+    right_scenario: str
+    new_device_gap: float | None
+    limit_change_gap: float | None
+    location_change_gap: float | None
     transaction_value_ecdf_distance: float | None
     recent_login_failures_ecdf_distance: float | None
 
@@ -160,3 +174,45 @@ def analyze_scenario_distribution_separation(
         )
         for left_scenario, right_scenario in combinations(scenarios, 2)
     )
+
+
+def analyze_scenario_separation_profile(
+    dataset: "GeneratedSyntheticDataset",
+) -> tuple[ScenarioSeparationProfile, ...]:
+    behavior_entries = analyze_behavior_flag_separation(
+        analyze_scenario_observables(dataset)
+    )
+
+    distribution_entries = analyze_scenario_distribution_separation(dataset)
+
+    distribution_by_pair = {
+        (entry.left_scenario, entry.right_scenario): entry
+        for entry in distribution_entries
+    }
+
+    profiles: list[ScenarioSeparationProfile] = []
+
+    for behavior in behavior_entries:
+        pair = (
+            behavior.left_scenario,
+            behavior.right_scenario,
+        )
+        distribution = distribution_by_pair[pair]
+
+        profiles.append(
+            ScenarioSeparationProfile(
+                left_scenario=behavior.left_scenario,
+                right_scenario=behavior.right_scenario,
+                new_device_gap=behavior.new_device_gap,
+                limit_change_gap=behavior.limit_change_gap,
+                location_change_gap=behavior.location_change_gap,
+                transaction_value_ecdf_distance=(
+                    distribution.transaction_value_ecdf_distance
+                ),
+                recent_login_failures_ecdf_distance=(
+                    distribution.recent_login_failures_ecdf_distance
+                ),
+            )
+        )
+
+    return tuple(profiles)

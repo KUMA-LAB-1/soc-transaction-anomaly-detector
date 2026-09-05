@@ -8,7 +8,9 @@ from src.synthetic.dataset import generate_synthetic_dataset
 from src.synthetic.label_policy import OperationalLabelPolicy
 from src.synthetic.quality import (
     ScenarioDistributionSeparationEntry,
+    ScenarioSeparationProfile,
     analyze_scenario_distribution_separation,
+    analyze_scenario_separation_profile,
 )
 from src.synthetic.scenarios import obter_cenario
 
@@ -35,6 +37,25 @@ def _build_controlled_dataset():
         ),
     )
 
+    behavior_flags = {
+        "baseline": iter(
+            (
+                (False, False, False),
+                (False, False, False),
+                (False, False, True),
+                (False, True, True),
+            )
+        ),
+        "account_takeover": iter(
+            (
+                (False, True, False),
+                (False, True, True),
+                (True, True, True),
+                (True, True, True),
+            )
+        ),
+    }
+
     transaction_values = {
         "baseline": iter((1.0, 2.0, 3.0, 4.0)),
         "account_takeover": iter((3.0, 4.0, 5.0, 6.0)),
@@ -45,21 +66,34 @@ def _build_controlled_dataset():
         "account_takeover": iter((0, 1, 1, 1)),
     }
 
-    records = tuple(
-        replace(
-            record,
-            observables={
-                **record.observables,
-                "valor_transacao": next(transaction_values[record.truth.scenario]),
-                "falhas_login_recentes": next(login_failures[record.truth.scenario]),
-            },
+    records = []
+
+    for record in dataset.records:
+        scenario = record.truth.scenario
+
+        (
+            dispositivo_novo,
+            alteracao_limite,
+            mudanca_localizacao,
+        ) = next(behavior_flags[scenario])
+
+        records.append(
+            replace(
+                record,
+                observables={
+                    **record.observables,
+                    "valor_transacao": next(transaction_values[scenario]),
+                    "falhas_login_recentes": next(login_failures[scenario]),
+                    "dispositivo_novo_flag": dispositivo_novo,
+                    "alteracao_limite_flag": alteracao_limite,
+                    "mudanca_localizacao_flag": mudanca_localizacao,
+                },
+            )
         )
-        for record in dataset.records
-    )
 
     return replace(
         dataset,
-        records=records,
+        records=tuple(records),
     )
 
 
@@ -139,3 +173,21 @@ def test_analyze_scenario_distribution_separation_rejeita_cenario_fora_do_manife
         match="cenário observado não está presente no manifest",
     ):
         analyze_scenario_distribution_separation(corrupted_dataset)
+
+
+def test_analyze_scenario_separation_profile_combina_metricas_observadas():
+    dataset = _build_controlled_dataset()
+
+    result = analyze_scenario_separation_profile(dataset)
+
+    assert result == (
+        ScenarioSeparationProfile(
+            left_scenario="baseline",
+            right_scenario="account_takeover",
+            new_device_gap=pytest.approx(0.50),
+            limit_change_gap=pytest.approx(0.75),
+            location_change_gap=pytest.approx(0.25),
+            transaction_value_ecdf_distance=pytest.approx(0.50),
+            recent_login_failures_ecdf_distance=pytest.approx(0.75),
+        ),
+    )

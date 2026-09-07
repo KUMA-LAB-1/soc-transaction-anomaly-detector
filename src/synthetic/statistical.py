@@ -5,6 +5,7 @@ import numpy as np
 from .contracts import GenerationTruth, SyntheticRecord
 from .label_policy import OperationalLabelPolicy
 from .population import CustomerBehaviorProfile, CustomerPopulation
+from .scenario_effects import ScenarioEffect
 from .scenarios import ScenarioDefinition
 from .temporal import TemporalSampler
 
@@ -56,6 +57,7 @@ class StatisticalGenerator:
         quantidade: int,
         inicio: datetime,
         fim: datetime,
+        scenario_effect: ScenarioEffect | None = None,
     ) -> list[SyntheticRecord]:
         """Gera registros sintéticos cronológicos para um cenário."""
         if not isinstance(quantidade, int) or isinstance(quantidade, bool):
@@ -78,6 +80,7 @@ class StatisticalGenerator:
                 cenario,
                 id_transacao=id_inicial + indice,
                 timestamp=timestamps[indice],
+                scenario_effect=scenario_effect,
             )
             for indice in range(quantidade)
         ]
@@ -92,6 +95,7 @@ class StatisticalGenerator:
         *,
         id_transacao: int,
         timestamp: datetime,
+        scenario_effect: ScenarioEffect | None,
     ) -> SyntheticRecord:
 
         customer_profile = self._selecionar_customer_profile()
@@ -99,6 +103,7 @@ class StatisticalGenerator:
         valor_transacao = self._gerar_valor_transacao(
             cenario,
             customer_profile=customer_profile,
+            scenario_effect=scenario_effect,
         )
 
         dispositivo_novo = self._sortear(cenario.probabilidade_dispositivo_novo)
@@ -184,6 +189,7 @@ class StatisticalGenerator:
         cenario: ScenarioDefinition,
         *,
         customer_profile: CustomerBehaviorProfile | None,
+        scenario_effect: ScenarioEffect | None,
     ) -> float:
         if customer_profile is None:
             valor_mediano = cenario.valor_mediano
@@ -191,6 +197,10 @@ class StatisticalGenerator:
         else:
             valor_mediano = customer_profile.transaction_value_median
             valor_sigma = customer_profile.transaction_value_sigma
+
+        if scenario_effect is not None:
+            valor_mediano *= scenario_effect.transaction_value_median_multiplier
+            valor_sigma *= scenario_effect.transaction_value_sigma_multiplier
 
         valor = self._rng.lognormal(
             mean=np.log(valor_mediano),

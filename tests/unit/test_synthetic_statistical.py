@@ -5,6 +5,10 @@ import pytest
 from src.synthetic.contracts import SyntheticRecord
 from src.synthetic.firewall import projetar_dataset_modelagem
 from src.synthetic.label_policy import OperationalLabelPolicy
+from src.synthetic.population import (
+    CustomerBehaviorProfile,
+    CustomerPopulation,
+)
 from src.synthetic.scenarios import obter_cenario
 from src.synthetic.statistical import StatisticalGenerator
 
@@ -21,6 +25,115 @@ SINAIS_BOOLEANOS = (
     "alteracao_limite_flag",
     "mudanca_localizacao_flag",
 )
+
+
+def criar_populacao(
+    customer_pseudonym: str,
+) -> CustomerPopulation:
+    return CustomerPopulation(
+        profiles=(
+            CustomerBehaviorProfile(
+                customer_pseudonym=customer_pseudonym,
+                transaction_value_median=180.0,
+                transaction_value_sigma=0.65,
+                recent_login_failure_rate=0.15,
+            ),
+        )
+    )
+
+
+def test_gerador_com_populacao_usa_pseudonimo_do_profile():
+    population = criar_populacao(
+        "entidade-sintetica-alpha",
+    )
+
+    gerador = StatisticalGenerator(
+        seed=42,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population,
+    )
+
+    registros = gerador.gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=20,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    assert {registro.observables["cliente_pseudonimo"] for registro in registros} == {
+        "entidade-sintetica-alpha",
+    }
+
+
+def test_gerador_rejeita_population_invalida():
+    with pytest.raises(
+        ValueError,
+        match="population",
+    ):
+        StatisticalGenerator(
+            seed=42,
+            label_policy=POLITICA_SEM_RUIDO,
+            population="population-invalida",
+        )
+
+
+def test_mudar_apenas_identidade_da_populacao_nao_altera_evento():
+    population_alpha = criar_populacao(
+        "entidade-alpha",
+    )
+    population_beta = criar_populacao(
+        "entidade-beta",
+    )
+
+    registros_alpha = StatisticalGenerator(
+        seed=777,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population_alpha,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    registros_beta = StatisticalGenerator(
+        seed=777,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population_beta,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    observaveis_alpha = [
+        {
+            campo: valor
+            for campo, valor in registro.observables.items()
+            if campo != "cliente_pseudonimo"
+        }
+        for registro in registros_alpha
+    ]
+
+    observaveis_beta = [
+        {
+            campo: valor
+            for campo, valor in registro.observables.items()
+            if campo != "cliente_pseudonimo"
+        }
+        for registro in registros_beta
+    ]
+
+    assert observaveis_alpha == observaveis_beta
+
+    assert [registro.operational_labels for registro in registros_alpha] == [
+        registro.operational_labels for registro in registros_beta
+    ]
+
+    assert [registro.truth for registro in registros_alpha] == [
+        registro.truth for registro in registros_beta
+    ]
 
 
 def criar_gerador(seed: int) -> StatisticalGenerator:

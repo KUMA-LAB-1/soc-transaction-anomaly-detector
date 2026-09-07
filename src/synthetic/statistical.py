@@ -4,6 +4,7 @@ import numpy as np
 
 from .contracts import GenerationTruth, SyntheticRecord
 from .label_policy import OperationalLabelPolicy
+from .population import CustomerPopulation
 from .scenarios import ScenarioDefinition
 from .temporal import TemporalSampler
 
@@ -26,10 +27,23 @@ class StatisticalGenerator:
         self,
         seed: int,
         label_policy: OperationalLabelPolicy,
+        population: CustomerPopulation | None = None,
     ) -> None:
+        if population is not None and not isinstance(
+            population,
+            CustomerPopulation,
+        ):
+            raise ValueError("population deve ser CustomerPopulation ou None.")
+
         self.seed = seed
         self._label_policy = label_policy
+        self._population = population
+
         self._rng = np.random.default_rng(seed)
+
+        customer_seed = np.random.SeedSequence(seed).spawn(1)[0]
+        self._customer_rng = np.random.default_rng(customer_seed)
+
         self._temporal = TemporalSampler(self._rng)
         self._proximo_id_transacao = 1
 
@@ -96,12 +110,7 @@ class StatisticalGenerator:
             )
         )
 
-        cliente = int(
-            self._rng.integers(
-                1,
-                101,
-            )
-        )
+        cliente_pseudonimo = self._selecionar_cliente_pseudonimo()
 
         status_transacao = self._label_policy.gerar_status(
             is_suspicious=cenario.is_suspicious,
@@ -111,7 +120,7 @@ class StatisticalGenerator:
         return SyntheticRecord(
             observables={
                 "id_transacao": id_transacao,
-                "cliente_pseudonimo": f"cliente-{cliente:03d}",
+                "cliente_pseudonimo": cliente_pseudonimo,
                 "data_hora_transacao": timestamp,
                 "tipo_transacao": tipo_transacao,
                 "valor_transacao": valor_transacao,
@@ -130,6 +139,26 @@ class StatisticalGenerator:
                 expected_mitre_techniques=(cenario.expected_mitre_techniques),
             ),
         )
+
+    def _selecionar_cliente_pseudonimo(self) -> str:
+        if self._population is None:
+            cliente = int(
+                self._rng.integers(
+                    1,
+                    101,
+                )
+            )
+
+            return f"cliente-{cliente:03d}"
+
+        profile_index = int(
+            self._customer_rng.integers(
+                0,
+                len(self._population.profiles),
+            )
+        )
+
+        return self._population.profiles[profile_index].customer_pseudonym
 
     def _gerar_valor_transacao(
         self,

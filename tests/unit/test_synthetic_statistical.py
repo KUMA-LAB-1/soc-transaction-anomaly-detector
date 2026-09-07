@@ -29,14 +29,18 @@ SINAIS_BOOLEANOS = (
 
 def criar_populacao(
     customer_pseudonym: str,
+    *,
+    transaction_value_median: float = 180.0,
+    transaction_value_sigma: float = 0.65,
+    recent_login_failure_rate: float = 0.15,
 ) -> CustomerPopulation:
     return CustomerPopulation(
         profiles=(
             CustomerBehaviorProfile(
                 customer_pseudonym=customer_pseudonym,
-                transaction_value_median=180.0,
-                transaction_value_sigma=0.65,
-                recent_login_failure_rate=0.15,
+                transaction_value_median=transaction_value_median,
+                transaction_value_sigma=transaction_value_sigma,
+                recent_login_failure_rate=recent_login_failure_rate,
             ),
         )
     )
@@ -500,3 +504,170 @@ def test_janela_temporal_preserva_diferenca_de_probabilidade_de_madrugada():
     assert 0 < taxa_baseline < 1
     assert 0 < taxa_credential_attack < 1
     assert taxa_baseline < taxa_credential_attack
+
+
+def test_profile_controla_mediana_do_valor_transacional():
+    population_baixa = criar_populacao(
+        "entidade-alpha",
+        transaction_value_median=90.0,
+        transaction_value_sigma=0.65,
+    )
+    population_alta = criar_populacao(
+        "entidade-alpha",
+        transaction_value_median=900.0,
+        transaction_value_sigma=0.65,
+    )
+
+    registros_baixos = StatisticalGenerator(
+        seed=42,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population_baixa,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    registros_altos = StatisticalGenerator(
+        seed=42,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population_alta,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    valores_baixos = [
+        registro.observables["valor_transacao"] for registro in registros_baixos
+    ]
+    valores_altos = [
+        registro.observables["valor_transacao"] for registro in registros_altos
+    ]
+
+    assert valores_baixos != valores_altos
+    assert all(
+        valor_alto > valor_baixo
+        for valor_baixo, valor_alto in zip(
+            valores_baixos,
+            valores_altos,
+            strict=True,
+        )
+    )
+
+
+def test_profile_controla_dispersao_do_valor_transacional():
+    population_estavel = criar_populacao(
+        "entidade-alpha",
+        transaction_value_median=180.0,
+        transaction_value_sigma=0.10,
+    )
+    population_volatil = criar_populacao(
+        "entidade-alpha",
+        transaction_value_median=180.0,
+        transaction_value_sigma=1.20,
+    )
+
+    registros_estaveis = StatisticalGenerator(
+        seed=42,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population_estavel,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    registros_volateis = StatisticalGenerator(
+        seed=42,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population_volatil,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    valores_estaveis = [
+        registro.observables["valor_transacao"] for registro in registros_estaveis
+    ]
+    valores_volateis = [
+        registro.observables["valor_transacao"] for registro in registros_volateis
+    ]
+
+    assert valores_estaveis != valores_volateis
+
+
+def test_mudar_apenas_baseline_transacional_nao_embaralha_evento():
+    population_baixa = criar_populacao(
+        "entidade-alpha",
+        transaction_value_median=90.0,
+        transaction_value_sigma=0.65,
+    )
+    population_alta = criar_populacao(
+        "entidade-alpha",
+        transaction_value_median=900.0,
+        transaction_value_sigma=0.65,
+    )
+
+    registros_baixos = StatisticalGenerator(
+        seed=777,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population_baixa,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    registros_altos = StatisticalGenerator(
+        seed=777,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population_alta,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    valores_baixos = [
+        registro.observables["valor_transacao"] for registro in registros_baixos
+    ]
+    valores_altos = [
+        registro.observables["valor_transacao"] for registro in registros_altos
+    ]
+
+    assert valores_baixos != valores_altos
+
+    observaveis_baixos_sem_valor = [
+        {
+            campo: valor
+            for campo, valor in registro.observables.items()
+            if campo != "valor_transacao"
+        }
+        for registro in registros_baixos
+    ]
+    observaveis_altos_sem_valor = [
+        {
+            campo: valor
+            for campo, valor in registro.observables.items()
+            if campo != "valor_transacao"
+        }
+        for registro in registros_altos
+    ]
+
+    assert observaveis_baixos_sem_valor == observaveis_altos_sem_valor
+
+    assert [registro.operational_labels for registro in registros_baixos] == [
+        registro.operational_labels for registro in registros_altos
+    ]
+
+    assert [registro.truth for registro in registros_baixos] == [
+        registro.truth for registro in registros_altos
+    ]

@@ -4,7 +4,7 @@ import numpy as np
 
 from .contracts import GenerationTruth, SyntheticRecord
 from .label_policy import OperationalLabelPolicy
-from .population import CustomerPopulation
+from .population import CustomerBehaviorProfile, CustomerPopulation
 from .scenarios import ScenarioDefinition
 from .temporal import TemporalSampler
 
@@ -92,7 +92,12 @@ class StatisticalGenerator:
         timestamp: datetime,
     ) -> SyntheticRecord:
 
-        valor_transacao = self._gerar_valor_transacao(cenario)
+        customer_profile = self._selecionar_customer_profile()
+
+        valor_transacao = self._gerar_valor_transacao(
+            cenario,
+            customer_profile=customer_profile,
+        )
 
         dispositivo_novo = self._sortear(cenario.probabilidade_dispositivo_novo)
         alteracao_limite = self._sortear(cenario.probabilidade_alteracao_limite)
@@ -110,7 +115,9 @@ class StatisticalGenerator:
             )
         )
 
-        cliente_pseudonimo = self._selecionar_cliente_pseudonimo()
+        cliente_pseudonimo = self._selecionar_cliente_pseudonimo(
+            customer_profile,
+        )
 
         status_transacao = self._label_policy.gerar_status(
             is_suspicious=cenario.is_suspicious,
@@ -140,16 +147,11 @@ class StatisticalGenerator:
             ),
         )
 
-    def _selecionar_cliente_pseudonimo(self) -> str:
+    def _selecionar_customer_profile(
+        self,
+    ) -> CustomerBehaviorProfile | None:
         if self._population is None:
-            cliente = int(
-                self._rng.integers(
-                    1,
-                    101,
-                )
-            )
-
-            return f"cliente-{cliente:03d}"
+            return None
 
         profile_index = int(
             self._customer_rng.integers(
@@ -158,15 +160,40 @@ class StatisticalGenerator:
             )
         )
 
-        return self._population.profiles[profile_index].customer_pseudonym
+        return self._population.profiles[profile_index]
+
+    def _selecionar_cliente_pseudonimo(
+        self,
+        customer_profile: CustomerBehaviorProfile | None,
+    ) -> str:
+        if customer_profile is not None:
+            return customer_profile.customer_pseudonym
+
+        cliente = int(
+            self._rng.integers(
+                1,
+                101,
+            )
+        )
+
+        return f"cliente-{cliente:03d}"
 
     def _gerar_valor_transacao(
         self,
         cenario: ScenarioDefinition,
+        *,
+        customer_profile: CustomerBehaviorProfile | None,
     ) -> float:
+        if customer_profile is None:
+            valor_mediano = cenario.valor_mediano
+            valor_sigma = cenario.valor_sigma
+        else:
+            valor_mediano = customer_profile.transaction_value_median
+            valor_sigma = customer_profile.transaction_value_sigma
+
         valor = self._rng.lognormal(
-            mean=np.log(cenario.valor_mediano),
-            sigma=cenario.valor_sigma,
+            mean=np.log(valor_mediano),
+            sigma=valor_sigma,
         )
 
         return max(

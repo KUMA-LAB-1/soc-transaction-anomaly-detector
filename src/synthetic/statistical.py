@@ -41,8 +41,10 @@ class StatisticalGenerator:
 
         self._rng = np.random.default_rng(seed)
 
-        customer_seed = np.random.SeedSequence(seed).spawn(1)[0]
+        customer_seed, login_seed = np.random.SeedSequence(seed).spawn(2)
+
         self._customer_rng = np.random.default_rng(customer_seed)
+        self._login_rng = np.random.default_rng(login_seed)
 
         self._temporal = TemporalSampler(self._rng)
         self._proximo_id_transacao = 1
@@ -103,10 +105,9 @@ class StatisticalGenerator:
         alteracao_limite = self._sortear(cenario.probabilidade_alteracao_limite)
         mudanca_localizacao = self._sortear(cenario.probabilidade_mudanca_localizacao)
 
-        falhas_login = int(
-            self._rng.poisson(
-                cenario.media_falhas_login,
-            )
+        falhas_login = self._gerar_falhas_login(
+            cenario,
+            customer_profile=customer_profile,
         )
 
         tipo_transacao = str(
@@ -203,3 +204,22 @@ class StatisticalGenerator:
 
     def _sortear(self, probabilidade: float) -> bool:
         return bool(self._rng.random() < probabilidade)
+
+    def _gerar_falhas_login(
+        self,
+        cenario: ScenarioDefinition,
+        *,
+        customer_profile: CustomerBehaviorProfile | None,
+    ) -> int:
+        if customer_profile is None:
+            return int(
+                self._rng.poisson(
+                    cenario.media_falhas_login,
+                )
+            )
+
+        return int(
+            self._login_rng.poisson(
+                customer_profile.recent_login_failure_rate,
+            )
+        )

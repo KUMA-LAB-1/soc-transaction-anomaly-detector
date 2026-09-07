@@ -671,3 +671,128 @@ def test_mudar_apenas_baseline_transacional_nao_embaralha_evento():
     assert [registro.truth for registro in registros_baixos] == [
         registro.truth for registro in registros_altos
     ]
+
+
+def test_profile_controla_baseline_de_falhas_login():
+    population_sem_falhas = criar_populacao(
+        "entidade-alpha",
+        transaction_value_median=180.0,
+        transaction_value_sigma=0.65,
+        recent_login_failure_rate=0.0,
+    )
+    population_com_falhas = criar_populacao(
+        "entidade-alpha",
+        transaction_value_median=180.0,
+        transaction_value_sigma=0.65,
+        recent_login_failure_rate=5.0,
+    )
+
+    registros_sem_falhas = StatisticalGenerator(
+        seed=42,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population_sem_falhas,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    registros_com_falhas = StatisticalGenerator(
+        seed=42,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population_com_falhas,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    falhas_sem_baseline = [
+        registro.observables["falhas_login_recentes"]
+        for registro in registros_sem_falhas
+    ]
+    falhas_com_baseline = [
+        registro.observables["falhas_login_recentes"]
+        for registro in registros_com_falhas
+    ]
+
+    assert all(falhas == 0 for falhas in falhas_sem_baseline)
+    assert sum(falhas_com_baseline) > 0
+    assert falhas_sem_baseline != falhas_com_baseline
+
+
+def test_mudar_apenas_baseline_login_nao_embaralha_evento():
+    population_sem_falhas = criar_populacao(
+        "entidade-alpha",
+        transaction_value_median=180.0,
+        transaction_value_sigma=0.65,
+        recent_login_failure_rate=0.0,
+    )
+    population_com_falhas = criar_populacao(
+        "entidade-alpha",
+        transaction_value_median=180.0,
+        transaction_value_sigma=0.65,
+        recent_login_failure_rate=5.0,
+    )
+
+    registros_sem_falhas = StatisticalGenerator(
+        seed=777,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population_sem_falhas,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    registros_com_falhas = StatisticalGenerator(
+        seed=777,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population_com_falhas,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    falhas_sem_baseline = [
+        registro.observables["falhas_login_recentes"]
+        for registro in registros_sem_falhas
+    ]
+    falhas_com_baseline = [
+        registro.observables["falhas_login_recentes"]
+        for registro in registros_com_falhas
+    ]
+
+    assert falhas_sem_baseline != falhas_com_baseline
+
+    observaveis_sem_falhas_login = [
+        {
+            campo: valor
+            for campo, valor in registro.observables.items()
+            if campo != "falhas_login_recentes"
+        }
+        for registro in registros_sem_falhas
+    ]
+    observaveis_com_falhas_login = [
+        {
+            campo: valor
+            for campo, valor in registro.observables.items()
+            if campo != "falhas_login_recentes"
+        }
+        for registro in registros_com_falhas
+    ]
+
+    assert observaveis_sem_falhas_login == observaveis_com_falhas_login
+
+    assert [registro.operational_labels for registro in registros_sem_falhas] == [
+        registro.operational_labels for registro in registros_com_falhas
+    ]
+
+    assert [registro.truth for registro in registros_sem_falhas] == [
+        registro.truth for registro in registros_com_falhas
+    ]

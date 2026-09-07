@@ -10,7 +10,6 @@ from src.synthetic.population import (
 from src.synthetic.scenarios import obter_cenario
 from src.synthetic.statistical import StatisticalGenerator
 
-
 INICIO = datetime(2026, 1, 1, 0, 0)
 FIM_PADRAO = INICIO + timedelta(days=30)
 

@@ -5,10 +5,8 @@ import pytest
 from src.synthetic.contracts import SyntheticRecord
 from src.synthetic.firewall import projetar_dataset_modelagem
 from src.synthetic.label_policy import OperationalLabelPolicy
-
 from src.synthetic.scenarios import obter_cenario
 from src.synthetic.statistical import StatisticalGenerator
-
 
 INICIO = datetime(2026, 1, 1, 0, 0)
 FIM_PADRAO = INICIO + timedelta(days=30)

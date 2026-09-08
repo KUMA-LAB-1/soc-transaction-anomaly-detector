@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import datetime, timedelta
 
 from src.synthetic.label_policy import OperationalLabelPolicy
@@ -239,3 +240,133 @@ def test_scenario_effect_controla_dispersao_transacional():
     assert [registro.truth for registro in registros_neutros] == [
         registro.truth for registro in registros_sem_dispersao
     ]
+
+
+def test_scenario_effect_login_modifica_apenas_falhas_login():
+    population = criar_populacao(
+        "entidade-alpha",
+        transaction_value_median=180.0,
+        transaction_value_sigma=0.65,
+        recent_login_failure_rate=0.0,
+    )
+
+    effect_sem_incremento = ScenarioEffect(
+        transaction_value_median_multiplier=1.0,
+        transaction_value_sigma_multiplier=1.0,
+        recent_login_failure_rate_increment=0.0,
+    )
+    effect_com_incremento = ScenarioEffect(
+        transaction_value_median_multiplier=1.0,
+        transaction_value_sigma_multiplier=1.0,
+        recent_login_failure_rate_increment=5.0,
+    )
+
+    registros_sem_incremento = StatisticalGenerator(
+        seed=777,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+        scenario_effect=effect_sem_incremento,
+    )
+
+    registros_com_incremento = StatisticalGenerator(
+        seed=777,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+        scenario_effect=effect_com_incremento,
+    )
+
+    falhas_sem_incremento = [
+        registro.observables["falhas_login_recentes"]
+        for registro in registros_sem_incremento
+    ]
+    falhas_com_incremento = [
+        registro.observables["falhas_login_recentes"]
+        for registro in registros_com_incremento
+    ]
+
+    assert all(falhas == 0 for falhas in falhas_sem_incremento)
+    assert sum(falhas_com_incremento) > 0
+    assert falhas_sem_incremento != falhas_com_incremento
+
+    observaveis_sem_incremento_sem_login = [
+        {
+            campo: valor
+            for campo, valor in registro.observables.items()
+            if campo != "falhas_login_recentes"
+        }
+        for registro in registros_sem_incremento
+    ]
+    observaveis_com_incremento_sem_login = [
+        {
+            campo: valor
+            for campo, valor in registro.observables.items()
+            if campo != "falhas_login_recentes"
+        }
+        for registro in registros_com_incremento
+    ]
+
+    assert observaveis_sem_incremento_sem_login == observaveis_com_incremento_sem_login
+
+    assert [registro.operational_labels for registro in registros_sem_incremento] == [
+        registro.operational_labels for registro in registros_com_incremento
+    ]
+
+    assert [registro.truth for registro in registros_sem_incremento] == [
+        registro.truth for registro in registros_com_incremento
+    ]
+
+
+def test_scenario_effect_login_aplica_incremento_no_caminho_legado():
+    cenario_baseline_sem_falhas = replace(
+        obter_cenario("baseline"),
+        media_falhas_login=0.0,
+    )
+    effect_com_incremento = ScenarioEffect(
+        transaction_value_median_multiplier=1.0,
+        transaction_value_sigma_multiplier=1.0,
+        recent_login_failure_rate_increment=5.0,
+    )
+
+    registros_sem_efeito = StatisticalGenerator(
+        seed=777,
+        label_policy=POLITICA_SEM_RUIDO,
+    ).gerar_registros(
+        cenario_baseline_sem_falhas,
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    registros_com_efeito = StatisticalGenerator(
+        seed=777,
+        label_policy=POLITICA_SEM_RUIDO,
+    ).gerar_registros(
+        cenario_baseline_sem_falhas,
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+        scenario_effect=effect_com_incremento,
+    )
+
+    falhas_sem_efeito = [
+        registro.observables["falhas_login_recentes"]
+        for registro in registros_sem_efeito
+    ]
+    falhas_com_efeito = [
+        registro.observables["falhas_login_recentes"]
+        for registro in registros_com_efeito
+    ]
+
+    assert all(falhas == 0 for falhas in falhas_sem_efeito)
+    assert sum(falhas_com_efeito) > 0
+    assert falhas_sem_efeito != falhas_com_efeito

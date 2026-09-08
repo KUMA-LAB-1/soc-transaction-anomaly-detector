@@ -113,6 +113,7 @@ class StatisticalGenerator:
         falhas_login = self._gerar_falhas_login(
             cenario,
             customer_profile=customer_profile,
+            scenario_effect=scenario_effect,
         )
 
         tipo_transacao = str(
@@ -220,16 +221,23 @@ class StatisticalGenerator:
         cenario: ScenarioDefinition,
         *,
         customer_profile: CustomerBehaviorProfile | None,
+        scenario_effect: ScenarioEffect | None,
     ) -> int:
+        incremento_login = (
+            scenario_effect.recent_login_failure_rate_increment
+            if scenario_effect is not None
+            else 0.0
+        )
+
         if customer_profile is None:
             return int(
                 self._rng.poisson(
-                    cenario.media_falhas_login,
+                    cenario.media_falhas_login + incremento_login,
                 )
             )
 
         return int(
             self._login_rng.poisson(
-                customer_profile.recent_login_failure_rate,
+                customer_profile.recent_login_failure_rate + incremento_login,
             )
         )

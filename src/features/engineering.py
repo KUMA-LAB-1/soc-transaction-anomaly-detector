@@ -43,6 +43,10 @@ def criar_features(df: pd.DataFrame) -> pd.DataFrame:
         .fillna(df["valor_transacao"])
     )
 
+    sem_desvio_historico = (
+        df["desvio_historico_cliente"].isna() & desvio_global_historico.isna()
+    )
+
     df["desvio_historico_cliente"] = (
         df["desvio_historico_cliente"]
         .fillna(desvio_global_historico)
@@ -54,6 +58,7 @@ def criar_features(df: pd.DataFrame) -> pd.DataFrame:
         df["valor_transacao"] - df["media_historica_cliente"]
     ) / df["desvio_historico_cliente"]
 
+    df.loc[sem_desvio_historico, "zscore_valor_cliente"] = 0.0
     df["dia_semana"] = pd.to_datetime(df["data_hora_transacao"]).dt.dayofweek
 
     colunas_com_padrao = {

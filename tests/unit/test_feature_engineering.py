@@ -118,6 +118,34 @@ def test_media_historica_usa_apenas_transacoes_anteriores():
     assert cliente_a.loc[1, "media_historica_cliente"] == 100.0
 
 
+def test_zscore_cold_start_sem_desvio_historico_fica_neutro():
+    df = pd.DataFrame(
+        {
+            "cliente_pseudonimo": [
+                "cliente-a",
+                "cliente-a",
+            ],
+            "valor_transacao": [
+                70_684.90,
+                19_403.92,
+            ],
+            "data_hora_transacao": [
+                "2026-06-22 05:38:00",
+                "2026-06-22 06:19:00",
+            ],
+        }
+    )
+
+    resultado = criar_features(df)
+
+    cliente_a = resultado[resultado["cliente_pseudonimo"] == "cliente-a"].reset_index(
+        drop=True
+    )
+
+    assert cliente_a.loc[1, "qtd_transacoes_anteriores"] == 1
+    assert cliente_a.loc[1, "zscore_valor_cliente"] == 0.0
+
+
 def test_criar_features_adiciona_sinais_de_seguranca_ausentes():
     df = criar_dataset_base()
 

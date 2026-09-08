@@ -150,7 +150,10 @@ def gerar_relatorio_pdf(
         tabela_dados.append(
             [
                 id_referencia,
-                str(row[col_cliente]),
+                Paragraph(
+                    html.escape(str(row[col_cliente])),
+                    styles["Normal"],
+                ),
                 f"R$ {float(row['valor_transacao']):,.2f}",
                 f"{int(row['hora'])}:00h",
                 f"{row['score_risco_predito']:.1f}/100",

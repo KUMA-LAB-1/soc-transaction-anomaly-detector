@@ -132,6 +132,63 @@ def test_gerar_relatorio_pdf_cria_arquivo(tmp_path, monkeypatch):
     assert caminho.stat().st_size > 0
 
 
+def test_relatorio_renderiza_pseudonimo_longo_com_quebra_na_celula(
+    tmp_path,
+    monkeypatch,
+):
+    caminho = tmp_path / "pseudonimo_longo.pdf"
+    pseudonimo_longo = "10000000-0000-4000-8000-000000000001"
+
+    df = criar_dataframe_com_anomalia()
+    df.loc[0, "cliente_pseudonimo"] = pseudonimo_longo
+
+    tabelas_capturadas = []
+    table_original = pdf_report.Table
+
+    def capturar_table(data, *args, **kwargs):
+        tabelas_capturadas.append([list(linha) for linha in data])
+        return table_original(data, *args, **kwargs)
+
+    monkeypatch.setattr(
+        pdf_report,
+        "Table",
+        capturar_table,
+    )
+
+    monkeypatch.setattr(
+        pdf_report,
+        "enriquecer_com_mitre",
+        lambda **kwargs: {
+            "mitre_id": "T1110",
+            "tecnica": "Brute Force",
+            "tatica": "Credential Access",
+            "procedimentos": "Aplicar controles de autenticação.",
+            "fonte": "teste",
+            "criterio": "falhas de login",
+        },
+    )
+
+    gerar_relatorio_pdf(
+        df_analisado=df,
+        metricas=criar_metricas(),
+        melhor_detector="elliptic_envelope",
+        aviso_amostra_pequena=False,
+        engine=object(),
+        pdf_path=caminho,
+    )
+
+    tabela_incidentes = next(
+        tabela
+        for tabela in tabelas_capturadas
+        if tabela and tabela[0][0] == "Ref/ID" and tabela[0][1] == "Cliente (LGPD)"
+    )
+
+    cliente_cell = tabela_incidentes[1][1]
+
+    assert isinstance(cliente_cell, pdf_report.Paragraph)
+    assert cliente_cell.getPlainText() == pseudonimo_longo
+
+
 def test_relatorio_sem_anomalias_nao_consulta_mitre(
     tmp_path,
     monkeypatch,

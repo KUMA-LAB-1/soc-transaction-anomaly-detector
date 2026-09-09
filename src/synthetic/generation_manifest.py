@@ -168,3 +168,50 @@ class EventIntensityPolicyManifest:
 
         if self.intensity_min > self.intensity_max:
             raise ValueError("intensity_min deve ser menor ou igual a intensity_max.")
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioEffectManifest:
+    transaction_value_median_multiplier: float
+    transaction_value_sigma_multiplier: float
+    recent_login_failure_rate_increment: float
+
+    def __post_init__(self) -> None:
+        valor = self.transaction_value_median_multiplier
+
+        if (
+            isinstance(valor, bool)
+            or not isinstance(valor, (int, float))
+            or not math.isfinite(valor)
+            or valor <= 0
+        ):
+            raise ValueError(
+                "transaction_value_median_multiplier deve ser "
+                "numerico, finito e maior que zero."
+            )
+
+        valor = self.transaction_value_sigma_multiplier
+
+        if (
+            isinstance(valor, bool)
+            or not isinstance(valor, (int, float))
+            or not math.isfinite(valor)
+            or valor < 0
+        ):
+            raise ValueError(
+                "transaction_value_sigma_multiplier deve ser "
+                "numerico, finito e maior ou igual a zero."
+            )
+
+        valor = self.recent_login_failure_rate_increment
+
+        if (
+            isinstance(valor, bool)
+            or not isinstance(valor, (int, float))
+            or not math.isfinite(valor)
+            or valor < 0
+        ):
+            raise ValueError(
+                "recent_login_failure_rate_increment deve ser "
+                "numerico, finito e maior ou igual a zero."
+            )

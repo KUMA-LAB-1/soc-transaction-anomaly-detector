@@ -1,11 +1,13 @@
 from .generation_manifest import (
     EventIntensityPolicyManifest,
     PopulationGenerationManifest,
+    ScenarioEffectManifest,
     SeedStrategyManifest,
     SeverityPolicyManifest,
 )
 from .intensity import EventIntensityPolicy
 from .population_generation import PopulationGenerationConfig
+from .scenario_effects import ScenarioEffect
 from .seed_strategy import SyntheticSeedPlan
 from .severity import SeverityPolicy
 
@@ -62,4 +64,21 @@ def build_event_intensity_policy_manifest(
     return EventIntensityPolicyManifest(
         intensity_min=policy.intensity_min,
         intensity_max=policy.intensity_max,
+    )
+
+
+def build_scenario_effect_manifest(
+    effect: ScenarioEffect,
+) -> ScenarioEffectManifest:
+    if not isinstance(effect, ScenarioEffect):
+        raise ValueError("effect deve ser ScenarioEffect.")
+
+    return ScenarioEffectManifest(
+        transaction_value_median_multiplier=(
+            effect.transaction_value_median_multiplier
+        ),
+        transaction_value_sigma_multiplier=(effect.transaction_value_sigma_multiplier),
+        recent_login_failure_rate_increment=(
+            effect.recent_login_failure_rate_increment
+        ),
     )

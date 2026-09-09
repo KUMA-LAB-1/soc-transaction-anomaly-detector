@@ -129,12 +129,20 @@ class StatisticalGenerator:
         intensity_policy: EventIntensityPolicy | None,
     ) -> SyntheticRecord:
 
+        event_intensity = self._gerar_event_intensity(intensity_policy)
+
+        effective_scenario_effect = (
+            scenario_effect.aplicar_intensidade(event_intensity)
+            if scenario_effect is not None and event_intensity is not None
+            else scenario_effect
+        )
+
         customer_profile = self._selecionar_customer_profile()
 
         valor_transacao = self._gerar_valor_transacao(
             cenario,
             customer_profile=customer_profile,
-            scenario_effect=scenario_effect,
+            scenario_effect=effective_scenario_effect,
         )
 
         dispositivo_novo = self._sortear(cenario.probabilidade_dispositivo_novo)
@@ -144,7 +152,7 @@ class StatisticalGenerator:
         falhas_login = self._gerar_falhas_login(
             cenario,
             customer_profile=customer_profile,
-            scenario_effect=scenario_effect,
+            scenario_effect=effective_scenario_effect,
         )
 
         tipo_transacao = str(
@@ -162,7 +170,6 @@ class StatisticalGenerator:
             sorteio=float(self._rng.random()),
         )
 
-        event_intensity = self._gerar_event_intensity(intensity_policy)
         severity_score = self._gerar_severity_score(cenario)
 
         return SyntheticRecord(

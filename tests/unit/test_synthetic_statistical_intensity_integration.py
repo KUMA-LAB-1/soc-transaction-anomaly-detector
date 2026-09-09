@@ -6,6 +6,7 @@ import pytest
 from src.synthetic.intensity import EventIntensityPolicy
 from src.synthetic.label_policy import OperationalLabelPolicy
 from src.synthetic.population import CustomerBehaviorProfile, CustomerPopulation
+from src.synthetic.scenario_effects import ScenarioEffect
 from src.synthetic.scenarios import obter_cenario
 from src.synthetic.severity import SeverityPolicy
 from src.synthetic.statistical import StatisticalGenerator
@@ -274,3 +275,207 @@ def test_gerador_rejeita_intensity_policy_invalida():
             fim=FIM,
             intensity_policy="policy-invalida",
         )
+
+
+def test_intensidade_zero_neutraliza_scenario_effect_transacional():
+    population = CustomerPopulation(
+        profiles=(
+            CustomerBehaviorProfile(
+                customer_pseudonym="cliente-alpha",
+                transaction_value_median=180.0,
+                transaction_value_sigma=0.65,
+                recent_login_failure_rate=0.15,
+            ),
+        )
+    )
+
+    scenario_effect = ScenarioEffect(
+        transaction_value_median_multiplier=2.0,
+        transaction_value_sigma_multiplier=1.0,
+        recent_login_failure_rate_increment=0.0,
+    )
+
+    intensity_zero = EventIntensityPolicy(
+        intensity_min=0.0,
+        intensity_max=0.0,
+    )
+
+    sem_efeito = StatisticalGenerator(
+        seed=4242,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population,
+    ).gerar_registros(
+        obter_cenario("transaction_anomaly"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM,
+    )
+
+    efeito_com_intensidade_zero = StatisticalGenerator(
+        seed=4242,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population,
+    ).gerar_registros(
+        obter_cenario("transaction_anomaly"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM,
+        scenario_effect=scenario_effect,
+        intensity_policy=intensity_zero,
+    )
+
+    assert [registro.observables for registro in efeito_com_intensidade_zero] == [
+        registro.observables for registro in sem_efeito
+    ]
+
+    assert {
+        registro.truth.event_intensity for registro in efeito_com_intensidade_zero
+    } == {0.0}
+
+    assert all(registro.truth.event_intensity is None for registro in sem_efeito)
+
+
+def test_intensidade_um_preserva_scenario_effect_completo():
+    population = CustomerPopulation(
+        profiles=(
+            CustomerBehaviorProfile(
+                customer_pseudonym="cliente-alpha",
+                transaction_value_median=220.0,
+                transaction_value_sigma=0.70,
+                recent_login_failure_rate=0.30,
+            ),
+        )
+    )
+
+    scenario_effect = ScenarioEffect(
+        transaction_value_median_multiplier=2.0,
+        transaction_value_sigma_multiplier=1.40,
+        recent_login_failure_rate_increment=3.0,
+    )
+
+    intensity_one = EventIntensityPolicy(
+        intensity_min=1.0,
+        intensity_max=1.0,
+    )
+
+    efeito_legado = StatisticalGenerator(
+        seed=5150,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population,
+    ).gerar_registros(
+        obter_cenario("credential_attack"),
+        quantidade=100,
+        inicio=INICIO,
+        fim=FIM,
+        scenario_effect=scenario_effect,
+    )
+
+    efeito_com_intensidade_um = StatisticalGenerator(
+        seed=5150,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population,
+    ).gerar_registros(
+        obter_cenario("credential_attack"),
+        quantidade=100,
+        inicio=INICIO,
+        fim=FIM,
+        scenario_effect=scenario_effect,
+        intensity_policy=intensity_one,
+    )
+
+    assert [registro.observables for registro in efeito_com_intensidade_um] == [
+        registro.observables for registro in efeito_legado
+    ]
+
+    assert [registro.operational_labels for registro in efeito_com_intensidade_um] == [
+        registro.operational_labels for registro in efeito_legado
+    ]
+
+    assert {
+        registro.truth.event_intensity for registro in efeito_com_intensidade_um
+    } == {1.0}
+
+    truth_sem_intensity = [
+        replace(
+            registro.truth,
+            event_intensity=None,
+        )
+        for registro in efeito_com_intensidade_um
+    ]
+
+    assert truth_sem_intensity == [registro.truth for registro in efeito_legado]
+
+
+def test_intensidade_intermediaria_aplica_scenario_effect_intermediario():
+    population = CustomerPopulation(
+        profiles=(
+            CustomerBehaviorProfile(
+                customer_pseudonym="cliente-alpha",
+                transaction_value_median=240.0,
+                transaction_value_sigma=0.60,
+                recent_login_failure_rate=0.40,
+            ),
+        )
+    )
+
+    scenario_effect = ScenarioEffect(
+        transaction_value_median_multiplier=2.0,
+        transaction_value_sigma_multiplier=1.40,
+        recent_login_failure_rate_increment=3.0,
+    )
+
+    scenario_effect_intermediario = ScenarioEffect(
+        transaction_value_median_multiplier=1.5,
+        transaction_value_sigma_multiplier=1.20,
+        recent_login_failure_rate_increment=1.5,
+    )
+
+    intensity_half = EventIntensityPolicy(
+        intensity_min=0.5,
+        intensity_max=0.5,
+    )
+
+    referencia = StatisticalGenerator(
+        seed=8080,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population,
+    ).gerar_registros(
+        obter_cenario("credential_attack"),
+        quantidade=100,
+        inicio=INICIO,
+        fim=FIM,
+        scenario_effect=scenario_effect_intermediario,
+    )
+
+    modulado = StatisticalGenerator(
+        seed=8080,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population,
+    ).gerar_registros(
+        obter_cenario("credential_attack"),
+        quantidade=100,
+        inicio=INICIO,
+        fim=FIM,
+        scenario_effect=scenario_effect,
+        intensity_policy=intensity_half,
+    )
+
+    assert [registro.observables for registro in modulado] == [
+        registro.observables for registro in referencia
+    ]
+
+    assert [registro.operational_labels for registro in modulado] == [
+        registro.operational_labels for registro in referencia
+    ]
+
+    assert {registro.truth.event_intensity for registro in modulado} == {0.5}
+
+    truth_sem_intensity = [
+        replace(
+            registro.truth,
+            event_intensity=None,
+        )
+        for registro in modulado
+    ]
+
+    assert truth_sem_intensity == [registro.truth for registro in referencia]

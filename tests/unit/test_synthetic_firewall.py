@@ -30,6 +30,7 @@ def criar_registro_sintetico() -> SyntheticRecord:
             is_suspicious=True,
             attack_profile="credential_attack",
             expected_mitre_techniques=("T1110",),
+            severity_score=72.5,
         ),
     )
 
@@ -47,6 +48,7 @@ def test_dataset_modelagem_nao_expoe_ground_truth():
     assert "is_suspicious" not in resultado.columns
     assert "attack_profile" not in resultado.columns
     assert "expected_mitre_techniques" not in resultado.columns
+    assert "severity_score" not in resultado.columns
 
 
 def test_label_operacional_pode_divergir_do_ground_truth():
@@ -69,6 +71,7 @@ def test_ground_truth_possui_projecao_separada_para_avaliacao():
     assert bool(resultado.loc[0, "is_suspicious"]) is True
     assert resultado.loc[0, "attack_profile"] == "credential_attack"
     assert resultado.loc[0, "expected_mitre_techniques"] == ("T1110",)
+    assert resultado.loc[0, "severity_score"] == 72.5
 
 
 @pytest.mark.parametrize(
@@ -78,6 +81,7 @@ def test_ground_truth_possui_projecao_separada_para_avaliacao():
         "is_suspicious",
         "attack_profile",
         "expected_mitre_techniques",
+        "severity_score",
     ],
 )
 def test_firewall_rejeita_ground_truth_injetado_nos_observaveis(

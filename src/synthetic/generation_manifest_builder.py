@@ -1,8 +1,10 @@
 from .generation_manifest import (
+    EventIntensityPolicyManifest,
     PopulationGenerationManifest,
     SeedStrategyManifest,
     SeverityPolicyManifest,
 )
+from .intensity import EventIntensityPolicy
 from .population_generation import PopulationGenerationConfig
 from .seed_strategy import SyntheticSeedPlan
 from .severity import SeverityPolicy
@@ -48,4 +50,16 @@ def build_severity_policy_manifest(
         normal_max=policy.normal_max,
         suspicious_min=policy.suspicious_min,
         suspicious_max=policy.suspicious_max,
+    )
+
+
+def build_event_intensity_policy_manifest(
+    policy: EventIntensityPolicy,
+) -> EventIntensityPolicyManifest:
+    if not isinstance(policy, EventIntensityPolicy):
+        raise ValueError("policy deve ser EventIntensityPolicy.")
+
+    return EventIntensityPolicyManifest(
+        intensity_min=policy.intensity_min,
+        intensity_max=policy.intensity_max,
     )

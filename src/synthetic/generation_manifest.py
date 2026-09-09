@@ -142,3 +142,29 @@ class SeverityPolicyManifest:
 
         if self.suspicious_min > self.suspicious_max:
             raise ValueError("suspicious_min deve ser menor ou igual a suspicious_max.")
+
+
+@dataclass(frozen=True, slots=True)
+class EventIntensityPolicyManifest:
+    intensity_min: float
+    intensity_max: float
+
+    def __post_init__(self) -> None:
+        campos = {
+            "intensity_min": self.intensity_min,
+            "intensity_max": self.intensity_max,
+        }
+
+        for nome, valor in campos.items():
+            if (
+                isinstance(valor, bool)
+                or not isinstance(valor, (int, float))
+                or not math.isfinite(valor)
+                or not 0.0 <= valor <= 1.0
+            ):
+                raise ValueError(
+                    f"{nome} deve ser numerico, finito e estar entre 0 e 1."
+                )
+
+        if self.intensity_min > self.intensity_max:
+            raise ValueError("intensity_min deve ser menor ou igual a intensity_max.")

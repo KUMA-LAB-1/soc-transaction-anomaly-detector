@@ -1,7 +1,12 @@
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.metrics import (
+    make_scorer,
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score,
+)
 from sklearn.model_selection import cross_val_score, train_test_split
 
 from .validation import criar_folds_temporais, dividir_holdout_temporal
@@ -33,6 +38,22 @@ ESTRATEGIAS_VALIDACAO = {
     ESTRATEGIA_RANDOM,
     ESTRATEGIA_TEMPORAL,
 }
+
+
+def _r2_score_operacional(y_true, y_pred) -> float:
+    predicao_operacional = np.clip(y_pred, 0, 100)
+
+    return float(
+        r2_score(
+            y_true,
+            predicao_operacional,
+        )
+    )
+
+
+SCORER_R2_OPERACIONAL = make_scorer(
+    _r2_score_operacional,
+)
 
 
 def treinar_regressao_severidade(
@@ -75,7 +96,7 @@ def treinar_regressao_severidade(
     modelo = LinearRegression()
     modelo.fit(X_train, y_train)
 
-    y_pred_test = modelo.predict(X_test)
+    y_pred_test = modelo.predict(X_test).clip(0, 100)
 
     r2 = r2_score(y_test, y_pred_test)
     mae = mean_absolute_error(y_test, y_pred_test)
@@ -108,7 +129,7 @@ def treinar_regressao_severidade(
                 X,
                 y,
                 cv=folds_validos,
-                scoring="r2",
+                scoring=SCORER_R2_OPERACIONAL,
             ).tolist()
 
     else:
@@ -117,7 +138,7 @@ def treinar_regressao_severidade(
             X,
             y,
             cv=5,
-            scoring="r2",
+            scoring=SCORER_R2_OPERACIONAL,
         ).tolist()
 
     score_risco_predito = modelo.predict(X).clip(0, 100)

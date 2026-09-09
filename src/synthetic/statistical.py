@@ -3,6 +3,7 @@ from datetime import datetime
 import numpy as np
 
 from .contracts import GenerationTruth, SyntheticRecord
+from .intensity import EventIntensityPolicy
 from .label_policy import OperationalLabelPolicy
 from .population import CustomerBehaviorProfile, CustomerPopulation
 from .scenario_effects import ScenarioEffect
@@ -62,6 +63,12 @@ class StatisticalGenerator:
         )
         self._severity_rng = np.random.default_rng(severity_seed)
 
+        intensity_seed = np.random.SeedSequence(
+            seed,
+            spawn_key=(3,),
+        )
+        self._intensity_rng = np.random.default_rng(intensity_seed)
+
         self._temporal = TemporalSampler(self._rng)
         self._proximo_id_transacao = 1
 
@@ -73,6 +80,7 @@ class StatisticalGenerator:
         inicio: datetime,
         fim: datetime,
         scenario_effect: ScenarioEffect | None = None,
+        intensity_policy: EventIntensityPolicy | None = None,
     ) -> list[SyntheticRecord]:
         """Gera registros sintéticos cronológicos para um cenário."""
         if not isinstance(quantidade, int) or isinstance(quantidade, bool):
@@ -80,6 +88,12 @@ class StatisticalGenerator:
 
         if quantidade <= 0:
             raise ValueError("quantidade deve ser maior que zero.")
+
+        if intensity_policy is not None and not isinstance(
+            intensity_policy,
+            EventIntensityPolicy,
+        ):
+            raise ValueError("intensity_policy deve ser EventIntensityPolicy ou None.")
 
         timestamps = self._temporal.gerar_timestamps(
             cenario,
@@ -96,6 +110,7 @@ class StatisticalGenerator:
                 id_transacao=id_inicial + indice,
                 timestamp=timestamps[indice],
                 scenario_effect=scenario_effect,
+                intensity_policy=intensity_policy,
             )
             for indice in range(quantidade)
         ]
@@ -111,6 +126,7 @@ class StatisticalGenerator:
         id_transacao: int,
         timestamp: datetime,
         scenario_effect: ScenarioEffect | None,
+        intensity_policy: EventIntensityPolicy | None,
     ) -> SyntheticRecord:
 
         customer_profile = self._selecionar_customer_profile()
@@ -146,6 +162,7 @@ class StatisticalGenerator:
             sorteio=float(self._rng.random()),
         )
 
+        event_intensity = self._gerar_event_intensity(intensity_policy)
         severity_score = self._gerar_severity_score(cenario)
 
         return SyntheticRecord(
@@ -169,7 +186,19 @@ class StatisticalGenerator:
                 attack_profile=(cenario.name if cenario.is_suspicious else None),
                 expected_mitre_techniques=(cenario.expected_mitre_techniques),
                 severity_score=severity_score,
+                event_intensity=event_intensity,
             ),
+        )
+
+    def _gerar_event_intensity(
+        self,
+        intensity_policy: EventIntensityPolicy | None,
+    ) -> float | None:
+        if intensity_policy is None:
+            return None
+
+        return intensity_policy.gerar_intensidade(
+            sorteio=float(self._intensity_rng.random()),
         )
 
     def _gerar_severity_score(

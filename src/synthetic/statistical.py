@@ -7,6 +7,7 @@ from .label_policy import OperationalLabelPolicy
 from .population import CustomerBehaviorProfile, CustomerPopulation
 from .scenario_effects import ScenarioEffect
 from .scenarios import ScenarioDefinition
+from .severity import SeverityPolicy
 from .temporal import TemporalSampler
 
 TIPOS_TRANSACAO = (
@@ -29,6 +30,7 @@ class StatisticalGenerator:
         seed: int,
         label_policy: OperationalLabelPolicy,
         population: CustomerPopulation | None = None,
+        severity_policy: SeverityPolicy | None = None,
     ) -> None:
         if population is not None and not isinstance(
             population,
@@ -36,9 +38,16 @@ class StatisticalGenerator:
         ):
             raise ValueError("population deve ser CustomerPopulation ou None.")
 
+        if severity_policy is not None and not isinstance(
+            severity_policy,
+            SeverityPolicy,
+        ):
+            raise ValueError("severity_policy deve ser SeverityPolicy ou None.")
+
         self.seed = seed
         self._label_policy = label_policy
         self._population = population
+        self._severity_policy = severity_policy
 
         self._rng = np.random.default_rng(seed)
 
@@ -46,6 +55,12 @@ class StatisticalGenerator:
 
         self._customer_rng = np.random.default_rng(customer_seed)
         self._login_rng = np.random.default_rng(login_seed)
+
+        severity_seed = np.random.SeedSequence(
+            seed,
+            spawn_key=(2,),
+        )
+        self._severity_rng = np.random.default_rng(severity_seed)
 
         self._temporal = TemporalSampler(self._rng)
         self._proximo_id_transacao = 1
@@ -131,6 +146,8 @@ class StatisticalGenerator:
             sorteio=float(self._rng.random()),
         )
 
+        severity_score = self._gerar_severity_score(cenario)
+
         return SyntheticRecord(
             observables={
                 "id_transacao": id_transacao,
@@ -151,7 +168,20 @@ class StatisticalGenerator:
                 is_suspicious=cenario.is_suspicious,
                 attack_profile=(cenario.name if cenario.is_suspicious else None),
                 expected_mitre_techniques=(cenario.expected_mitre_techniques),
+                severity_score=severity_score,
             ),
+        )
+
+    def _gerar_severity_score(
+        self,
+        cenario: ScenarioDefinition,
+    ) -> float | None:
+        if self._severity_policy is None:
+            return None
+
+        return self._severity_policy.gerar_score(
+            is_suspicious=cenario.is_suspicious,
+            sorteio=float(self._severity_rng.random()),
         )
 
     def _selecionar_customer_profile(

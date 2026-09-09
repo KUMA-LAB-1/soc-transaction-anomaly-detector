@@ -125,3 +125,72 @@ def test_scenario_effect_e_imutavel():
 
     with pytest.raises(FrozenInstanceError):
         effect.transaction_value_median_multiplier = 2.0
+
+
+def test_scenario_effect_intensidade_zero_retorna_efeito_neutro():
+    effect = ScenarioEffect(
+        transaction_value_median_multiplier=1.5,
+        transaction_value_sigma_multiplier=1.10,
+        recent_login_failure_rate_increment=0.35,
+    )
+
+    resultado = effect.aplicar_intensidade(0.0)
+
+    assert resultado == ScenarioEffect(
+        transaction_value_median_multiplier=1.0,
+        transaction_value_sigma_multiplier=1.0,
+        recent_login_failure_rate_increment=0.0,
+    )
+
+
+def test_scenario_effect_intensidade_intermediaria_interpola_efeito():
+    effect = ScenarioEffect(
+        transaction_value_median_multiplier=1.5,
+        transaction_value_sigma_multiplier=1.10,
+        recent_login_failure_rate_increment=0.35,
+    )
+
+    resultado = effect.aplicar_intensidade(0.5)
+
+    assert resultado.transaction_value_median_multiplier == pytest.approx(1.25)
+    assert resultado.transaction_value_sigma_multiplier == pytest.approx(1.05)
+    assert resultado.recent_login_failure_rate_increment == pytest.approx(0.175)
+
+
+def test_scenario_effect_intensidade_um_preserva_efeito_original():
+    effect = ScenarioEffect(
+        transaction_value_median_multiplier=1.5,
+        transaction_value_sigma_multiplier=1.10,
+        recent_login_failure_rate_increment=0.35,
+    )
+
+    resultado = effect.aplicar_intensidade(1.0)
+
+    assert resultado == effect
+
+
+@pytest.mark.parametrize(
+    "intensidade",
+    [
+        -0.01,
+        1.01,
+        float("nan"),
+        float("inf"),
+        float("-inf"),
+        True,
+        "0.5",
+        None,
+    ],
+)
+def test_scenario_effect_rejeita_intensidade_invalida(intensidade):
+    effect = ScenarioEffect(
+        transaction_value_median_multiplier=1.5,
+        transaction_value_sigma_multiplier=1.10,
+        recent_login_failure_rate_increment=0.35,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="intensidade",
+    ):
+        effect.aplicar_intensidade(intensidade)

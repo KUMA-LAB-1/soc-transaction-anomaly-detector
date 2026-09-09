@@ -24,6 +24,32 @@ class ScenarioEffect:
             self.recent_login_failure_rate_increment,
         )
 
+    def aplicar_intensidade(
+        self,
+        intensidade: float,
+    ) -> "ScenarioEffect":
+        if (
+            isinstance(intensidade, bool)
+            or not isinstance(intensidade, (int, float))
+            or not math.isfinite(intensidade)
+            or not 0.0 <= intensidade <= 1.0
+        ):
+            raise ValueError(
+                "intensidade deve ser numerica, finita e estar entre 0 e 1."
+            )
+
+        return ScenarioEffect(
+            transaction_value_median_multiplier=(
+                1.0 + (self.transaction_value_median_multiplier - 1.0) * intensidade
+            ),
+            transaction_value_sigma_multiplier=(
+                1.0 + (self.transaction_value_sigma_multiplier - 1.0) * intensidade
+            ),
+            recent_login_failure_rate_increment=(
+                self.recent_login_failure_rate_increment * intensidade
+            ),
+        )
+
     @staticmethod
     def _validate_positive_finite_number(
         name: str,

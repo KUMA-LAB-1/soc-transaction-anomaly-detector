@@ -479,3 +479,284 @@ def test_intensidade_intermediaria_aplica_scenario_effect_intermediario():
     ]
 
     assert truth_sem_intensity == [registro.truth for registro in referencia]
+
+
+def test_event_intensity_determina_severity_quando_modula_scenario_effect():
+    severity_policy = SeverityPolicy(
+        normal_min=0.0,
+        normal_max=40.0,
+        suspicious_min=20.0,
+        suspicious_max=100.0,
+    )
+
+    scenario_effect = ScenarioEffect(
+        transaction_value_median_multiplier=2.0,
+        transaction_value_sigma_multiplier=1.40,
+        recent_login_failure_rate_increment=3.0,
+    )
+
+    intensity_half = EventIntensityPolicy(
+        intensity_min=0.5,
+        intensity_max=0.5,
+    )
+
+    registros = StatisticalGenerator(
+        seed=9090,
+        label_policy=POLITICA_SEM_RUIDO,
+        severity_policy=severity_policy,
+    ).gerar_registros(
+        obter_cenario("credential_attack"),
+        quantidade=50,
+        inicio=INICIO,
+        fim=FIM,
+        scenario_effect=scenario_effect,
+        intensity_policy=intensity_half,
+    )
+
+    assert {registro.truth.event_intensity for registro in registros} == {0.5}
+
+    assert {registro.truth.severity_score for registro in registros} == {60.0}
+
+
+def test_modo_causal_preserva_estado_futuro_do_severity_rng():
+    severity_policy = SeverityPolicy(
+        normal_min=0.0,
+        normal_max=40.0,
+        suspicious_min=20.0,
+        suspicious_max=100.0,
+    )
+
+    scenario_effect = ScenarioEffect(
+        transaction_value_median_multiplier=2.0,
+        transaction_value_sigma_multiplier=1.40,
+        recent_login_failure_rate_increment=3.0,
+    )
+
+    intensity_half = EventIntensityPolicy(
+        intensity_min=0.5,
+        intensity_max=0.5,
+    )
+
+    gerador_causal = StatisticalGenerator(
+        seed=12345,
+        label_policy=POLITICA_SEM_RUIDO,
+        severity_policy=severity_policy,
+    )
+
+    gerador_referencia = StatisticalGenerator(
+        seed=12345,
+        label_policy=POLITICA_SEM_RUIDO,
+        severity_policy=severity_policy,
+    )
+
+    gerador_causal.gerar_registros(
+        obter_cenario("account_takeover"),
+        quantidade=40,
+        inicio=INICIO,
+        fim=FIM,
+        scenario_effect=scenario_effect,
+        intensity_policy=intensity_half,
+    )
+
+    gerador_referencia.gerar_registros(
+        obter_cenario("account_takeover"),
+        quantidade=40,
+        inicio=INICIO,
+        fim=FIM,
+    )
+
+    lote_futuro_causal = gerador_causal.gerar_registros(
+        obter_cenario("account_takeover"),
+        quantidade=30,
+        inicio=INICIO,
+        fim=FIM,
+    )
+
+    lote_futuro_referencia = gerador_referencia.gerar_registros(
+        obter_cenario("account_takeover"),
+        quantidade=30,
+        inicio=INICIO,
+        fim=FIM,
+    )
+
+    scores_causal = [registro.truth.severity_score for registro in lote_futuro_causal]
+
+    scores_referencia = [
+        registro.truth.severity_score for registro in lote_futuro_referencia
+    ]
+
+    assert scores_causal == scores_referencia
+
+
+def test_scenario_effect_sem_intensity_preserva_sequencia_de_severity():
+    severity_policy = SeverityPolicy(
+        normal_min=0.0,
+        normal_max=40.0,
+        suspicious_min=20.0,
+        suspicious_max=100.0,
+    )
+
+    scenario_effect = ScenarioEffect(
+        transaction_value_median_multiplier=2.0,
+        transaction_value_sigma_multiplier=1.40,
+        recent_login_failure_rate_increment=3.0,
+    )
+
+    referencia = StatisticalGenerator(
+        seed=2468,
+        label_policy=POLITICA_SEM_RUIDO,
+        severity_policy=severity_policy,
+    ).gerar_registros(
+        obter_cenario("account_takeover"),
+        quantidade=100,
+        inicio=INICIO,
+        fim=FIM,
+    )
+
+    com_scenario_effect = StatisticalGenerator(
+        seed=2468,
+        label_policy=POLITICA_SEM_RUIDO,
+        severity_policy=severity_policy,
+    ).gerar_registros(
+        obter_cenario("account_takeover"),
+        quantidade=100,
+        inicio=INICIO,
+        fim=FIM,
+        scenario_effect=scenario_effect,
+    )
+
+    scores_referencia = [registro.truth.severity_score for registro in referencia]
+
+    scores_com_scenario_effect = [
+        registro.truth.severity_score for registro in com_scenario_effect
+    ]
+
+    assert scores_com_scenario_effect == scores_referencia
+
+    assert all(registro.truth.event_intensity is None for registro in referencia)
+
+    assert all(
+        registro.truth.event_intensity is None for registro in com_scenario_effect
+    )
+
+
+def test_scenario_effect_neutro_nao_acopla_intensity_a_severity():
+    severity_policy = SeverityPolicy(
+        normal_min=0.0,
+        normal_max=40.0,
+        suspicious_min=20.0,
+        suspicious_max=100.0,
+    )
+
+    scenario_effect_neutro = ScenarioEffect(
+        transaction_value_median_multiplier=1.0,
+        transaction_value_sigma_multiplier=1.0,
+        recent_login_failure_rate_increment=0.0,
+    )
+
+    intensity_half = EventIntensityPolicy(
+        intensity_min=0.5,
+        intensity_max=0.5,
+    )
+
+    referencia = StatisticalGenerator(
+        seed=8642,
+        label_policy=POLITICA_SEM_RUIDO,
+        severity_policy=severity_policy,
+    ).gerar_registros(
+        obter_cenario("account_takeover"),
+        quantidade=100,
+        inicio=INICIO,
+        fim=FIM,
+        intensity_policy=intensity_half,
+    )
+
+    com_efeito_neutro = StatisticalGenerator(
+        seed=8642,
+        label_policy=POLITICA_SEM_RUIDO,
+        severity_policy=severity_policy,
+    ).gerar_registros(
+        obter_cenario("account_takeover"),
+        quantidade=100,
+        inicio=INICIO,
+        fim=FIM,
+        scenario_effect=scenario_effect_neutro,
+        intensity_policy=intensity_half,
+    )
+
+    assert [registro.observables for registro in com_efeito_neutro] == [
+        registro.observables for registro in referencia
+    ]
+
+    assert [registro.truth.event_intensity for registro in com_efeito_neutro] == [
+        registro.truth.event_intensity for registro in referencia
+    ]
+
+    scores_referencia = [registro.truth.severity_score for registro in referencia]
+
+    scores_efeito_neutro = [
+        registro.truth.severity_score for registro in com_efeito_neutro
+    ]
+
+    assert scores_efeito_neutro == scores_referencia
+
+
+def test_intensidade_zero_que_neutraliza_efeito_nao_acopla_intensity_a_severity():
+    severity_policy = SeverityPolicy(
+        normal_min=0.0,
+        normal_max=40.0,
+        suspicious_min=20.0,
+        suspicious_max=100.0,
+    )
+
+    scenario_effect = ScenarioEffect(
+        transaction_value_median_multiplier=2.0,
+        transaction_value_sigma_multiplier=1.40,
+        recent_login_failure_rate_increment=3.0,
+    )
+
+    intensity_zero = EventIntensityPolicy(
+        intensity_min=0.0,
+        intensity_max=0.0,
+    )
+
+    referencia = StatisticalGenerator(
+        seed=97531,
+        label_policy=POLITICA_SEM_RUIDO,
+        severity_policy=severity_policy,
+    ).gerar_registros(
+        obter_cenario("account_takeover"),
+        quantidade=100,
+        inicio=INICIO,
+        fim=FIM,
+        intensity_policy=intensity_zero,
+    )
+
+    com_efeito_neutralizado = StatisticalGenerator(
+        seed=97531,
+        label_policy=POLITICA_SEM_RUIDO,
+        severity_policy=severity_policy,
+    ).gerar_registros(
+        obter_cenario("account_takeover"),
+        quantidade=100,
+        inicio=INICIO,
+        fim=FIM,
+        scenario_effect=scenario_effect,
+        intensity_policy=intensity_zero,
+    )
+
+    assert [registro.observables for registro in com_efeito_neutralizado] == [
+        registro.observables for registro in referencia
+    ]
+
+    assert {registro.truth.event_intensity for registro in com_efeito_neutralizado} == {
+        0.0
+    }
+
+    scores_referencia = [registro.truth.severity_score for registro in referencia]
+
+    scores_efeito_neutralizado = [
+        registro.truth.severity_score for registro in com_efeito_neutralizado
+    ]
+
+    assert scores_efeito_neutralizado == scores_referencia

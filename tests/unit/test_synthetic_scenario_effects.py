@@ -194,3 +194,41 @@ def test_scenario_effect_rejeita_intensidade_invalida(intensidade):
         match="intensidade",
     ):
         effect.aplicar_intensidade(intensidade)
+
+
+def test_scenario_effect_identifica_efeito_neutro():
+    effect = ScenarioEffect(
+        transaction_value_median_multiplier=1.0,
+        transaction_value_sigma_multiplier=1.0,
+        recent_login_failure_rate_increment=0.0,
+    )
+
+    assert effect.is_neutral is True
+
+
+@pytest.mark.parametrize(
+    (
+        "transaction_value_median_multiplier",
+        "transaction_value_sigma_multiplier",
+        "recent_login_failure_rate_increment",
+    ),
+    (
+        (1.01, 1.0, 0.0),
+        (1.0, 1.01, 0.0),
+        (1.0, 1.0, 0.01),
+        (0.99, 1.0, 0.0),
+        (1.0, 0.99, 0.0),
+    ),
+)
+def test_scenario_effect_identifica_efeito_nao_neutro(
+    transaction_value_median_multiplier,
+    transaction_value_sigma_multiplier,
+    recent_login_failure_rate_increment,
+):
+    effect = ScenarioEffect(
+        transaction_value_median_multiplier=transaction_value_median_multiplier,
+        transaction_value_sigma_multiplier=transaction_value_sigma_multiplier,
+        recent_login_failure_rate_increment=recent_login_failure_rate_increment,
+    )
+
+    assert effect.is_neutral is False

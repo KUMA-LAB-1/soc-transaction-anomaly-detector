@@ -170,7 +170,17 @@ class StatisticalGenerator:
             sorteio=float(self._rng.random()),
         )
 
-        severity_score = self._gerar_severity_score(cenario)
+        severity_score = self._gerar_severity_score(
+            cenario,
+            event_intensity=(
+                event_intensity
+                if (
+                    effective_scenario_effect is not None
+                    and not effective_scenario_effect.is_neutral
+                )
+                else None
+            ),
+        )
 
         return SyntheticRecord(
             observables={
@@ -211,13 +221,19 @@ class StatisticalGenerator:
     def _gerar_severity_score(
         self,
         cenario: ScenarioDefinition,
+        *,
+        event_intensity: float | None = None,
     ) -> float | None:
         if self._severity_policy is None:
             return None
 
+        severity_draw = float(self._severity_rng.random())
+
+        sorteio = event_intensity if event_intensity is not None else severity_draw
+
         return self._severity_policy.gerar_score(
             is_suspicious=cenario.is_suspicious,
-            sorteio=float(self._severity_rng.random()),
+            sorteio=sorteio,
         )
 
     def _selecionar_customer_profile(

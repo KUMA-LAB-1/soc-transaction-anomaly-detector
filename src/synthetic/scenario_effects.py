@@ -24,6 +24,14 @@ class ScenarioEffect:
             self.recent_login_failure_rate_increment,
         )
 
+    @property
+    def is_neutral(self) -> bool:
+        return (
+            self.transaction_value_median_multiplier == 1.0
+            and self.transaction_value_sigma_multiplier == 1.0
+            and self.recent_login_failure_rate_increment == 0.0
+        )
+
     def aplicar_intensidade(
         self,
         intensidade: float,

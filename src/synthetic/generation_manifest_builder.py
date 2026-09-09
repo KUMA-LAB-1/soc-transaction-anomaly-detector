@@ -1,9 +1,11 @@
 from .generation_manifest import (
     PopulationGenerationManifest,
     SeedStrategyManifest,
+    SeverityPolicyManifest,
 )
 from .population_generation import PopulationGenerationConfig
 from .seed_strategy import SyntheticSeedPlan
+from .severity import SeverityPolicy
 
 
 def build_seed_strategy_manifest(
@@ -32,4 +34,18 @@ def build_population_generation_manifest(
         transaction_value_sigma=config.transaction_value_sigma,
         recent_login_failure_rate_mean=config.recent_login_failure_rate_mean,
         recent_login_failure_rate_shape=config.recent_login_failure_rate_shape,
+    )
+
+
+def build_severity_policy_manifest(
+    policy: SeverityPolicy,
+) -> SeverityPolicyManifest:
+    if not isinstance(policy, SeverityPolicy):
+        raise ValueError("policy deve ser SeverityPolicy.")
+
+    return SeverityPolicyManifest(
+        normal_min=policy.normal_min,
+        normal_max=policy.normal_max,
+        suspicious_min=policy.suspicious_min,
+        suspicious_max=policy.suspicious_max,
     )

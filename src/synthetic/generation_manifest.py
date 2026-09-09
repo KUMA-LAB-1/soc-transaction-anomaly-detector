@@ -109,3 +109,36 @@ class PopulationGenerationManifest:
                 "recent_login_failure_rate_shape deve ser numerico, "
                 "finito e maior que zero."
             )
+
+
+@dataclass(frozen=True, slots=True)
+class SeverityPolicyManifest:
+    normal_min: float
+    normal_max: float
+    suspicious_min: float
+    suspicious_max: float
+
+    def __post_init__(self) -> None:
+        campos = {
+            "normal_min": self.normal_min,
+            "normal_max": self.normal_max,
+            "suspicious_min": self.suspicious_min,
+            "suspicious_max": self.suspicious_max,
+        }
+
+        for nome, valor in campos.items():
+            if (
+                isinstance(valor, bool)
+                or not isinstance(valor, (int, float))
+                or not math.isfinite(valor)
+                or not 0.0 <= valor <= 100.0
+            ):
+                raise ValueError(
+                    f"{nome} deve ser numerico, finito e estar entre 0 e 100."
+                )
+
+        if self.normal_min > self.normal_max:
+            raise ValueError("normal_min deve ser menor ou igual a normal_max.")
+
+        if self.suspicious_min > self.suspicious_max:
+            raise ValueError("suspicious_min deve ser menor ou igual a suspicious_max.")

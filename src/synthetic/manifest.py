@@ -2,6 +2,8 @@ import math
 from dataclasses import dataclass
 from datetime import datetime
 
+from .generation_manifest import SyntheticGenerationManifest
+
 
 @dataclass(frozen=True, slots=True)
 class ScenarioManifestEntry:
@@ -138,3 +140,20 @@ class DatasetManifest:
             raise ValueError(
                 "a soma de allocated_quantity deve ser igual a quantidade."
             )
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetManifestV2(DatasetManifest):
+    generation: SyntheticGenerationManifest
+
+    def __post_init__(self) -> None:
+        DatasetManifest.__post_init__(self)
+
+        if self.schema_version != "2":
+            raise ValueError("schema_version deve ser '2' para DatasetManifestV2.")
+
+        if not isinstance(
+            self.generation,
+            SyntheticGenerationManifest,
+        ):
+            raise ValueError("generation deve ser SyntheticGenerationManifest.")

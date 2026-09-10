@@ -3,9 +3,13 @@ from datetime import datetime
 
 from .composer import MixedDatasetComposer, ScenarioMix
 from .contracts import SyntheticRecord
+from .generation_config import SyntheticGenerationConfig
 from .label_policy import OperationalLabelPolicy
 from .manifest import DatasetManifest
-from .manifest_builder import build_dataset_manifest
+from .manifest_builder import build_dataset_manifest, build_dataset_manifest_v2
+from .population_generation import PopulationGenerator
+from .scenario_generation import ScenarioConfiguredGenerator
+from .seed_strategy import build_synthetic_seed_plan
 from .statistical import StatisticalGenerator
 
 
@@ -51,6 +55,85 @@ def generate_synthetic_dataset(
         fim=fim,
         misturas=misturas,
         label_policy=label_policy,
+    )
+
+    return GeneratedSyntheticDataset(
+        records=tuple(registros),
+        manifest=manifest,
+    )
+
+
+def generate_synthetic_dataset_v3(
+    *,
+    seed: int,
+    quantidade: int,
+    inicio: datetime,
+    fim: datetime,
+    misturas: list[ScenarioMix],
+    label_policy: OperationalLabelPolicy,
+    generation_config: SyntheticGenerationConfig,
+) -> GeneratedSyntheticDataset:
+    if not isinstance(
+        generation_config,
+        SyntheticGenerationConfig,
+    ):
+        raise ValueError("generation_config deve ser SyntheticGenerationConfig.")
+
+    scenario_names = {mistura.cenario.name for mistura in misturas}
+
+    if any(
+        config.scenario not in scenario_names
+        for config in generation_config.scenario_configs
+    ):
+        raise ValueError(
+            "scenario_configs deve referenciar apenas cenarios presentes em misturas."
+        )
+
+    if generation_config.population_config is None and any(
+        config.scenario_effect is not None
+        for config in generation_config.scenario_configs
+    ):
+        raise ValueError("scenario_effect requer population_config no runtime V3.")
+
+    seed_plan = build_synthetic_seed_plan(seed)
+
+    population = (
+        PopulationGenerator(
+            seed=seed_plan.population_seed,
+        ).generate(generation_config.population_config)
+        if generation_config.population_config is not None
+        else None
+    )
+
+    gerador = StatisticalGenerator(
+        seed=seed_plan.statistical_seed,
+        label_policy=label_policy,
+        population=population,
+        severity_policy=generation_config.severity_policy,
+    )
+
+    configured_generator = ScenarioConfiguredGenerator(
+        generator=gerador,
+        scenario_configs=generation_config.scenario_configs,
+    )
+
+    compositor = MixedDatasetComposer(configured_generator)
+
+    registros = compositor.compor(
+        quantidade=quantidade,
+        inicio=inicio,
+        fim=fim,
+        misturas=misturas,
+    )
+
+    manifest = build_dataset_manifest_v2(
+        seed_plan=seed_plan,
+        quantidade=quantidade,
+        inicio=inicio,
+        fim=fim,
+        misturas=misturas,
+        label_policy=label_policy,
+        generation_config=generation_config,
     )
 
     return GeneratedSyntheticDataset(

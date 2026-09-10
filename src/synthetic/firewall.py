@@ -77,6 +77,8 @@ def projetar_ground_truth(
                 "is_suspicious": registro.truth.is_suspicious,
                 "attack_profile": registro.truth.attack_profile,
                 "expected_mitre_techniques": (registro.truth.expected_mitre_techniques),
+                "severity_score": registro.truth.severity_score,
+                "event_intensity": registro.truth.event_intensity,
             }
         )
 

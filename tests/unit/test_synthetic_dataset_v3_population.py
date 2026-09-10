@@ -77,38 +77,6 @@ def test_generate_synthetic_dataset_v3_integra_population():
     )
 
 
-def test_generate_synthetic_dataset_v3_rejeita_severity_ainda_nao_integrada():
-    from src.synthetic.severity import SeverityPolicy
-
-    generation_config = SyntheticGenerationConfig(
-        severity_policy=SeverityPolicy(
-            normal_min=0.0,
-            normal_max=40.0,
-            suspicious_min=20.0,
-            suspicious_max=100.0,
-        ),
-    )
-
-    with pytest.raises(ValueError, match="severity_policy"):
-        generate_synthetic_dataset_v3(
-            seed=42,
-            quantidade=10,
-            inicio=datetime(2026, 1, 1, 0, 0),
-            fim=datetime(2026, 1, 8, 0, 0),
-            misturas=[
-                ScenarioMix(
-                    cenario=obter_cenario("baseline"),
-                    proporcao=1.0,
-                ),
-            ],
-            label_policy=OperationalLabelPolicy(
-                probabilidade_falso_positivo=0.0,
-                probabilidade_falso_negativo=0.0,
-            ),
-            generation_config=generation_config,
-        )
-
-
 def test_generate_synthetic_dataset_v3_aceita_generation_config_vazio():
     resultado = generate_synthetic_dataset_v3(
         seed=42,

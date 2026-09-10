@@ -79,9 +79,6 @@ def generate_synthetic_dataset_v3(
     ):
         raise ValueError("generation_config deve ser SyntheticGenerationConfig.")
 
-    if generation_config.severity_policy is not None:
-        raise ValueError("severity_policy ainda nao esta integrada ao runtime V3.")
-
     scenario_names = {mistura.cenario.name for mistura in misturas}
 
     if any(
@@ -112,6 +109,7 @@ def generate_synthetic_dataset_v3(
         seed=seed_plan.statistical_seed,
         label_policy=label_policy,
         population=population,
+        severity_policy=generation_config.severity_policy,
     )
 
     configured_generator = ScenarioConfiguredGenerator(

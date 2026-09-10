@@ -8,6 +8,7 @@ from .label_policy import OperationalLabelPolicy
 from .manifest import DatasetManifest
 from .manifest_builder import build_dataset_manifest, build_dataset_manifest_v2
 from .population_generation import PopulationGenerator
+from .scenario_generation import ScenarioConfiguredGenerator
 from .seed_strategy import build_synthetic_seed_plan
 from .statistical import StatisticalGenerator
 
@@ -81,8 +82,21 @@ def generate_synthetic_dataset_v3(
     if generation_config.severity_policy is not None:
         raise ValueError("severity_policy ainda nao esta integrada ao runtime V3.")
 
-    if generation_config.scenario_configs:
-        raise ValueError("scenario_configs ainda nao estao integrados ao runtime V3.")
+    scenario_names = {mistura.cenario.name for mistura in misturas}
+
+    if any(
+        config.scenario not in scenario_names
+        for config in generation_config.scenario_configs
+    ):
+        raise ValueError(
+            "scenario_configs deve referenciar apenas cenarios presentes em misturas."
+        )
+
+    if generation_config.population_config is None and any(
+        config.scenario_effect is not None
+        for config in generation_config.scenario_configs
+    ):
+        raise ValueError("scenario_effect requer population_config no runtime V3.")
 
     seed_plan = build_synthetic_seed_plan(seed)
 
@@ -100,7 +114,12 @@ def generate_synthetic_dataset_v3(
         population=population,
     )
 
-    compositor = MixedDatasetComposer(gerador)
+    configured_generator = ScenarioConfiguredGenerator(
+        generator=gerador,
+        scenario_configs=generation_config.scenario_configs,
+    )
+
+    compositor = MixedDatasetComposer(configured_generator)
 
     registros = compositor.compor(
         quantidade=quantidade,

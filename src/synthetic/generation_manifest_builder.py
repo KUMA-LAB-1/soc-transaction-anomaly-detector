@@ -1,7 +1,9 @@
+from .generation_config import ScenarioGenerationConfig
 from .generation_manifest import (
     EventIntensityPolicyManifest,
     PopulationGenerationManifest,
     ScenarioEffectManifest,
+    ScenarioGenerationManifest,
     SeedStrategyManifest,
     SeverityPolicyManifest,
 )
@@ -81,4 +83,29 @@ def build_scenario_effect_manifest(
         recent_login_failure_rate_increment=(
             effect.recent_login_failure_rate_increment
         ),
+    )
+
+
+def build_scenario_generation_manifest(
+    config: ScenarioGenerationConfig,
+) -> ScenarioGenerationManifest:
+    if not isinstance(config, ScenarioGenerationConfig):
+        raise ValueError("config deve ser ScenarioGenerationConfig.")
+
+    scenario_effect = (
+        build_scenario_effect_manifest(config.scenario_effect)
+        if config.scenario_effect is not None
+        else None
+    )
+
+    intensity_policy = (
+        build_event_intensity_policy_manifest(config.intensity_policy)
+        if config.intensity_policy is not None
+        else None
+    )
+
+    return ScenarioGenerationManifest(
+        scenario=config.scenario,
+        scenario_effect=scenario_effect,
+        intensity_policy=intensity_policy,
     )

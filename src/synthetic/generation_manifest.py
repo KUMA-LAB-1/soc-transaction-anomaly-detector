@@ -215,3 +215,34 @@ class ScenarioEffectManifest:
                 "recent_login_failure_rate_increment deve ser "
                 "numerico, finito e maior ou igual a zero."
             )
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioGenerationManifest:
+    scenario: str
+    scenario_effect: ScenarioEffectManifest | None = None
+    intensity_policy: EventIntensityPolicyManifest | None = None
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.scenario, str)
+            or not self.scenario.strip()
+            or self.scenario != self.scenario.strip()
+        ):
+            raise ValueError(
+                "scenario deve ser uma string nao vazia e sem whitespace externo."
+            )
+
+        if self.scenario_effect is not None and not isinstance(
+            self.scenario_effect,
+            ScenarioEffectManifest,
+        ):
+            raise ValueError("scenario_effect deve ser ScenarioEffectManifest ou None.")
+
+        if self.intensity_policy is not None and not isinstance(
+            self.intensity_policy,
+            EventIntensityPolicyManifest,
+        ):
+            raise ValueError(
+                "intensity_policy deve ser EventIntensityPolicyManifest ou None."
+            )

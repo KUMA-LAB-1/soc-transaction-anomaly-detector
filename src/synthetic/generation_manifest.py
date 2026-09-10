@@ -246,3 +246,46 @@ class ScenarioGenerationManifest:
             raise ValueError(
                 "intensity_policy deve ser EventIntensityPolicyManifest ou None."
             )
+
+
+@dataclass(frozen=True, slots=True)
+class SyntheticGenerationManifest:
+    seed_strategy: SeedStrategyManifest
+    population: PopulationGenerationManifest | None = None
+    severity_policy: SeverityPolicyManifest | None = None
+    scenarios: tuple[ScenarioGenerationManifest, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not isinstance(
+            self.seed_strategy,
+            SeedStrategyManifest,
+        ):
+            raise ValueError("seed_strategy deve ser SeedStrategyManifest.")
+
+        if self.population is not None and not isinstance(
+            self.population,
+            PopulationGenerationManifest,
+        ):
+            raise ValueError(
+                "population deve ser PopulationGenerationManifest ou None."
+            )
+
+        if self.severity_policy is not None and not isinstance(
+            self.severity_policy,
+            SeverityPolicyManifest,
+        ):
+            raise ValueError("severity_policy deve ser SeverityPolicyManifest ou None.")
+
+        if not isinstance(self.scenarios, tuple):
+            raise ValueError("scenarios deve ser uma tuple.")
+
+        if not all(
+            isinstance(scenario, ScenarioGenerationManifest)
+            for scenario in self.scenarios
+        ):
+            raise ValueError("scenarios deve conter apenas ScenarioGenerationManifest.")
+
+        scenario_names = tuple(scenario.scenario for scenario in self.scenarios)
+
+        if len(scenario_names) != len(set(scenario_names)):
+            raise ValueError("scenarios nao pode conter cenarios duplicados.")

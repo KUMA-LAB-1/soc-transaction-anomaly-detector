@@ -1,4 +1,4 @@
-from .generation_config import ScenarioGenerationConfig
+from .generation_config import ScenarioGenerationConfig, SyntheticGenerationConfig
 from .generation_manifest import (
     EventIntensityPolicyManifest,
     PopulationGenerationManifest,
@@ -6,6 +6,7 @@ from .generation_manifest import (
     ScenarioGenerationManifest,
     SeedStrategyManifest,
     SeverityPolicyManifest,
+    SyntheticGenerationManifest,
 )
 from .intensity import EventIntensityPolicy
 from .population_generation import PopulationGenerationConfig
@@ -108,4 +109,37 @@ def build_scenario_generation_manifest(
         scenario=config.scenario,
         scenario_effect=scenario_effect,
         intensity_policy=intensity_policy,
+    )
+
+
+def build_synthetic_generation_manifest(
+    *,
+    config: SyntheticGenerationConfig,
+    seed_plan: SyntheticSeedPlan,
+) -> SyntheticGenerationManifest:
+    if not isinstance(config, SyntheticGenerationConfig):
+        raise ValueError("config deve ser SyntheticGenerationConfig.")
+
+    population = (
+        build_population_generation_manifest(config.population_config)
+        if config.population_config is not None
+        else None
+    )
+
+    severity_policy = (
+        build_severity_policy_manifest(config.severity_policy)
+        if config.severity_policy is not None
+        else None
+    )
+
+    scenarios = tuple(
+        build_scenario_generation_manifest(scenario_config)
+        for scenario_config in config.scenario_configs
+    )
+
+    return SyntheticGenerationManifest(
+        seed_strategy=build_seed_strategy_manifest(seed_plan),
+        population=population,
+        severity_policy=severity_policy,
+        scenarios=scenarios,
     )

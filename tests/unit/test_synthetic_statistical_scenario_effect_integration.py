@@ -326,6 +326,167 @@ def test_scenario_effect_login_modifica_apenas_falhas_login():
     ]
 
 
+def test_probabilidades_booleanas_efetivas_aplicam_clamp_antes_do_sorteio(
+    monkeypatch,
+):
+    from src.synthetic.behavior_flags import BehaviorFlagBaseline
+
+    population = CustomerPopulation(
+        profiles=(
+            CustomerBehaviorProfile(
+                customer_pseudonym="entidade-alpha",
+                transaction_value_median=180.0,
+                transaction_value_sigma=0.65,
+                recent_login_failure_rate=0.15,
+                behavior_flag_baseline=BehaviorFlagBaseline(
+                    new_device_probability=0.8,
+                    limit_change_probability=0.1,
+                    location_change_probability=0.5,
+                ),
+            ),
+        )
+    )
+
+    effect = ScenarioEffect(
+        transaction_value_median_multiplier=1.0,
+        transaction_value_sigma_multiplier=1.0,
+        recent_login_failure_rate_increment=0.0,
+        new_device_probability_delta=0.6,
+        limit_change_probability_delta=-0.5,
+        location_change_probability_delta=0.25,
+    )
+
+    gerador = StatisticalGenerator(
+        seed=2026,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population,
+    )
+
+    probabilidades = []
+
+    def capturar_probabilidade(probabilidade):
+        probabilidades.append(probabilidade)
+        return False
+
+    monkeypatch.setattr(
+        gerador,
+        "_sortear",
+        capturar_probabilidade,
+    )
+
+    gerador.gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=1,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+        scenario_effect=effect,
+    )
+
+    assert len(probabilidades) == 3
+    assert probabilidades[0] == 1.0
+    assert probabilidades[1] == 0.0
+    assert probabilidades[2] == 0.75
+
+
+def test_scenario_effect_booleano_soma_delta_ao_baseline_do_cliente():
+    from src.synthetic.behavior_flags import BehaviorFlagBaseline
+
+    population = CustomerPopulation(
+        profiles=(
+            CustomerBehaviorProfile(
+                customer_pseudonym="entidade-alpha",
+                transaction_value_median=180.0,
+                transaction_value_sigma=0.65,
+                recent_login_failure_rate=0.15,
+                behavior_flag_baseline=BehaviorFlagBaseline(
+                    new_device_probability=0.0,
+                    limit_change_probability=0.0,
+                    location_change_probability=0.0,
+                ),
+            ),
+        )
+    )
+
+    effect = ScenarioEffect(
+        transaction_value_median_multiplier=1.0,
+        transaction_value_sigma_multiplier=1.0,
+        recent_login_failure_rate_increment=0.0,
+        new_device_probability_delta=1.0,
+        limit_change_probability_delta=1.0,
+        location_change_probability_delta=1.0,
+    )
+
+    registros = StatisticalGenerator(
+        seed=2026,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=10,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+        scenario_effect=effect,
+    )
+
+    assert all(
+        registro.observables["dispositivo_novo_flag"] is True for registro in registros
+    )
+    assert all(
+        registro.observables["alteracao_limite_flag"] is True for registro in registros
+    )
+    assert all(
+        registro.observables["mudanca_localizacao_flag"] is True
+        for registro in registros
+    )
+
+
+def test_delta_booleano_preserva_caminho_legado_sem_behavior_flag_baseline():
+    population = CustomerPopulation(
+        profiles=(
+            CustomerBehaviorProfile(
+                customer_pseudonym="entidade-alpha",
+                transaction_value_median=180.0,
+                transaction_value_sigma=0.65,
+                recent_login_failure_rate=0.15,
+            ),
+        )
+    )
+
+    effect = ScenarioEffect(
+        transaction_value_median_multiplier=1.0,
+        transaction_value_sigma_multiplier=1.0,
+        recent_login_failure_rate_increment=0.0,
+        new_device_probability_delta=1.0,
+        limit_change_probability_delta=1.0,
+        location_change_probability_delta=1.0,
+    )
+
+    registros_sem_efeito = StatisticalGenerator(
+        seed=2026,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=100,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    registros_com_efeito = StatisticalGenerator(
+        seed=2026,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=100,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+        scenario_effect=effect,
+    )
+
+    assert registros_com_efeito == registros_sem_efeito
+
+
 def test_scenario_effect_login_aplica_incremento_no_caminho_legado():
     cenario_baseline_sem_falhas = replace(
         obter_cenario("baseline"),

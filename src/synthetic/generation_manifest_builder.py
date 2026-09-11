@@ -1,5 +1,7 @@
+from .behavior_flags import BehaviorFlagBaseline
 from .generation_config import ScenarioGenerationConfig, SyntheticGenerationConfig
 from .generation_manifest import (
+    BehaviorFlagBaselineManifest,
     EventIntensityPolicyManifest,
     PopulationGenerationManifest,
     ScenarioEffectManifest,
@@ -28,11 +30,30 @@ def build_seed_strategy_manifest(
     )
 
 
+def build_behavior_flag_baseline_manifest(
+    baseline: BehaviorFlagBaseline,
+) -> BehaviorFlagBaselineManifest:
+    if not isinstance(baseline, BehaviorFlagBaseline):
+        raise ValueError("baseline deve ser BehaviorFlagBaseline.")
+
+    return BehaviorFlagBaselineManifest(
+        new_device_probability=baseline.new_device_probability,
+        limit_change_probability=baseline.limit_change_probability,
+        location_change_probability=baseline.location_change_probability,
+    )
+
+
 def build_population_generation_manifest(
     config: PopulationGenerationConfig,
 ) -> PopulationGenerationManifest:
     if not isinstance(config, PopulationGenerationConfig):
         raise ValueError("config deve ser PopulationGenerationConfig.")
+
+    behavior_flag_baseline = (
+        build_behavior_flag_baseline_manifest(config.behavior_flag_baseline)
+        if config.behavior_flag_baseline is not None
+        else None
+    )
 
     return PopulationGenerationManifest(
         customer_count=config.customer_count,
@@ -41,6 +62,7 @@ def build_population_generation_manifest(
         transaction_value_sigma=config.transaction_value_sigma,
         recent_login_failure_rate_mean=config.recent_login_failure_rate_mean,
         recent_login_failure_rate_shape=config.recent_login_failure_rate_shape,
+        behavior_flag_baseline=behavior_flag_baseline,
     )
 
 
@@ -84,6 +106,9 @@ def build_scenario_effect_manifest(
         recent_login_failure_rate_increment=(
             effect.recent_login_failure_rate_increment
         ),
+        new_device_probability_delta=effect.new_device_probability_delta,
+        limit_change_probability_delta=effect.limit_change_probability_delta,
+        location_change_probability_delta=effect.location_change_probability_delta,
     )
 
 

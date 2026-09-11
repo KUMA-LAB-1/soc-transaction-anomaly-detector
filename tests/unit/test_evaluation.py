@@ -4,6 +4,7 @@ import pytest
 
 from src.models.evaluation import (
     avaliar_detector,
+    chave_ranking_detector,
     selecionar_melhor_detector,
     selecionar_melhor_detector_benchmark,
 )
@@ -101,3 +102,44 @@ def test_selecionar_melhor_detector_mantem_compatibilidade():
     benchmark = selecionar_melhor_detector_benchmark(resultados)
 
     assert antigo == benchmark
+
+
+def test_chave_ranking_detector_preserva_ordem_de_prioridades():
+    referencia = chave_ranking_detector(
+        f1=0.80,
+        recall=0.70,
+        precision=0.60,
+        tempo_segundos=0.50,
+    )
+
+    maior_f1 = chave_ranking_detector(
+        f1=0.81,
+        recall=0.00,
+        precision=0.00,
+        tempo_segundos=999.0,
+    )
+    assert maior_f1 > referencia
+
+    maior_recall = chave_ranking_detector(
+        f1=0.80,
+        recall=0.71,
+        precision=0.00,
+        tempo_segundos=999.0,
+    )
+    assert maior_recall > referencia
+
+    maior_precision = chave_ranking_detector(
+        f1=0.80,
+        recall=0.70,
+        precision=0.61,
+        tempo_segundos=999.0,
+    )
+    assert maior_precision > referencia
+
+    menor_tempo = chave_ranking_detector(
+        f1=0.80,
+        recall=0.70,
+        precision=0.60,
+        tempo_segundos=0.10,
+    )
+    assert menor_tempo > referencia

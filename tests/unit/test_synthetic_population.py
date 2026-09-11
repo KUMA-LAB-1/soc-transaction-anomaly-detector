@@ -2,6 +2,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
+from src.synthetic.behavior_flags import BehaviorFlagBaseline
 from src.synthetic.population import (
     CustomerBehaviorProfile,
     CustomerPopulation,
@@ -20,6 +21,60 @@ def test_customer_behavior_profile_preserva_baseline_do_cliente():
     assert profile.transaction_value_median == 180.0
     assert profile.transaction_value_sigma == 0.65
     assert profile.recent_login_failure_rate == 0.15
+
+
+def test_customer_behavior_profile_preserva_behavior_flag_baseline():
+    behavior_flag_baseline = BehaviorFlagBaseline(
+        new_device_probability=0.08,
+        limit_change_probability=0.04,
+        location_change_probability=0.07,
+    )
+
+    profile = CustomerBehaviorProfile(
+        customer_pseudonym="cliente-042",
+        transaction_value_median=180.0,
+        transaction_value_sigma=0.65,
+        recent_login_failure_rate=0.15,
+        behavior_flag_baseline=behavior_flag_baseline,
+    )
+
+    assert profile.behavior_flag_baseline is behavior_flag_baseline
+
+
+def test_customer_behavior_profile_mantem_behavior_flag_baseline_none_por_padrao():
+    profile = CustomerBehaviorProfile(
+        customer_pseudonym="cliente-042",
+        transaction_value_median=180.0,
+        transaction_value_sigma=0.65,
+        recent_login_failure_rate=0.15,
+    )
+
+    assert profile.behavior_flag_baseline is None
+
+
+@pytest.mark.parametrize(
+    "behavior_flag_baseline",
+    (
+        True,
+        123,
+        "baseline",
+        {},
+    ),
+)
+def test_customer_behavior_profile_rejeita_behavior_flag_baseline_invalido(
+    behavior_flag_baseline,
+):
+    with pytest.raises(
+        ValueError,
+        match="behavior_flag_baseline",
+    ):
+        CustomerBehaviorProfile(
+            customer_pseudonym="cliente-042",
+            transaction_value_median=180.0,
+            transaction_value_sigma=0.65,
+            recent_login_failure_rate=0.15,
+            behavior_flag_baseline=behavior_flag_baseline,
+        )
 
 
 @pytest.mark.parametrize(

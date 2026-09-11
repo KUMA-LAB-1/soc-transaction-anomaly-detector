@@ -5,9 +5,11 @@ import pandas as pd
 import pytest
 
 from src.models.detector_benchmark import (
+    DetectorBenchmarkEntry,
     _align_truth_to_evaluation,
     _build_detector_entry,
     run_synthetic_detector_benchmark,
+    selecionar_campeao_benchmark_truth,
 )
 from src.synthetic.benchmark_experiment import (
     build_canonical_generation_config,
@@ -165,6 +167,7 @@ def test_detector_benchmark_nao_usa_label_operacional_como_truth(
     )
 
     assert len(result.detectors) == 1
+    assert result.benchmark_champion == "controlled_detector"
 
     detector = result.detectors[0]
 
@@ -253,3 +256,60 @@ def test_detector_benchmark_falha_se_detector_ok_nao_tem_predicoes():
                 dtype=int,
             ),
         )
+
+
+def test_selecionar_campeao_benchmark_truth_ignora_erros():
+    erro = DetectorBenchmarkEntry(
+        detector="detector_com_erro",
+        status="erro",
+        precision=None,
+        recall=None,
+        f1=None,
+        roc_auc=None,
+        false_positives=None,
+        false_negatives=None,
+        alert_count=None,
+        alert_rate=None,
+        elapsed_seconds=0.001,
+        error="falha simulada",
+    )
+
+    lento = DetectorBenchmarkEntry(
+        detector="detector_lento",
+        status="ok",
+        precision=0.90,
+        recall=0.70,
+        f1=0.80,
+        roc_auc=0.85,
+        false_positives=2,
+        false_negatives=3,
+        alert_count=10,
+        alert_rate=0.20,
+        elapsed_seconds=0.50,
+    )
+
+    rapido = DetectorBenchmarkEntry(
+        detector="detector_rapido",
+        status="ok",
+        precision=0.90,
+        recall=0.70,
+        f1=0.80,
+        roc_auc=0.85,
+        false_positives=2,
+        false_negatives=3,
+        alert_count=10,
+        alert_rate=0.20,
+        elapsed_seconds=0.10,
+    )
+
+    campeao = selecionar_campeao_benchmark_truth(
+        (
+            erro,
+            lento,
+            rapido,
+        )
+    )
+
+    assert campeao is rapido
+
+    assert selecionar_campeao_benchmark_truth((erro,)) is None

@@ -15,7 +15,7 @@ from .anomaly_detection import (
     ESTRATEGIA_TEMPORAL,
     executar_detectores_anomalia,
 )
-from .evaluation import avaliar_detector
+from .evaluation import avaliar_detector, chave_ranking_detector
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +42,7 @@ class SyntheticDetectorBenchmarkResult:
     max_train_timestamp: pd.Timestamp
     min_evaluation_timestamp: pd.Timestamp
     detectors: tuple[DetectorBenchmarkEntry, ...]
+    benchmark_champion: str | None
 
 
 def _prepare_modeling_dataset(
@@ -145,6 +146,25 @@ def _build_detector_entry(
     )
 
 
+def selecionar_campeao_benchmark_truth(
+    detectors: tuple[DetectorBenchmarkEntry, ...],
+) -> DetectorBenchmarkEntry | None:
+    validos = tuple(detector for detector in detectors if detector.status == "ok")
+
+    if not validos:
+        return None
+
+    return max(
+        validos,
+        key=lambda detector: chave_ranking_detector(
+            f1=detector.f1,
+            recall=detector.recall,
+            precision=detector.precision,
+            tempo_segundos=detector.elapsed_seconds,
+        ),
+    )
+
+
 def run_synthetic_detector_benchmark(
     dataset: GeneratedSyntheticDataset,
     *,
@@ -178,6 +198,8 @@ def run_synthetic_detector_benchmark(
         for result in execution["resultados"]
     )
 
+    benchmark_champion = selecionar_campeao_benchmark_truth(detector_entries)
+
     return SyntheticDetectorBenchmarkResult(
         validation_strategy=execution["estrategia_validacao"],
         n_train=execution["n_treino"],
@@ -185,4 +207,7 @@ def run_synthetic_detector_benchmark(
         max_train_timestamp=timestamps.iloc[train_indices].max(),
         min_evaluation_timestamp=timestamps.iloc[evaluation_indices].min(),
         detectors=detector_entries,
+        benchmark_champion=(
+            benchmark_champion.detector if benchmark_champion is not None else None
+        ),
     )

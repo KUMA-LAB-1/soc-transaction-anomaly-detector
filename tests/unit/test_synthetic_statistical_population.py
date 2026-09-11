@@ -299,6 +299,234 @@ def test_mudar_apenas_baseline_transacional_nao_embaralha_evento():
     ]
 
 
+def test_profile_behavior_flag_baseline_controla_observaveis_booleanos():
+    from dataclasses import replace
+
+    from src.synthetic.behavior_flags import BehaviorFlagBaseline
+
+    population = CustomerPopulation(
+        profiles=(
+            CustomerBehaviorProfile(
+                customer_pseudonym="entidade-alpha",
+                transaction_value_median=180.0,
+                transaction_value_sigma=0.65,
+                recent_login_failure_rate=0.15,
+                behavior_flag_baseline=BehaviorFlagBaseline(
+                    new_device_probability=0.0,
+                    limit_change_probability=0.0,
+                    location_change_probability=0.0,
+                ),
+            ),
+        )
+    )
+
+    cenario = replace(
+        obter_cenario("baseline"),
+        probabilidade_dispositivo_novo=1.0,
+        probabilidade_alteracao_limite=1.0,
+        probabilidade_mudanca_localizacao=1.0,
+    )
+
+    registros = StatisticalGenerator(
+        seed=2026,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population,
+    ).gerar_registros(
+        cenario,
+        quantidade=10,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    assert all(
+        registro.observables["dispositivo_novo_flag"] is False for registro in registros
+    )
+    assert all(
+        registro.observables["alteracao_limite_flag"] is False for registro in registros
+    )
+    assert all(
+        registro.observables["mudanca_localizacao_flag"] is False
+        for registro in registros
+    )
+
+
+def test_behavior_flag_baseline_equivalente_reproduz_fallback_legado():
+    from src.synthetic.behavior_flags import BehaviorFlagBaseline
+
+    cenario = obter_cenario("baseline")
+
+    population_fallback = CustomerPopulation(
+        profiles=(
+            CustomerBehaviorProfile(
+                customer_pseudonym="entidade-alpha",
+                transaction_value_median=180.0,
+                transaction_value_sigma=0.65,
+                recent_login_failure_rate=0.15,
+            ),
+        )
+    )
+
+    population_explicit = CustomerPopulation(
+        profiles=(
+            CustomerBehaviorProfile(
+                customer_pseudonym="entidade-alpha",
+                transaction_value_median=180.0,
+                transaction_value_sigma=0.65,
+                recent_login_failure_rate=0.15,
+                behavior_flag_baseline=BehaviorFlagBaseline(
+                    new_device_probability=(cenario.probabilidade_dispositivo_novo),
+                    limit_change_probability=(cenario.probabilidade_alteracao_limite),
+                    location_change_probability=(
+                        cenario.probabilidade_mudanca_localizacao
+                    ),
+                ),
+            ),
+        )
+    )
+
+    registros_fallback = StatisticalGenerator(
+        seed=2026,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population_fallback,
+    ).gerar_registros(
+        cenario,
+        quantidade=100,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    registros_explicit = StatisticalGenerator(
+        seed=2026,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population_explicit,
+    ).gerar_registros(
+        cenario,
+        quantidade=100,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    assert registros_explicit == registros_fallback
+
+
+def test_mudar_apenas_behavior_flag_baseline_nao_embaralha_restante_do_evento():
+    from src.synthetic.behavior_flags import BehaviorFlagBaseline
+
+    population_zero = CustomerPopulation(
+        profiles=(
+            CustomerBehaviorProfile(
+                customer_pseudonym="entidade-alpha",
+                transaction_value_median=180.0,
+                transaction_value_sigma=0.65,
+                recent_login_failure_rate=0.15,
+                behavior_flag_baseline=BehaviorFlagBaseline(
+                    new_device_probability=0.0,
+                    limit_change_probability=0.0,
+                    location_change_probability=0.0,
+                ),
+            ),
+        )
+    )
+
+    population_um = CustomerPopulation(
+        profiles=(
+            CustomerBehaviorProfile(
+                customer_pseudonym="entidade-alpha",
+                transaction_value_median=180.0,
+                transaction_value_sigma=0.65,
+                recent_login_failure_rate=0.15,
+                behavior_flag_baseline=BehaviorFlagBaseline(
+                    new_device_probability=1.0,
+                    limit_change_probability=1.0,
+                    location_change_probability=1.0,
+                ),
+            ),
+        )
+    )
+
+    registros_zero = StatisticalGenerator(
+        seed=777,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population_zero,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=100,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    registros_um = StatisticalGenerator(
+        seed=777,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population_um,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=100,
+        inicio=INICIO,
+        fim=FIM_PADRAO,
+    )
+
+    boolean_fields = {
+        "dispositivo_novo_flag",
+        "alteracao_limite_flag",
+        "mudanca_localizacao_flag",
+    }
+
+    observaveis_zero_sem_flags = [
+        {
+            field_name: value
+            for field_name, value in registro.observables.items()
+            if field_name not in boolean_fields
+        }
+        for registro in registros_zero
+    ]
+
+    observaveis_um_sem_flags = [
+        {
+            field_name: value
+            for field_name, value in registro.observables.items()
+            if field_name not in boolean_fields
+        }
+        for registro in registros_um
+    ]
+
+    assert observaveis_zero_sem_flags == observaveis_um_sem_flags
+
+    assert [registro.operational_labels for registro in registros_zero] == [
+        registro.operational_labels for registro in registros_um
+    ]
+
+    assert [registro.truth for registro in registros_zero] == [
+        registro.truth for registro in registros_um
+    ]
+
+    assert all(
+        registro.observables["dispositivo_novo_flag"] is False
+        for registro in registros_zero
+    )
+    assert all(
+        registro.observables["alteracao_limite_flag"] is False
+        for registro in registros_zero
+    )
+    assert all(
+        registro.observables["mudanca_localizacao_flag"] is False
+        for registro in registros_zero
+    )
+
+    assert all(
+        registro.observables["dispositivo_novo_flag"] is True
+        for registro in registros_um
+    )
+    assert all(
+        registro.observables["alteracao_limite_flag"] is True
+        for registro in registros_um
+    )
+    assert all(
+        registro.observables["mudanca_localizacao_flag"] is True
+        for registro in registros_um
+    )
+
+
 def test_profile_controla_baseline_de_falhas_login():
     population_sem_falhas = criar_populacao(
         "entidade-alpha",

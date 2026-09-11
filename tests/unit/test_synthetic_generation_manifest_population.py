@@ -4,6 +4,75 @@ from dataclasses import FrozenInstanceError
 import pytest
 
 
+def test_behavior_flag_baseline_manifest_preserva_snapshot():
+    from src.synthetic.generation_manifest import BehaviorFlagBaselineManifest
+
+    manifest = BehaviorFlagBaselineManifest(
+        new_device_probability=0.08,
+        limit_change_probability=0.04,
+        location_change_probability=0.07,
+    )
+
+    assert manifest.new_device_probability == 0.08
+    assert manifest.limit_change_probability == 0.04
+    assert manifest.location_change_probability == 0.07
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    (
+        "new_device_probability",
+        "limit_change_probability",
+        "location_change_probability",
+    ),
+)
+@pytest.mark.parametrize(
+    "invalid_value",
+    (
+        -0.01,
+        1.01,
+        math.nan,
+        math.inf,
+        -math.inf,
+        True,
+        None,
+        "0.50",
+    ),
+)
+def test_behavior_flag_baseline_manifest_rejeita_probabilidade_invalida(
+    field_name,
+    invalid_value,
+):
+    values = {
+        "new_device_probability": 0.08,
+        "limit_change_probability": 0.04,
+        "location_change_probability": 0.07,
+    }
+    values[field_name] = invalid_value
+
+    from src.synthetic.generation_manifest import BehaviorFlagBaselineManifest
+
+    with pytest.raises(
+        ValueError,
+        match=field_name,
+    ):
+        BehaviorFlagBaselineManifest(**values)
+
+
+def test_behavior_flag_baseline_manifest_aceita_limites_de_probabilidade():
+    from src.synthetic.generation_manifest import BehaviorFlagBaselineManifest
+
+    manifest = BehaviorFlagBaselineManifest(
+        new_device_probability=0.0,
+        limit_change_probability=1.0,
+        location_change_probability=0.0,
+    )
+
+    assert manifest.new_device_probability == 0.0
+    assert manifest.limit_change_probability == 1.0
+    assert manifest.location_change_probability == 0.0
+
+
 def test_population_generation_manifest_preserva_snapshot_da_configuracao():
     from src.synthetic.generation_manifest import PopulationGenerationManifest
 
@@ -22,6 +91,75 @@ def test_population_generation_manifest_preserva_snapshot_da_configuracao():
     assert manifest.transaction_value_sigma == 0.65
     assert manifest.recent_login_failure_rate_mean == 0.15
     assert manifest.recent_login_failure_rate_shape == 2.0
+
+
+def test_population_generation_manifest_preserva_behavior_flag_baseline():
+    from src.synthetic.generation_manifest import (
+        BehaviorFlagBaselineManifest,
+        PopulationGenerationManifest,
+    )
+
+    behavior_flag_baseline = BehaviorFlagBaselineManifest(
+        new_device_probability=0.08,
+        limit_change_probability=0.04,
+        location_change_probability=0.07,
+    )
+
+    manifest = PopulationGenerationManifest(
+        customer_count=100,
+        transaction_value_median_base=180.0,
+        transaction_value_median_log_sigma=0.75,
+        transaction_value_sigma=0.65,
+        recent_login_failure_rate_mean=0.15,
+        recent_login_failure_rate_shape=2.0,
+        behavior_flag_baseline=behavior_flag_baseline,
+    )
+
+    assert manifest.behavior_flag_baseline is behavior_flag_baseline
+
+
+def test_population_generation_manifest_mantem_behavior_flag_baseline_none_por_padrao():
+    from src.synthetic.generation_manifest import PopulationGenerationManifest
+
+    manifest = PopulationGenerationManifest(
+        customer_count=100,
+        transaction_value_median_base=180.0,
+        transaction_value_median_log_sigma=0.75,
+        transaction_value_sigma=0.65,
+        recent_login_failure_rate_mean=0.15,
+        recent_login_failure_rate_shape=2.0,
+    )
+
+    assert manifest.behavior_flag_baseline is None
+
+
+@pytest.mark.parametrize(
+    "behavior_flag_baseline",
+    (
+        True,
+        123,
+        "baseline",
+        {},
+    ),
+)
+def test_population_generation_manifest_rejeita_behavior_flag_baseline_invalido(
+    behavior_flag_baseline,
+):
+    from src.synthetic.generation_manifest import PopulationGenerationManifest
+
+    with pytest.raises(
+        ValueError,
+        match="behavior_flag_baseline",
+    ):
+        PopulationGenerationManifest(
+            customer_count=100,
+            transaction_value_median_base=180.0,
+            transaction_value_median_log_sigma=0.75,
+            transaction_value_sigma=0.65,
+            recent_login_failure_rate_mean=0.15,
+            recent_login_failure_rate_shape=2.0,
+            behavior_flag_baseline=behavior_flag_baseline,
+        )
 
 
 @pytest.mark.parametrize(
@@ -260,6 +398,47 @@ def test_build_population_generation_manifest_cria_snapshot_da_configuracao():
         == config.recent_login_failure_rate_shape
     )
     assert manifest is not config
+
+
+def test_build_population_generation_manifest_preserva_behavior_flag_baseline():
+    from src.synthetic.behavior_flags import BehaviorFlagBaseline
+    from src.synthetic.generation_manifest_builder import (
+        build_population_generation_manifest,
+    )
+    from src.synthetic.population_generation import PopulationGenerationConfig
+
+    behavior_flag_baseline = BehaviorFlagBaseline(
+        new_device_probability=0.08,
+        limit_change_probability=0.04,
+        location_change_probability=0.07,
+    )
+
+    config = PopulationGenerationConfig(
+        customer_count=100,
+        transaction_value_median_base=180.0,
+        transaction_value_median_log_sigma=0.75,
+        transaction_value_sigma=0.65,
+        recent_login_failure_rate_mean=0.15,
+        recent_login_failure_rate_shape=2.0,
+        behavior_flag_baseline=behavior_flag_baseline,
+    )
+
+    manifest = build_population_generation_manifest(config)
+
+    assert manifest.behavior_flag_baseline is not None
+    assert (
+        manifest.behavior_flag_baseline.new_device_probability
+        == behavior_flag_baseline.new_device_probability
+    )
+    assert (
+        manifest.behavior_flag_baseline.limit_change_probability
+        == behavior_flag_baseline.limit_change_probability
+    )
+    assert (
+        manifest.behavior_flag_baseline.location_change_probability
+        == behavior_flag_baseline.location_change_probability
+    )
+    assert manifest.behavior_flag_baseline is not behavior_flag_baseline
 
 
 @pytest.mark.parametrize(

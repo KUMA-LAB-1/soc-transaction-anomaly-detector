@@ -31,6 +31,31 @@ class SeedStrategyManifest:
 
 
 @dataclass(frozen=True, slots=True)
+class BehaviorFlagBaselineManifest:
+    new_device_probability: float
+    limit_change_probability: float
+    location_change_probability: float
+
+    def __post_init__(self) -> None:
+        probabilities = {
+            "new_device_probability": self.new_device_probability,
+            "limit_change_probability": self.limit_change_probability,
+            "location_change_probability": self.location_change_probability,
+        }
+
+        for name, value in probabilities.items():
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or not 0.0 <= value <= 1.0
+            ):
+                raise ValueError(
+                    f"{name} deve ser numerico, finito e estar entre 0 e 1."
+                )
+
+
+@dataclass(frozen=True, slots=True)
 class PopulationGenerationManifest:
     customer_count: int
     transaction_value_median_base: float
@@ -38,8 +63,17 @@ class PopulationGenerationManifest:
     transaction_value_sigma: float
     recent_login_failure_rate_mean: float
     recent_login_failure_rate_shape: float
+    behavior_flag_baseline: BehaviorFlagBaselineManifest | None = None
 
     def __post_init__(self) -> None:
+        if self.behavior_flag_baseline is not None and not isinstance(
+            self.behavior_flag_baseline,
+            BehaviorFlagBaselineManifest,
+        ):
+            raise ValueError(
+                "behavior_flag_baseline deve ser BehaviorFlagBaselineManifest ou None."
+            )
+
         if (
             isinstance(self.customer_count, bool)
             or not isinstance(self.customer_count, int)
@@ -175,6 +209,9 @@ class ScenarioEffectManifest:
     transaction_value_median_multiplier: float
     transaction_value_sigma_multiplier: float
     recent_login_failure_rate_increment: float
+    new_device_probability_delta: float = 0.0
+    limit_change_probability_delta: float = 0.0
+    location_change_probability_delta: float = 0.0
 
     def __post_init__(self) -> None:
         valor = self.transaction_value_median_multiplier
@@ -215,6 +252,23 @@ class ScenarioEffectManifest:
                 "recent_login_failure_rate_increment deve ser "
                 "numerico, finito e maior ou igual a zero."
             )
+
+        probability_deltas = {
+            "new_device_probability_delta": self.new_device_probability_delta,
+            "limit_change_probability_delta": self.limit_change_probability_delta,
+            "location_change_probability_delta": self.location_change_probability_delta,
+        }
+
+        for name, value in probability_deltas.items():
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or not -1.0 <= value <= 1.0
+            ):
+                raise ValueError(
+                    f"{name} deve ser numerico, finito e estar entre -1 e 1."
+                )
 
 
 @dataclass(frozen=True, slots=True)

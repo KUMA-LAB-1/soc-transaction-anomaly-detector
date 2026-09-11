@@ -2,6 +2,7 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
+from src.synthetic.behavior_flags import BehaviorFlagBaseline
 from src.synthetic.population import CustomerPopulation
 from src.synthetic.population_generation import (
     PopulationGenerationConfig,
@@ -25,6 +26,66 @@ def test_population_generation_config_preserva_parametros():
     assert config.transaction_value_sigma == 0.65
     assert config.recent_login_failure_rate_mean == 0.15
     assert config.recent_login_failure_rate_shape == 2.0
+
+
+def test_population_generation_config_preserva_behavior_flag_baseline():
+    behavior_flag_baseline = BehaviorFlagBaseline(
+        new_device_probability=0.08,
+        limit_change_probability=0.04,
+        location_change_probability=0.07,
+    )
+
+    config = PopulationGenerationConfig(
+        customer_count=100,
+        transaction_value_median_base=180.0,
+        transaction_value_median_log_sigma=0.75,
+        transaction_value_sigma=0.65,
+        recent_login_failure_rate_mean=0.15,
+        recent_login_failure_rate_shape=2.0,
+        behavior_flag_baseline=behavior_flag_baseline,
+    )
+
+    assert config.behavior_flag_baseline is behavior_flag_baseline
+
+
+def test_population_generation_config_mantem_behavior_flag_baseline_none_por_padrao():
+    config = PopulationGenerationConfig(
+        customer_count=100,
+        transaction_value_median_base=180.0,
+        transaction_value_median_log_sigma=0.75,
+        transaction_value_sigma=0.65,
+        recent_login_failure_rate_mean=0.15,
+        recent_login_failure_rate_shape=2.0,
+    )
+
+    assert config.behavior_flag_baseline is None
+
+
+@pytest.mark.parametrize(
+    "behavior_flag_baseline",
+    (
+        True,
+        123,
+        "baseline",
+        {},
+    ),
+)
+def test_population_generation_config_rejeita_behavior_flag_baseline_invalido(
+    behavior_flag_baseline,
+):
+    with pytest.raises(
+        ValueError,
+        match="behavior_flag_baseline",
+    ):
+        PopulationGenerationConfig(
+            customer_count=100,
+            transaction_value_median_base=180.0,
+            transaction_value_median_log_sigma=0.75,
+            transaction_value_sigma=0.65,
+            recent_login_failure_rate_mean=0.15,
+            recent_login_failure_rate_shape=2.0,
+            behavior_flag_baseline=behavior_flag_baseline,
+        )
 
 
 @pytest.mark.parametrize(
@@ -250,6 +311,7 @@ def _build_population_generation_config(
     transaction_value_sigma: float = 0.65,
     recent_login_failure_rate_mean: float = 0.15,
     recent_login_failure_rate_shape: float = 2.0,
+    behavior_flag_baseline: BehaviorFlagBaseline | None = None,
 ) -> PopulationGenerationConfig:
     return PopulationGenerationConfig(
         customer_count=customer_count,
@@ -258,6 +320,28 @@ def _build_population_generation_config(
         transaction_value_sigma=transaction_value_sigma,
         recent_login_failure_rate_mean=recent_login_failure_rate_mean,
         recent_login_failure_rate_shape=recent_login_failure_rate_shape,
+        behavior_flag_baseline=behavior_flag_baseline,
+    )
+
+
+def test_population_generator_propaga_behavior_flag_baseline_para_perfis():
+    behavior_flag_baseline = BehaviorFlagBaseline(
+        new_device_probability=0.08,
+        limit_change_probability=0.04,
+        location_change_probability=0.07,
+    )
+    generator = PopulationGenerator(seed=42)
+
+    population = generator.generate(
+        _build_population_generation_config(
+            customer_count=5,
+            behavior_flag_baseline=behavior_flag_baseline,
+        )
+    )
+
+    assert all(
+        profile.behavior_flag_baseline is behavior_flag_baseline
+        for profile in population.profiles
     )
 
 
@@ -315,6 +399,39 @@ def test_population_generator_gera_baselines_validos():
     assert all(profile.transaction_value_median > 0 for profile in population.profiles)
     assert all(
         profile.recent_login_failure_rate >= 0 for profile in population.profiles
+    )
+
+
+def test_population_generator_behavior_flag_baseline_nao_altera_streams_existentes():
+    behavior_flag_baseline = BehaviorFlagBaseline(
+        new_device_probability=0.08,
+        limit_change_probability=0.04,
+        location_change_probability=0.07,
+    )
+
+    sem_behavior_flags = PopulationGenerator(seed=2026).generate(
+        _build_population_generation_config(
+            customer_count=25,
+        )
+    )
+
+    com_behavior_flags = PopulationGenerator(seed=2026).generate(
+        _build_population_generation_config(
+            customer_count=25,
+            behavior_flag_baseline=behavior_flag_baseline,
+        )
+    )
+
+    assert tuple(
+        profile.transaction_value_median for profile in sem_behavior_flags.profiles
+    ) == tuple(
+        profile.transaction_value_median for profile in com_behavior_flags.profiles
+    )
+
+    assert tuple(
+        profile.recent_login_failure_rate for profile in sem_behavior_flags.profiles
+    ) == tuple(
+        profile.recent_login_failure_rate for profile in com_behavior_flags.profiles
     )
 
 

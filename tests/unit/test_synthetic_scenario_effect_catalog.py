@@ -24,6 +24,10 @@ def test_baseline_possui_efeito_neutro():
     assert effect.transaction_value_median_multiplier == 1.0
     assert effect.transaction_value_sigma_multiplier == 1.0
     assert effect.recent_login_failure_rate_increment == 0.0
+    assert effect.new_device_probability_delta == 0.0
+    assert effect.limit_change_probability_delta == 0.0
+    assert effect.location_change_probability_delta == 0.0
+    assert effect.is_neutral is True
 
 
 def test_credential_attack_prioriza_perturbacao_de_login():
@@ -55,6 +59,39 @@ def test_transaction_anomaly_prioriza_perturbacao_transacional():
     assert effect.transaction_value_median_multiplier > 1.0
     assert effect.transaction_value_sigma_multiplier > 1.0
     assert effect.recent_login_failure_rate_increment == 0.0
+
+
+@pytest.mark.parametrize(
+    (
+        "scenario",
+        "new_device_probability_delta",
+        "limit_change_probability_delta",
+        "location_change_probability_delta",
+    ),
+    (
+        ("credential_attack", 0.20, 0.14, 0.23),
+        ("account_takeover", 0.64, 0.54, 0.39),
+        ("location_anomaly", 0.25, 0.08, 0.71),
+        ("transaction_anomaly", 0.12, 0.14, 0.15),
+    ),
+)
+def test_catalogo_define_deltas_booleanos_causais(
+    scenario,
+    new_device_probability_delta,
+    limit_change_probability_delta,
+    location_change_probability_delta,
+):
+    effect = obter_efeito_cenario(scenario)
+
+    assert effect.new_device_probability_delta == pytest.approx(
+        new_device_probability_delta
+    )
+    assert effect.limit_change_probability_delta == pytest.approx(
+        limit_change_probability_delta
+    )
+    assert effect.location_change_probability_delta == pytest.approx(
+        location_change_probability_delta
+    )
 
 
 def test_obter_efeito_cenario_retorna_objeto_do_catalogo():

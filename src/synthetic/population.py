@@ -1,6 +1,8 @@
 import math
 from dataclasses import dataclass
 
+from .behavior_flags import BehaviorFlagBaseline
+
 
 @dataclass(frozen=True, slots=True)
 class CustomerBehaviorProfile:
@@ -10,8 +12,17 @@ class CustomerBehaviorProfile:
     transaction_value_median: float
     transaction_value_sigma: float
     recent_login_failure_rate: float
+    behavior_flag_baseline: BehaviorFlagBaseline | None = None
 
     def __post_init__(self) -> None:
+        if self.behavior_flag_baseline is not None and not isinstance(
+            self.behavior_flag_baseline,
+            BehaviorFlagBaseline,
+        ):
+            raise ValueError(
+                "behavior_flag_baseline deve ser BehaviorFlagBaseline ou None."
+            )
+
         if (
             not isinstance(self.customer_pseudonym, str)
             or not self.customer_pseudonym.strip()

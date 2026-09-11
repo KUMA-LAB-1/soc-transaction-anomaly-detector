@@ -145,9 +145,40 @@ class StatisticalGenerator:
             scenario_effect=effective_scenario_effect,
         )
 
-        dispositivo_novo = self._sortear(cenario.probabilidade_dispositivo_novo)
-        alteracao_limite = self._sortear(cenario.probabilidade_alteracao_limite)
-        mudanca_localizacao = self._sortear(cenario.probabilidade_mudanca_localizacao)
+        behavior_flag_baseline = (
+            customer_profile.behavior_flag_baseline
+            if customer_profile is not None
+            else None
+        )
+
+        if behavior_flag_baseline is None:
+            new_device_probability = cenario.probabilidade_dispositivo_novo
+            limit_change_probability = cenario.probabilidade_alteracao_limite
+            location_change_probability = cenario.probabilidade_mudanca_localizacao
+        else:
+            new_device_probability = behavior_flag_baseline.new_device_probability
+            limit_change_probability = behavior_flag_baseline.limit_change_probability
+            location_change_probability = (
+                behavior_flag_baseline.location_change_probability
+            )
+
+            if effective_scenario_effect is not None:
+                new_device_probability = self._clamp_probability(
+                    new_device_probability
+                    + effective_scenario_effect.new_device_probability_delta
+                )
+                limit_change_probability = self._clamp_probability(
+                    limit_change_probability
+                    + effective_scenario_effect.limit_change_probability_delta
+                )
+                location_change_probability = self._clamp_probability(
+                    location_change_probability
+                    + effective_scenario_effect.location_change_probability_delta
+                )
+
+        dispositivo_novo = self._sortear(new_device_probability)
+        alteracao_limite = self._sortear(limit_change_probability)
+        mudanca_localizacao = self._sortear(location_change_probability)
 
         falhas_login = self._gerar_falhas_login(
             cenario,
@@ -294,6 +325,10 @@ class StatisticalGenerator:
             round(float(valor), 2),
             0.01,
         )
+
+    @staticmethod
+    def _clamp_probability(probabilidade: float) -> float:
+        return min(max(probabilidade, 0.0), 1.0)
 
     def _sortear(self, probabilidade: float) -> bool:
         return bool(self._rng.random() < probabilidade)

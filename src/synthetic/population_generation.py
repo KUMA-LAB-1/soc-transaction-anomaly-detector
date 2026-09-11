@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .behavior_flags import BehaviorFlagBaseline
 from .population import CustomerBehaviorProfile, CustomerPopulation
 
 
@@ -16,8 +17,17 @@ class PopulationGenerationConfig:
     transaction_value_sigma: float
     recent_login_failure_rate_mean: float
     recent_login_failure_rate_shape: float
+    behavior_flag_baseline: BehaviorFlagBaseline | None = None
 
     def __post_init__(self) -> None:
+        if self.behavior_flag_baseline is not None and not isinstance(
+            self.behavior_flag_baseline,
+            BehaviorFlagBaseline,
+        ):
+            raise ValueError(
+                "behavior_flag_baseline deve ser BehaviorFlagBaseline ou None."
+            )
+
         if (
             isinstance(self.customer_count, bool)
             or not isinstance(self.customer_count, int)
@@ -153,4 +163,5 @@ class PopulationGenerator:
             transaction_value_median=transaction_value_median,
             transaction_value_sigma=config.transaction_value_sigma,
             recent_login_failure_rate=recent_login_failure_rate,
+            behavior_flag_baseline=config.behavior_flag_baseline,
         )

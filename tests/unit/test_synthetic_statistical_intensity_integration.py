@@ -70,6 +70,85 @@ def test_integrar_intensity_policy_preserva_evento_existente():
     assert truth_sem_intensity == [registro.truth for registro in sem_intensity]
 
 
+def test_event_intensity_escala_deltas_booleanos_entre_zero_e_um():
+    from src.synthetic.behavior_flags import BehaviorFlagBaseline
+
+    population = CustomerPopulation(
+        profiles=(
+            CustomerBehaviorProfile(
+                customer_pseudonym="entidade-alpha",
+                transaction_value_median=180.0,
+                transaction_value_sigma=0.65,
+                recent_login_failure_rate=0.15,
+                behavior_flag_baseline=BehaviorFlagBaseline(
+                    new_device_probability=0.0,
+                    limit_change_probability=0.0,
+                    location_change_probability=0.0,
+                ),
+            ),
+        )
+    )
+
+    effect = ScenarioEffect(
+        transaction_value_median_multiplier=1.0,
+        transaction_value_sigma_multiplier=1.0,
+        recent_login_failure_rate_increment=0.0,
+        new_device_probability_delta=1.0,
+        limit_change_probability_delta=1.0,
+        location_change_probability_delta=1.0,
+    )
+
+    intensity_zero = EventIntensityPolicy(
+        intensity_min=0.0,
+        intensity_max=0.0,
+    )
+    intensity_um = EventIntensityPolicy(
+        intensity_min=1.0,
+        intensity_max=1.0,
+    )
+
+    registros_zero = StatisticalGenerator(
+        seed=2026,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=10,
+        inicio=INICIO,
+        fim=FIM,
+        scenario_effect=effect,
+        intensity_policy=intensity_zero,
+    )
+
+    registros_um = StatisticalGenerator(
+        seed=2026,
+        label_policy=POLITICA_SEM_RUIDO,
+        population=population,
+    ).gerar_registros(
+        obter_cenario("baseline"),
+        quantidade=10,
+        inicio=INICIO,
+        fim=FIM,
+        scenario_effect=effect,
+        intensity_policy=intensity_um,
+    )
+
+    assert all(registro.truth.event_intensity == 0.0 for registro in registros_zero)
+    assert all(registro.truth.event_intensity == 1.0 for registro in registros_um)
+
+    for field_name in (
+        "dispositivo_novo_flag",
+        "alteracao_limite_flag",
+        "mudanca_localizacao_flag",
+    ):
+        assert all(
+            registro.observables[field_name] is False for registro in registros_zero
+        )
+        assert all(
+            registro.observables[field_name] is True for registro in registros_um
+        )
+
+
 def test_mesma_seed_reproduz_mesmas_event_intensities():
     primeira_execucao = StatisticalGenerator(
         seed=2026,

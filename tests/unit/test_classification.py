@@ -338,3 +338,22 @@ def test_preparar_dados_classificacao_expoe_matriz_target_e_features():
     assert "hora" in prepared.features
 
     assert all(pd.api.types.is_numeric_dtype(dtype) for dtype in prepared.X.dtypes)
+
+
+def test_criar_classificador_triagem_preserva_configuracao_operacional():
+    from sklearn.tree import DecisionTreeClassifier
+
+    from src.models.classification import (
+        criar_classificador_triagem,
+    )
+
+    modelo = criar_classificador_triagem()
+
+    assert isinstance(
+        modelo,
+        DecisionTreeClassifier,
+    )
+
+    assert modelo.max_depth == 4
+    assert modelo.random_state == 42
+    assert modelo.class_weight == "balanced"

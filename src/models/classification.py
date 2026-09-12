@@ -76,6 +76,15 @@ def preparar_dados_classificacao(
     )
 
 
+def criar_classificador_triagem() -> DecisionTreeClassifier:
+    """Cria o classificador operacional de triagem com configuracao canonica."""
+    return DecisionTreeClassifier(
+        max_depth=4,
+        random_state=42,
+        class_weight="balanced",
+    )
+
+
 def treinar_classificador_triagem(
     df: pd.DataFrame,
     *,
@@ -131,11 +140,7 @@ def treinar_classificador_triagem(
             stratify=estratificar,
         )
 
-    modelo = DecisionTreeClassifier(
-        max_depth=4,
-        random_state=42,
-        class_weight="balanced",
-    )
+    modelo = criar_classificador_triagem()
 
     modelo.fit(X_train, y_train)
 

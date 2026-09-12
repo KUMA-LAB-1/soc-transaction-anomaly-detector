@@ -22,7 +22,8 @@ from ..synthetic.firewall import (
 )
 from .classification import (
     ESTRATEGIA_TEMPORAL,
-    treinar_classificador_triagem,
+    criar_classificador_triagem,
+    preparar_dados_classificacao,
 )
 from .validation import dividir_holdout_temporal
 
@@ -260,16 +261,16 @@ def run_synthetic_classification_benchmark(
         test_size=0.25,
     )
 
-    training_started = perf_counter()
-
-    training_result = treinar_classificador_triagem(
+    prepared = preparar_dados_classificacao(
         features,
-        estrategia_validacao=ESTRATEGIA_TEMPORAL,
-        indices_treino=train_indices,
-        indices_teste=evaluation_indices,
     )
 
-    elapsed_seconds = perf_counter() - training_started
+    execution = _execute_classification_benchmark_model(
+        model_factory=criar_classificador_triagem,
+        X=prepared.X,
+        y=prepared.y,
+        train_indices=train_indices,
+    )
 
     aligned_truth = _align_truth_to_evaluation(
         features,
@@ -279,10 +280,10 @@ def run_synthetic_classification_benchmark(
 
     candidate = _build_classification_candidate(
         model="decision_tree",
-        probabilities=training_result["proba_suspeita"],
+        probabilities=execution.probabilities,
         evaluation_indices=evaluation_indices,
         truth=aligned_truth,
-        elapsed_seconds=elapsed_seconds,
+        elapsed_seconds=execution.elapsed_seconds,
     )
 
     timestamps = pd.to_datetime(

@@ -361,7 +361,7 @@ def test_classification_benchmark_expoe_pr_auc_e_taxa_de_positivos(
 
 def test_classification_candidate_pr_auc_usa_area_da_curva_precision_recall():
     from src.models.classification_benchmark import (
-        _build_decision_tree_candidate,
+        _build_classification_candidate,
     )
 
     probabilities = np.array(
@@ -389,7 +389,8 @@ def test_classification_candidate_pr_auc_usa_area_da_curva_precision_recall():
         dtype=int,
     )
 
-    candidate = _build_decision_tree_candidate(
+    candidate = _build_classification_candidate(
+        model="decision_tree",
         probabilities=probabilities,
         evaluation_indices=evaluation_indices,
         truth=truth,
@@ -401,7 +402,7 @@ def test_classification_candidate_pr_auc_usa_area_da_curva_precision_recall():
 
 def test_classification_candidate_single_class_nao_expoe_auc_indefinida():
     from src.models.classification_benchmark import (
-        _build_decision_tree_candidate,
+        _build_classification_candidate,
     )
 
     probabilities = np.array(
@@ -429,7 +430,8 @@ def test_classification_candidate_single_class_nao_expoe_auc_indefinida():
         dtype=int,
     )
 
-    candidate = _build_decision_tree_candidate(
+    candidate = _build_classification_candidate(
+        model="decision_tree",
         probabilities=probabilities,
         evaluation_indices=evaluation_indices,
         truth=truth,
@@ -502,14 +504,15 @@ def test_classification_benchmark_expoe_tempo_decorrido_do_treino(
 
 def test_classification_candidate_rejeita_elapsed_seconds_ausente():
     from src.models.classification_benchmark import (
-        _build_decision_tree_candidate,
+        _build_classification_candidate,
     )
 
     with pytest.raises(
         TypeError,
         match="elapsed_seconds",
     ):
-        _build_decision_tree_candidate(
+        _build_classification_candidate(
+            model="decision_tree",
             probabilities=np.array(
                 [
                     0.1,
@@ -529,3 +532,45 @@ def test_classification_candidate_rejeita_elapsed_seconds_ausente():
                 dtype=int,
             ),
         )
+
+
+def test_classification_candidate_builder_aceita_identidade_do_modelo():
+    from src.models.classification_benchmark import (
+        _build_classification_candidate,
+    )
+
+    candidate = _build_classification_candidate(
+        model="logistic_regression",
+        probabilities=np.array(
+            [
+                0.1,
+                0.9,
+            ],
+            dtype=float,
+        ),
+        evaluation_indices=np.arange(
+            0,
+            2,
+        ),
+        truth=pd.Series(
+            [
+                0,
+                1,
+            ],
+            dtype=int,
+        ),
+        elapsed_seconds=0.25,
+    )
+
+    assert candidate.model == "logistic_regression"
+    assert candidate.status == "ok"
+    assert candidate.precision == 1.0
+    assert candidate.recall == 1.0
+    assert candidate.f1 == 1.0
+    assert candidate.roc_auc == 1.0
+    assert candidate.pr_auc == 1.0
+    assert candidate.positive_count == 1
+    assert candidate.positive_rate == pytest.approx(0.5)
+    assert candidate.false_positives == 0
+    assert candidate.false_negatives == 0
+    assert candidate.elapsed_seconds == pytest.approx(0.25)

@@ -97,8 +97,9 @@ def _align_truth_to_evaluation(
     return aligned["is_suspicious"].astype(int)
 
 
-def _build_decision_tree_candidate(
+def _build_classification_candidate(
     *,
+    model: str,
     probabilities: np.ndarray,
     evaluation_indices: np.ndarray,
     truth: pd.Series,
@@ -150,7 +151,7 @@ def _build_decision_tree_candidate(
     false_negatives = int(((y_pred == 0) & (y_true == 1)).sum())
 
     return ClassificationBenchmarkCandidate(
-        model="decision_tree",
+        model=model,
         status="ok",
         precision=float(
             precision_score(
@@ -216,7 +217,8 @@ def run_synthetic_classification_benchmark(
         evaluation_indices,
     )
 
-    candidate = _build_decision_tree_candidate(
+    candidate = _build_classification_candidate(
+        model="decision_tree",
         probabilities=training_result["proba_suspeita"],
         evaluation_indices=evaluation_indices,
         truth=aligned_truth,

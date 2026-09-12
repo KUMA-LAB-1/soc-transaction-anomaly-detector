@@ -28,6 +28,12 @@ from .validation import dividir_holdout_temporal
 
 
 @dataclass(frozen=True, slots=True)
+class ClassificationBenchmarkExecution:
+    probabilities: np.ndarray
+    elapsed_seconds: float
+
+
+@dataclass(frozen=True, slots=True)
 class ClassificationBenchmarkCandidate:
     model: str
     status: str
@@ -95,6 +101,60 @@ def _align_truth_to_evaluation(
         )
 
     return aligned["is_suspicious"].astype(int)
+
+
+def _execute_classification_benchmark_model(
+    *,
+    model_factory,
+    X: pd.DataFrame,
+    y: pd.Series,
+    train_indices: np.ndarray,
+) -> ClassificationBenchmarkExecution:
+    """Executa fit e inferencia sob uma fronteira temporal comparavel."""
+    model = model_factory()
+
+    training_started = perf_counter()
+
+    model.fit(
+        X.iloc[train_indices],
+        y.iloc[train_indices],
+    )
+
+    probability_matrix = np.asarray(
+        model.predict_proba(X),
+        dtype=float,
+    )
+
+    elapsed_seconds = perf_counter() - training_started
+
+    classes = np.asarray(
+        model.classes_,
+    )
+
+    positive_positions = np.flatnonzero(
+        classes == 1,
+    )
+
+    if positive_positions.size == 0:
+        probabilities = np.zeros(
+            len(X),
+            dtype=float,
+        )
+    else:
+        positive_index = int(positive_positions[0])
+
+        probabilities = probability_matrix[
+            :,
+            positive_index,
+        ]
+
+    return ClassificationBenchmarkExecution(
+        probabilities=np.asarray(
+            probabilities,
+            dtype=float,
+        ),
+        elapsed_seconds=elapsed_seconds,
+    )
 
 
 def _build_classification_candidate(

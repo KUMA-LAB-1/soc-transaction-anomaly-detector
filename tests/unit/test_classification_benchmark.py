@@ -574,3 +574,259 @@ def test_classification_candidate_builder_aceita_identidade_do_modelo():
     assert candidate.false_positives == 0
     assert candidate.false_negatives == 0
     assert candidate.elapsed_seconds == pytest.approx(0.25)
+
+
+def test_classification_benchmark_executor_mede_fit_e_predict_proba_no_mesmo_contrato(
+    monkeypatch,
+):
+    import src.models.classification_benchmark as classification_benchmark
+    from src.models.classification_benchmark import (
+        _execute_classification_benchmark_model,
+    )
+
+    events = []
+
+    X = pd.DataFrame(
+        {
+            "feature_a": [
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+            ],
+        },
+        index=[
+            10,
+            20,
+            30,
+            40,
+        ],
+    )
+
+    y = pd.Series(
+        [
+            0,
+            1,
+            0,
+            1,
+        ],
+        index=X.index,
+        dtype=int,
+    )
+
+    train_indices = np.array(
+        [
+            0,
+            1,
+        ],
+        dtype=int,
+    )
+
+    class FakeClassifier:
+        classes_ = np.array(
+            [
+                0,
+                1,
+            ],
+            dtype=int,
+        )
+
+        def fit(
+            self,
+            X_train,
+            y_train,
+        ):
+            events.append("fit")
+
+            assert X_train.index.tolist() == [
+                10,
+                20,
+            ]
+
+            assert y_train.index.tolist() == [
+                10,
+                20,
+            ]
+
+            return self
+
+        def predict_proba(
+            self,
+            X_full,
+        ):
+            events.append("predict_proba")
+
+            assert X_full.index.tolist() == [
+                10,
+                20,
+                30,
+                40,
+            ]
+
+            positive = np.array(
+                [
+                    0.1,
+                    0.8,
+                    0.2,
+                    0.9,
+                ],
+                dtype=float,
+            )
+
+            return np.column_stack(
+                [
+                    1.0 - positive,
+                    positive,
+                ]
+            )
+
+    def factory():
+        events.append("factory")
+        return FakeClassifier()
+
+    clock_values = iter(
+        [
+            100.0,
+            100.25,
+        ]
+    )
+
+    def fake_clock():
+        value = next(clock_values)
+
+        events.append("clock_start" if value == 100.0 else "clock_stop")
+
+        return value
+
+    monkeypatch.setattr(
+        classification_benchmark,
+        "perf_counter",
+        fake_clock,
+    )
+
+    execution = _execute_classification_benchmark_model(
+        model_factory=factory,
+        X=X,
+        y=y,
+        train_indices=train_indices,
+    )
+
+    np.testing.assert_allclose(
+        execution.probabilities,
+        np.array(
+            [
+                0.1,
+                0.8,
+                0.2,
+                0.9,
+            ],
+            dtype=float,
+        ),
+    )
+
+    assert execution.elapsed_seconds == pytest.approx(0.25)
+
+    assert events == [
+        "factory",
+        "clock_start",
+        "fit",
+        "predict_proba",
+        "clock_stop",
+    ]
+
+
+def test_classification_benchmark_executor_retorna_zero_sem_classe_positiva(
+    monkeypatch,
+):
+    import src.models.classification_benchmark as classification_benchmark
+    from src.models.classification_benchmark import (
+        _execute_classification_benchmark_model,
+    )
+
+    X = pd.DataFrame(
+        {
+            "feature_a": [
+                1.0,
+                2.0,
+                3.0,
+            ],
+        }
+    )
+
+    y = pd.Series(
+        [
+            0,
+            0,
+            0,
+        ],
+        dtype=int,
+    )
+
+    class FakeSingleClassClassifier:
+        classes_ = np.array(
+            [
+                0,
+            ],
+            dtype=int,
+        )
+
+        def fit(
+            self,
+            X_train,
+            y_train,
+        ):
+            assert len(X_train) == 2
+            assert y_train.tolist() == [
+                0,
+                0,
+            ]
+
+            return self
+
+        def predict_proba(
+            self,
+            X_full,
+        ):
+            return np.ones(
+                (
+                    len(X_full),
+                    1,
+                ),
+                dtype=float,
+            )
+
+    clock_values = iter(
+        [
+            10.0,
+            10.1,
+        ]
+    )
+
+    monkeypatch.setattr(
+        classification_benchmark,
+        "perf_counter",
+        lambda: next(clock_values),
+    )
+
+    execution = _execute_classification_benchmark_model(
+        model_factory=FakeSingleClassClassifier,
+        X=X,
+        y=y,
+        train_indices=np.array(
+            [
+                0,
+                1,
+            ],
+            dtype=int,
+        ),
+    )
+
+    np.testing.assert_array_equal(
+        execution.probabilities,
+        np.zeros(
+            len(X),
+            dtype=float,
+        ),
+    )
+
+    assert execution.elapsed_seconds == pytest.approx(0.1)

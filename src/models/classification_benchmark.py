@@ -1,0 +1,199 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics import (
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+
+from ..features.engineering import criar_features
+from ..synthetic.dataset import GeneratedSyntheticDataset
+from ..synthetic.firewall import (
+    projetar_dataset_modelagem,
+    projetar_ground_truth,
+)
+from .classification import (
+    ESTRATEGIA_TEMPORAL,
+    treinar_classificador_triagem,
+)
+from .validation import dividir_holdout_temporal
+
+
+@dataclass(frozen=True, slots=True)
+class ClassificationBenchmarkCandidate:
+    model: str
+    status: str
+    precision: float
+    recall: float
+    f1: float
+    roc_auc: float | None
+    false_positives: int
+    false_negatives: int
+
+
+@dataclass(frozen=True, slots=True)
+class SyntheticClassificationBenchmarkResult:
+    validation_strategy: str
+    n_train: int
+    n_evaluation: int
+    max_train_timestamp: pd.Timestamp
+    min_evaluation_timestamp: pd.Timestamp
+    candidates: tuple[ClassificationBenchmarkCandidate, ...]
+
+
+def _prepare_modeling_dataset(
+    dataset: GeneratedSyntheticDataset,
+) -> pd.DataFrame:
+    modeling = projetar_dataset_modelagem(
+        dataset.records,
+    )
+
+    modeling["hora"] = pd.to_datetime(
+        modeling["data_hora_transacao"],
+    ).dt.hour
+
+    return criar_features(
+        modeling.copy(),
+    )
+
+
+def _align_truth_to_evaluation(
+    features: pd.DataFrame,
+    truth: pd.DataFrame,
+    evaluation_indices: np.ndarray,
+) -> pd.Series:
+    evaluation_ids = features.iloc[evaluation_indices][["id_transacao"]].copy()
+
+    aligned = evaluation_ids.merge(
+        truth[
+            [
+                "id_transacao",
+                "is_suspicious",
+            ]
+        ],
+        on="id_transacao",
+        how="left",
+        sort=False,
+        validate="one_to_one",
+    )
+
+    if aligned["is_suspicious"].isna().any():
+        raise RuntimeError(
+            "Ground truth ausente para registros da janela de avaliacao."
+        )
+
+    return aligned["is_suspicious"].astype(int)
+
+
+def _build_decision_tree_candidate(
+    *,
+    probabilities: np.ndarray,
+    evaluation_indices: np.ndarray,
+    truth: pd.Series,
+) -> ClassificationBenchmarkCandidate:
+    evaluation_probabilities = np.asarray(
+        probabilities,
+        dtype=float,
+    )[evaluation_indices]
+
+    y_true = truth.to_numpy(
+        dtype=int,
+    )
+
+    y_pred = (evaluation_probabilities >= 0.5).astype(int)
+
+    roc_auc = (
+        float(
+            roc_auc_score(
+                y_true,
+                evaluation_probabilities,
+            )
+        )
+        if np.unique(y_true).size > 1
+        else None
+    )
+
+    false_positives = int(((y_pred == 1) & (y_true == 0)).sum())
+
+    false_negatives = int(((y_pred == 0) & (y_true == 1)).sum())
+
+    return ClassificationBenchmarkCandidate(
+        model="decision_tree",
+        status="ok",
+        precision=float(
+            precision_score(
+                y_true,
+                y_pred,
+                zero_division=0,
+            )
+        ),
+        recall=float(
+            recall_score(
+                y_true,
+                y_pred,
+                zero_division=0,
+            )
+        ),
+        f1=float(
+            f1_score(
+                y_true,
+                y_pred,
+                zero_division=0,
+            )
+        ),
+        roc_auc=roc_auc,
+        false_positives=false_positives,
+        false_negatives=false_negatives,
+    )
+
+
+def run_synthetic_classification_benchmark(
+    dataset: GeneratedSyntheticDataset,
+) -> SyntheticClassificationBenchmarkResult:
+    features = _prepare_modeling_dataset(
+        dataset,
+    )
+
+    truth = projetar_ground_truth(
+        dataset.records,
+    )
+
+    train_indices, evaluation_indices = dividir_holdout_temporal(
+        features,
+        test_size=0.25,
+    )
+
+    training_result = treinar_classificador_triagem(
+        features,
+        estrategia_validacao=ESTRATEGIA_TEMPORAL,
+    )
+
+    aligned_truth = _align_truth_to_evaluation(
+        features,
+        truth,
+        evaluation_indices,
+    )
+
+    candidate = _build_decision_tree_candidate(
+        probabilities=training_result["proba_suspeita"],
+        evaluation_indices=evaluation_indices,
+        truth=aligned_truth,
+    )
+
+    timestamps = pd.to_datetime(
+        features["data_hora_transacao"],
+    )
+
+    return SyntheticClassificationBenchmarkResult(
+        validation_strategy=ESTRATEGIA_TEMPORAL,
+        n_train=len(train_indices),
+        n_evaluation=len(evaluation_indices),
+        max_train_timestamp=timestamps.iloc[train_indices].max(),
+        min_evaluation_timestamp=timestamps.iloc[evaluation_indices].min(),
+        candidates=(candidate,),
+    )

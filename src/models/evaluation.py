@@ -35,6 +35,29 @@ def avaliar_detector(
     }
 
 
+def chave_ranking_detector(
+    *,
+    f1: float,
+    recall: float,
+    precision: float,
+    tempo_segundos: float,
+) -> tuple[float, float, float, float]:
+    """Retorna a chave canonica de ranking entre detectores.
+
+    Prioridades, nesta ordem:
+    1. maior F1-score;
+    2. maior recall;
+    3. maior precision;
+    4. menor tempo de execucao.
+    """
+    return (
+        f1,
+        recall,
+        precision,
+        -tempo_segundos,
+    )
+
+
 def selecionar_melhor_detector_benchmark(
     resultados_validos: list[dict],
 ) -> dict:
@@ -57,11 +80,11 @@ def selecionar_melhor_detector_benchmark(
 
     return max(
         resultados_validos,
-        key=lambda resultado: (
-            resultado["f1_vs_status_real"],
-            resultado["recall_vs_status_real"],
-            resultado["precision_vs_status_real"],
-            -resultado["tempo_segundos"],
+        key=lambda resultado: chave_ranking_detector(
+            f1=resultado["f1_vs_status_real"],
+            recall=resultado["recall_vs_status_real"],
+            precision=resultado["precision_vs_status_real"],
+            tempo_segundos=resultado["tempo_segundos"],
         ),
     )
 

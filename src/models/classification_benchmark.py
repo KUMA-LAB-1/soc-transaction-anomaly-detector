@@ -171,6 +171,8 @@ def run_synthetic_classification_benchmark(
     training_result = treinar_classificador_triagem(
         features,
         estrategia_validacao=ESTRATEGIA_TEMPORAL,
+        indices_treino=train_indices,
+        indices_teste=evaluation_indices,
     )
 
     aligned_truth = _align_truth_to_evaluation(

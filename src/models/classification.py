@@ -41,10 +41,25 @@ def treinar_classificador_triagem(
     df: pd.DataFrame,
     *,
     estrategia_validacao: str = ESTRATEGIA_RANDOM,
+    indices_treino: np.ndarray | None = None,
+    indices_teste: np.ndarray | None = None,
 ) -> dict:
     """Treina e avalia o classificador supervisionado de triagem do SOC."""
     if estrategia_validacao not in ESTRATEGIAS_VALIDACAO:
         raise ValueError("estrategia_validacao deve ser 'random' ou 'temporal'.")
+
+    holdout_parcial = (indices_treino is None) != (indices_teste is None)
+
+    if holdout_parcial:
+        raise ValueError("indices_treino e indices_teste devem ser fornecidos juntos.")
+
+    holdout_explicito = indices_treino is not None and indices_teste is not None
+
+    if estrategia_validacao != ESTRATEGIA_TEMPORAL and holdout_explicito:
+        raise ValueError(
+            "indices_treino e indices_teste somente podem ser usados "
+            "com validacao temporal."
+        )
 
     df_class = pd.get_dummies(
         df,
@@ -64,10 +79,11 @@ def treinar_classificador_triagem(
     y = df_class["status_transacao"].isin(STATUS_SUSPEITOS).astype(int)
 
     if estrategia_validacao == ESTRATEGIA_TEMPORAL:
-        indices_treino, indices_teste = dividir_holdout_temporal(
-            df_class,
-            test_size=0.25,
-        )
+        if indices_treino is None or indices_teste is None:
+            indices_treino, indices_teste = dividir_holdout_temporal(
+                df_class,
+                test_size=0.25,
+            )
 
         X_train = X.iloc[indices_treino]
         X_test = X.iloc[indices_teste]

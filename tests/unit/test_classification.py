@@ -159,3 +159,78 @@ def test_classificador_rejeita_estrategia_desconhecida():
             df,
             estrategia_validacao="telepatica",
         )
+
+
+def test_classificador_temporal_aceita_holdout_explicito():
+    df = criar_dataset_classificacao()
+
+    indices_treino = np.arange(
+        0,
+        20,
+    )
+    indices_teste = np.arange(
+        20,
+        40,
+    )
+
+    resultado = treinar_classificador_triagem(
+        df,
+        estrategia_validacao="temporal",
+        indices_treino=indices_treino,
+        indices_teste=indices_teste,
+    )
+
+    metricas = resultado["metricas"]
+
+    assert metricas["estrategia_validacao"] == "temporal"
+    assert metricas["n_treino"] == 20
+    assert metricas["n_teste"] == 20
+
+
+@pytest.mark.parametrize(
+    (
+        "indices_treino",
+        "indices_teste",
+    ),
+    [
+        (
+            np.arange(0, 20),
+            None,
+        ),
+        (
+            None,
+            np.arange(20, 40),
+        ),
+    ],
+)
+def test_classificador_temporal_rejeita_holdout_parcial(
+    indices_treino,
+    indices_teste,
+):
+    df = criar_dataset_classificacao()
+
+    with pytest.raises(
+        ValueError,
+        match="indices_treino e indices_teste",
+    ):
+        treinar_classificador_triagem(
+            df,
+            estrategia_validacao="temporal",
+            indices_treino=indices_treino,
+            indices_teste=indices_teste,
+        )
+
+
+def test_classificador_random_rejeita_holdout_explicito():
+    df = criar_dataset_classificacao()
+
+    with pytest.raises(
+        ValueError,
+        match="validacao temporal",
+    ):
+        treinar_classificador_triagem(
+            df,
+            estrategia_validacao="random",
+            indices_treino=np.arange(0, 20),
+            indices_teste=np.arange(20, 40),
+        )

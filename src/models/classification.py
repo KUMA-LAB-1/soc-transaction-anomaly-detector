@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics import (
@@ -37,6 +39,43 @@ ESTRATEGIAS_VALIDACAO = {
 }
 
 
+@dataclass(frozen=True, slots=True)
+class ClassificationPreparedData:
+    frame: pd.DataFrame
+    X: pd.DataFrame
+    y: pd.Series
+    features: list[str]
+
+
+def preparar_dados_classificacao(
+    df: pd.DataFrame,
+) -> ClassificationPreparedData:
+    """Prepara features e target compartilhados pelos classificadores."""
+    df_class = pd.get_dummies(
+        df,
+        columns=["tipo_transacao"],
+        drop_first=True,
+    )
+
+    features_tipo = [
+        coluna for coluna in df_class.columns if coluna.startswith("tipo_transacao_")
+    ]
+
+    candidatos = features_tipo + FEATURES_BASE_CLASSIFICACAO
+    features = [coluna for coluna in candidatos if coluna in df_class.columns]
+
+    X = df_class[features].fillna(0).astype(float)
+
+    y = df_class["status_transacao"].isin(STATUS_SUSPEITOS).astype(int)
+
+    return ClassificationPreparedData(
+        frame=df_class,
+        X=X,
+        y=y,
+        features=features,
+    )
+
+
 def treinar_classificador_triagem(
     df: pd.DataFrame,
     *,
@@ -61,22 +100,14 @@ def treinar_classificador_triagem(
             "com validacao temporal."
         )
 
-    df_class = pd.get_dummies(
+    prepared = preparar_dados_classificacao(
         df,
-        columns=["tipo_transacao"],
-        drop_first=True,
     )
 
-    features_tipo = [
-        coluna for coluna in df_class.columns if coluna.startswith("tipo_transacao_")
-    ]
-
-    candidatos = features_tipo + FEATURES_BASE_CLASSIFICACAO
-    features = [coluna for coluna in candidatos if coluna in df_class.columns]
-
-    X = df_class[features].fillna(0).astype(float)
-
-    y = df_class["status_transacao"].isin(STATUS_SUSPEITOS).astype(int)
+    df_class = prepared.frame
+    X = prepared.X
+    y = prepared.y
+    features = prepared.features
 
     if estrategia_validacao == ESTRATEGIA_TEMPORAL:
         if indices_treino is None or indices_teste is None:

@@ -49,7 +49,10 @@ def test_classification_benchmark_usa_holdout_temporal_com_baseline_decision_tre
 
     assert result.max_train_timestamp < result.min_evaluation_timestamp
 
-    assert len(result.candidates) == 1
+    assert tuple(candidate.model for candidate in result.candidates) == (
+        "decision_tree",
+        "logistic_regression",
+    )
 
     baseline = result.candidates[0]
 
@@ -838,9 +841,6 @@ def test_classification_benchmark_baseline_usa_executor_comparavel_em_vez_do_tra
     monkeypatch,
 ):
     import src.models.classification_benchmark as classification_benchmark
-    from src.models.classification import (
-        criar_classificador_triagem,
-    )
     from src.models.classification_benchmark import (
         ClassificationBenchmarkExecution,
     )
@@ -895,7 +895,10 @@ def test_classification_benchmark_baseline_usa_executor_comparavel_em_vez_do_tra
         y,
         train_indices,
     ):
-        assert model_factory is criar_classificador_triagem
+        assert model_factory.__name__ in {
+            "criar_classificador_triagem",
+            "criar_classificador_logistic_benchmark",
+        }
 
         assert len(X) == 200
         assert len(y) == 200
@@ -908,6 +911,7 @@ def test_classification_benchmark_baseline_usa_executor_comparavel_em_vez_do_tra
 
         executor_calls.append(
             {
+                "factory_name": model_factory.__name__,
                 "n_rows": len(X),
                 "n_train": len(train_indices),
             }
@@ -946,9 +950,15 @@ def test_classification_benchmark_baseline_usa_executor_comparavel_em_vez_do_tra
 
     assert executor_calls == [
         {
+            "factory_name": "criar_classificador_triagem",
             "n_rows": 200,
             "n_train": 150,
-        }
+        },
+        {
+            "factory_name": "criar_classificador_logistic_benchmark",
+            "n_rows": 200,
+            "n_train": 150,
+        },
     ]
 
     assert result.n_train == 150
@@ -958,3 +968,117 @@ def test_classification_benchmark_baseline_usa_executor_comparavel_em_vez_do_tra
 
     assert candidate.model == "decision_tree"
     assert candidate.elapsed_seconds == pytest.approx(0.125)
+
+
+def test_classification_benchmark_executa_decision_tree_e_logistic_regression_no_mesmo_contrato(
+    monkeypatch,
+):
+    from src.models.classification_benchmark import (
+        ClassificationBenchmarkExecution,
+    )
+
+    dataset = generate_synthetic_dataset_v3(
+        seed=1,
+        quantidade=200,
+        inicio=datetime(2026, 1, 1),
+        fim=datetime(2026, 1, 8),
+        misturas=build_canonical_misturas(),
+        label_policy=build_canonical_label_policy(),
+        generation_config=build_canonical_generation_config(),
+    )
+
+    expected_train = np.arange(
+        0,
+        150,
+        dtype=int,
+    )
+
+    expected_evaluation = np.arange(
+        150,
+        200,
+        dtype=int,
+    )
+
+    def fake_split(
+        features,
+        *,
+        test_size,
+    ):
+        assert len(features) == 200
+        assert test_size == 0.25
+
+        return (
+            expected_train,
+            expected_evaluation,
+        )
+
+    executor_calls = []
+
+    def fake_executor(
+        *,
+        model_factory,
+        X,
+        y,
+        train_indices,
+    ):
+        np.testing.assert_array_equal(
+            train_indices,
+            expected_train,
+        )
+
+        executor_calls.append(
+            {
+                "factory_name": model_factory.__name__,
+                "x_id": id(X),
+                "y_id": id(y),
+                "n_rows": len(X),
+                "n_train": len(train_indices),
+            }
+        )
+
+        return ClassificationBenchmarkExecution(
+            probabilities=np.zeros(
+                len(X),
+                dtype=float,
+            ),
+            elapsed_seconds=(0.1 if len(executor_calls) == 1 else 0.2),
+        )
+
+    monkeypatch.setattr(
+        "src.models.classification_benchmark.dividir_holdout_temporal",
+        fake_split,
+    )
+
+    monkeypatch.setattr(
+        "src.models.classification_benchmark._execute_classification_benchmark_model",
+        fake_executor,
+    )
+
+    result = run_synthetic_classification_benchmark(
+        dataset,
+    )
+
+    assert [call["factory_name"] for call in executor_calls] == [
+        "criar_classificador_triagem",
+        "criar_classificador_logistic_benchmark",
+    ]
+
+    assert {call["x_id"] for call in executor_calls}.__len__() == 1
+
+    assert {call["y_id"] for call in executor_calls}.__len__() == 1
+
+    assert all(call["n_rows"] == 200 for call in executor_calls)
+
+    assert all(call["n_train"] == 150 for call in executor_calls)
+
+    assert tuple(candidate.model for candidate in result.candidates) == (
+        "decision_tree",
+        "logistic_regression",
+    )
+
+    assert result.n_train == 150
+    assert result.n_evaluation == 50
+
+    assert result.candidates[0].elapsed_seconds == pytest.approx(0.1)
+
+    assert result.candidates[1].elapsed_seconds == pytest.approx(0.2)

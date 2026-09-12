@@ -5,6 +5,7 @@ from time import perf_counter
 
 import numpy as np
 import pandas as pd
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     auc,
     f1_score,
@@ -13,6 +14,8 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 from ..features.engineering import criar_features
 from ..synthetic.dataset import GeneratedSyntheticDataset
@@ -26,6 +29,26 @@ from .classification import (
     preparar_dados_classificacao,
 )
 from .validation import dividir_holdout_temporal
+
+
+def criar_classificador_logistic_benchmark() -> Pipeline:
+    """Cria o challenger LogisticRegression exclusivo do benchmark."""
+    return Pipeline(
+        steps=[
+            (
+                "scaler",
+                StandardScaler(),
+            ),
+            (
+                "classifier",
+                LogisticRegression(
+                    class_weight="balanced",
+                    max_iter=1000,
+                    random_state=42,
+                ),
+            ),
+        ]
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -265,26 +288,42 @@ def run_synthetic_classification_benchmark(
         features,
     )
 
-    execution = _execute_classification_benchmark_model(
-        model_factory=criar_classificador_triagem,
-        X=prepared.X,
-        y=prepared.y,
-        train_indices=train_indices,
-    )
-
     aligned_truth = _align_truth_to_evaluation(
         features,
         truth,
         evaluation_indices,
     )
 
-    candidate = _build_classification_candidate(
-        model="decision_tree",
-        probabilities=execution.probabilities,
-        evaluation_indices=evaluation_indices,
-        truth=aligned_truth,
-        elapsed_seconds=execution.elapsed_seconds,
+    candidate_specs = (
+        (
+            "decision_tree",
+            criar_classificador_triagem,
+        ),
+        (
+            "logistic_regression",
+            criar_classificador_logistic_benchmark,
+        ),
     )
+
+    candidates = []
+
+    for model_name, model_factory in candidate_specs:
+        execution = _execute_classification_benchmark_model(
+            model_factory=model_factory,
+            X=prepared.X,
+            y=prepared.y,
+            train_indices=train_indices,
+        )
+
+        candidates.append(
+            _build_classification_candidate(
+                model=model_name,
+                probabilities=execution.probabilities,
+                evaluation_indices=evaluation_indices,
+                truth=aligned_truth,
+                elapsed_seconds=execution.elapsed_seconds,
+            )
+        )
 
     timestamps = pd.to_datetime(
         features["data_hora_transacao"],
@@ -296,5 +335,5 @@ def run_synthetic_classification_benchmark(
         n_evaluation=len(evaluation_indices),
         max_train_timestamp=timestamps.iloc[train_indices].max(),
         min_evaluation_timestamp=timestamps.iloc[evaluation_indices].min(),
-        candidates=(candidate,),
+        candidates=tuple(candidates),
     )

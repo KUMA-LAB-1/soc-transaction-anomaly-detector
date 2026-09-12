@@ -5,7 +5,9 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 from sklearn.metrics import (
+    auc,
     f1_score,
+    precision_recall_curve,
     precision_score,
     recall_score,
     roc_auc_score,
@@ -32,6 +34,9 @@ class ClassificationBenchmarkCandidate:
     recall: float
     f1: float
     roc_auc: float | None
+    pr_auc: float | None
+    positive_count: int
+    positive_rate: float
     false_positives: int
     false_negatives: int
 
@@ -107,6 +112,8 @@ def _build_decision_tree_candidate(
 
     y_pred = (evaluation_probabilities >= 0.5).astype(int)
 
+    has_both_classes = np.unique(y_true).size > 1
+
     roc_auc = (
         float(
             roc_auc_score(
@@ -114,9 +121,26 @@ def _build_decision_tree_candidate(
                 evaluation_probabilities,
             )
         )
-        if np.unique(y_true).size > 1
+        if has_both_classes
         else None
     )
+
+    if has_both_classes:
+        precision_curve, recall_curve, _ = precision_recall_curve(
+            y_true,
+            evaluation_probabilities,
+        )
+        pr_auc = float(
+            auc(
+                recall_curve,
+                precision_curve,
+            )
+        )
+    else:
+        pr_auc = None
+
+    positive_count = int(y_pred.sum())
+    positive_rate = float(positive_count / len(y_pred))
 
     false_positives = int(((y_pred == 1) & (y_true == 0)).sum())
 
@@ -147,6 +171,9 @@ def _build_decision_tree_candidate(
             )
         ),
         roc_auc=roc_auc,
+        pr_auc=pr_auc,
+        positive_count=positive_count,
+        positive_rate=positive_rate,
         false_positives=false_positives,
         false_negatives=false_negatives,
     )

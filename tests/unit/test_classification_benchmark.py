@@ -255,3 +255,186 @@ def test_classification_benchmark_entrega_mesmo_holdout_ao_classificador(
 
     assert result.n_train == 150
     assert result.n_evaluation == 50
+
+
+def test_classification_benchmark_expoe_pr_auc_e_taxa_de_positivos(
+    monkeypatch,
+):
+    dataset = generate_synthetic_dataset_v3(
+        seed=1,
+        quantidade=200,
+        inicio=datetime(2026, 1, 1),
+        fim=datetime(2026, 1, 8),
+        misturas=build_canonical_misturas(),
+        label_policy=build_canonical_label_policy(),
+        generation_config=build_canonical_generation_config(),
+    )
+
+    expected_train = np.arange(
+        0,
+        150,
+    )
+    expected_evaluation = np.arange(
+        150,
+        200,
+    )
+
+    truth_by_id = {
+        record.observables["id_transacao"]: record.truth.is_suspicious
+        for record in dataset.records
+    }
+
+    def fake_split(
+        features,
+        *,
+        test_size,
+    ):
+        assert test_size == 0.25
+
+        return (
+            expected_train,
+            expected_evaluation,
+        )
+
+    def fake_train(
+        features,
+        *,
+        estrategia_validacao,
+        indices_treino,
+        indices_teste,
+    ):
+        assert estrategia_validacao == "temporal"
+
+        np.testing.assert_array_equal(
+            indices_treino,
+            expected_train,
+        )
+        np.testing.assert_array_equal(
+            indices_teste,
+            expected_evaluation,
+        )
+
+        probabilities = np.array(
+            [
+                1.0 if truth_by_id[transaction_id] else 0.0
+                for transaction_id in features["id_transacao"]
+            ],
+            dtype=float,
+        )
+
+        return {
+            "proba_suspeita": probabilities,
+        }
+
+    monkeypatch.setattr(
+        "src.models.classification_benchmark.dividir_holdout_temporal",
+        fake_split,
+    )
+
+    monkeypatch.setattr(
+        "src.models.classification_benchmark.treinar_classificador_triagem",
+        fake_train,
+    )
+
+    result = run_synthetic_classification_benchmark(
+        dataset,
+    )
+
+    candidate = result.candidates[0]
+
+    evaluation_ids = (
+        projetar_ground_truth_real(dataset.records)
+        .iloc[expected_evaluation]["id_transacao"]
+        .tolist()
+    )
+
+    expected_positive_count = sum(
+        truth_by_id[transaction_id] for transaction_id in evaluation_ids
+    )
+
+    assert candidate.pr_auc == 1.0
+    assert candidate.positive_count == expected_positive_count
+    assert candidate.positive_rate == pytest.approx(
+        expected_positive_count / len(expected_evaluation)
+    )
+
+
+def test_classification_candidate_pr_auc_usa_area_da_curva_precision_recall():
+    from src.models.classification_benchmark import (
+        _build_decision_tree_candidate,
+    )
+
+    probabilities = np.array(
+        [
+            0.9,
+            0.8,
+            0.7,
+            0.1,
+        ],
+        dtype=float,
+    )
+
+    evaluation_indices = np.arange(
+        0,
+        4,
+    )
+
+    truth = pd.Series(
+        [
+            1,
+            0,
+            1,
+            0,
+        ],
+        dtype=int,
+    )
+
+    candidate = _build_decision_tree_candidate(
+        probabilities=probabilities,
+        evaluation_indices=evaluation_indices,
+        truth=truth,
+    )
+
+    assert candidate.pr_auc == pytest.approx(0.7916666666666666)
+
+
+def test_classification_candidate_single_class_nao_expoe_auc_indefinida():
+    from src.models.classification_benchmark import (
+        _build_decision_tree_candidate,
+    )
+
+    probabilities = np.array(
+        [
+            0.1,
+            0.2,
+            0.3,
+            0.4,
+        ],
+        dtype=float,
+    )
+
+    evaluation_indices = np.arange(
+        0,
+        4,
+    )
+
+    truth = pd.Series(
+        [
+            0,
+            0,
+            0,
+            0,
+        ],
+        dtype=int,
+    )
+
+    candidate = _build_decision_tree_candidate(
+        probabilities=probabilities,
+        evaluation_indices=evaluation_indices,
+        truth=truth,
+    )
+
+    assert candidate.roc_auc is None
+    assert candidate.pr_auc is None
+    assert candidate.positive_count == 0
+    assert candidate.positive_rate == 0.0

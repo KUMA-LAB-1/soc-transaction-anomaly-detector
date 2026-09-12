@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import perf_counter
 
 import numpy as np
 import pandas as pd
@@ -39,6 +40,7 @@ class ClassificationBenchmarkCandidate:
     positive_rate: float
     false_positives: int
     false_negatives: int
+    elapsed_seconds: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,6 +102,7 @@ def _build_decision_tree_candidate(
     probabilities: np.ndarray,
     evaluation_indices: np.ndarray,
     truth: pd.Series,
+    elapsed_seconds: float,
 ) -> ClassificationBenchmarkCandidate:
     evaluation_probabilities = np.asarray(
         probabilities,
@@ -176,6 +179,7 @@ def _build_decision_tree_candidate(
         positive_rate=positive_rate,
         false_positives=false_positives,
         false_negatives=false_negatives,
+        elapsed_seconds=elapsed_seconds,
     )
 
 
@@ -195,12 +199,16 @@ def run_synthetic_classification_benchmark(
         test_size=0.25,
     )
 
+    training_started = perf_counter()
+
     training_result = treinar_classificador_triagem(
         features,
         estrategia_validacao=ESTRATEGIA_TEMPORAL,
         indices_treino=train_indices,
         indices_teste=evaluation_indices,
     )
+
+    elapsed_seconds = perf_counter() - training_started
 
     aligned_truth = _align_truth_to_evaluation(
         features,
@@ -212,6 +220,7 @@ def run_synthetic_classification_benchmark(
         probabilities=training_result["proba_suspeita"],
         evaluation_indices=evaluation_indices,
         truth=aligned_truth,
+        elapsed_seconds=elapsed_seconds,
     )
 
     timestamps = pd.to_datetime(

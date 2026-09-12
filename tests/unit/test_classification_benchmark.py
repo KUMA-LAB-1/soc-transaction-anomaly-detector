@@ -393,6 +393,7 @@ def test_classification_candidate_pr_auc_usa_area_da_curva_precision_recall():
         probabilities=probabilities,
         evaluation_indices=evaluation_indices,
         truth=truth,
+        elapsed_seconds=0.0,
     )
 
     assert candidate.pr_auc == pytest.approx(0.7916666666666666)
@@ -432,9 +433,99 @@ def test_classification_candidate_single_class_nao_expoe_auc_indefinida():
         probabilities=probabilities,
         evaluation_indices=evaluation_indices,
         truth=truth,
+        elapsed_seconds=0.0,
     )
 
     assert candidate.roc_auc is None
     assert candidate.pr_auc is None
     assert candidate.positive_count == 0
     assert candidate.positive_rate == 0.0
+
+
+def test_classification_benchmark_expoe_tempo_decorrido_do_treino(
+    monkeypatch,
+):
+    dataset = generate_synthetic_dataset_v3(
+        seed=1,
+        quantidade=200,
+        inicio=datetime(2026, 1, 1),
+        fim=datetime(2026, 1, 8),
+        misturas=build_canonical_misturas(),
+        label_policy=build_canonical_label_policy(),
+        generation_config=build_canonical_generation_config(),
+    )
+
+    clock_values = iter(
+        [
+            100.0,
+            100.25,
+        ]
+    )
+
+    monkeypatch.setattr(
+        "src.models.classification_benchmark.perf_counter",
+        lambda: next(clock_values),
+        raising=False,
+    )
+
+    def fake_train(
+        features,
+        *,
+        estrategia_validacao,
+        indices_treino,
+        indices_teste,
+    ):
+        assert estrategia_validacao == "temporal"
+        assert indices_treino is not None
+        assert indices_teste is not None
+
+        return {
+            "proba_suspeita": np.zeros(
+                len(features),
+                dtype=float,
+            ),
+        }
+
+    monkeypatch.setattr(
+        "src.models.classification_benchmark.treinar_classificador_triagem",
+        fake_train,
+    )
+
+    result = run_synthetic_classification_benchmark(
+        dataset,
+    )
+
+    candidate = result.candidates[0]
+
+    assert candidate.elapsed_seconds == pytest.approx(0.25)
+
+
+def test_classification_candidate_rejeita_elapsed_seconds_ausente():
+    from src.models.classification_benchmark import (
+        _build_decision_tree_candidate,
+    )
+
+    with pytest.raises(
+        TypeError,
+        match="elapsed_seconds",
+    ):
+        _build_decision_tree_candidate(
+            probabilities=np.array(
+                [
+                    0.1,
+                    0.9,
+                ],
+                dtype=float,
+            ),
+            evaluation_indices=np.arange(
+                0,
+                2,
+            ),
+            truth=pd.Series(
+                [
+                    0,
+                    1,
+                ],
+                dtype=int,
+            ),
+        )

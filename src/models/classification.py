@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics import (
@@ -37,15 +39,18 @@ ESTRATEGIAS_VALIDACAO = {
 }
 
 
-def treinar_classificador_triagem(
-    df: pd.DataFrame,
-    *,
-    estrategia_validacao: str = ESTRATEGIA_RANDOM,
-) -> dict:
-    """Treina e avalia o classificador supervisionado de triagem do SOC."""
-    if estrategia_validacao not in ESTRATEGIAS_VALIDACAO:
-        raise ValueError("estrategia_validacao deve ser 'random' ou 'temporal'.")
+@dataclass(frozen=True, slots=True)
+class ClassificationPreparedData:
+    frame: pd.DataFrame
+    X: pd.DataFrame
+    y: pd.Series
+    features: list[str]
 
+
+def preparar_dados_classificacao(
+    df: pd.DataFrame,
+) -> ClassificationPreparedData:
+    """Prepara features e target compartilhados pelos classificadores."""
     df_class = pd.get_dummies(
         df,
         columns=["tipo_transacao"],
@@ -63,11 +68,62 @@ def treinar_classificador_triagem(
 
     y = df_class["status_transacao"].isin(STATUS_SUSPEITOS).astype(int)
 
-    if estrategia_validacao == ESTRATEGIA_TEMPORAL:
-        indices_treino, indices_teste = dividir_holdout_temporal(
-            df_class,
-            test_size=0.25,
+    return ClassificationPreparedData(
+        frame=df_class,
+        X=X,
+        y=y,
+        features=features,
+    )
+
+
+def criar_classificador_triagem() -> DecisionTreeClassifier:
+    """Cria o classificador operacional de triagem com configuracao canonica."""
+    return DecisionTreeClassifier(
+        max_depth=4,
+        random_state=42,
+        class_weight="balanced",
+    )
+
+
+def treinar_classificador_triagem(
+    df: pd.DataFrame,
+    *,
+    estrategia_validacao: str = ESTRATEGIA_RANDOM,
+    indices_treino: np.ndarray | None = None,
+    indices_teste: np.ndarray | None = None,
+) -> dict:
+    """Treina e avalia o classificador supervisionado de triagem do SOC."""
+    if estrategia_validacao not in ESTRATEGIAS_VALIDACAO:
+        raise ValueError("estrategia_validacao deve ser 'random' ou 'temporal'.")
+
+    holdout_parcial = (indices_treino is None) != (indices_teste is None)
+
+    if holdout_parcial:
+        raise ValueError("indices_treino e indices_teste devem ser fornecidos juntos.")
+
+    holdout_explicito = indices_treino is not None and indices_teste is not None
+
+    if estrategia_validacao != ESTRATEGIA_TEMPORAL and holdout_explicito:
+        raise ValueError(
+            "indices_treino e indices_teste somente podem ser usados "
+            "com validacao temporal."
         )
+
+    prepared = preparar_dados_classificacao(
+        df,
+    )
+
+    df_class = prepared.frame
+    X = prepared.X
+    y = prepared.y
+    features = prepared.features
+
+    if estrategia_validacao == ESTRATEGIA_TEMPORAL:
+        if indices_treino is None or indices_teste is None:
+            indices_treino, indices_teste = dividir_holdout_temporal(
+                df_class,
+                test_size=0.25,
+            )
 
         X_train = X.iloc[indices_treino]
         X_test = X.iloc[indices_teste]
@@ -84,11 +140,7 @@ def treinar_classificador_triagem(
             stratify=estratificar,
         )
 
-    modelo = DecisionTreeClassifier(
-        max_depth=4,
-        random_state=42,
-        class_weight="balanced",
-    )
+    modelo = criar_classificador_triagem()
 
     modelo.fit(X_train, y_train)
 

@@ -159,3 +159,201 @@ def test_classificador_rejeita_estrategia_desconhecida():
             df,
             estrategia_validacao="telepatica",
         )
+
+
+def test_classificador_temporal_aceita_holdout_explicito():
+    df = criar_dataset_classificacao()
+
+    indices_treino = np.arange(
+        0,
+        20,
+    )
+    indices_teste = np.arange(
+        20,
+        40,
+    )
+
+    resultado = treinar_classificador_triagem(
+        df,
+        estrategia_validacao="temporal",
+        indices_treino=indices_treino,
+        indices_teste=indices_teste,
+    )
+
+    metricas = resultado["metricas"]
+
+    assert metricas["estrategia_validacao"] == "temporal"
+    assert metricas["n_treino"] == 20
+    assert metricas["n_teste"] == 20
+
+
+@pytest.mark.parametrize(
+    (
+        "indices_treino",
+        "indices_teste",
+    ),
+    [
+        (
+            np.arange(0, 20),
+            None,
+        ),
+        (
+            None,
+            np.arange(20, 40),
+        ),
+    ],
+)
+def test_classificador_temporal_rejeita_holdout_parcial(
+    indices_treino,
+    indices_teste,
+):
+    df = criar_dataset_classificacao()
+
+    with pytest.raises(
+        ValueError,
+        match="indices_treino e indices_teste",
+    ):
+        treinar_classificador_triagem(
+            df,
+            estrategia_validacao="temporal",
+            indices_treino=indices_treino,
+            indices_teste=indices_teste,
+        )
+
+
+def test_classificador_random_rejeita_holdout_explicito():
+    df = criar_dataset_classificacao()
+
+    with pytest.raises(
+        ValueError,
+        match="validacao temporal",
+    ):
+        treinar_classificador_triagem(
+            df,
+            estrategia_validacao="random",
+            indices_treino=np.arange(0, 20),
+            indices_teste=np.arange(20, 40),
+        )
+
+
+def test_preparar_dados_classificacao_expoe_matriz_target_e_features():
+    from src.models.classification import (
+        preparar_dados_classificacao,
+    )
+
+    df = pd.DataFrame(
+        {
+            "tipo_transacao": [
+                "PIX",
+                "TED",
+                "PIX",
+            ],
+            "hora": [
+                8,
+                12,
+                18,
+            ],
+            "media_historica_cliente": [
+                100.0,
+                200.0,
+                300.0,
+            ],
+            "desvio_historico_cliente": [
+                10.0,
+                20.0,
+                30.0,
+            ],
+            "qtd_transacoes_anteriores": [
+                5,
+                10,
+                15,
+            ],
+            "zscore_valor_cliente": [
+                0.1,
+                0.2,
+                0.3,
+            ],
+            "dia_semana": [
+                1,
+                2,
+                3,
+            ],
+            "falhas_login_recentes": [
+                0,
+                1,
+                2,
+            ],
+            "dispositivo_novo_flag": [
+                False,
+                True,
+                False,
+            ],
+            "alteracao_limite_flag": [
+                False,
+                False,
+                True,
+            ],
+            "mudanca_localizacao_flag": [
+                False,
+                True,
+                True,
+            ],
+            "status_transacao": [
+                "Aprovada",
+                "Em An\u00e1lise",
+                "Bloqueada por Suspeita",
+            ],
+        },
+        index=[
+            10,
+            20,
+            30,
+        ],
+    )
+
+    prepared = preparar_dados_classificacao(df)
+
+    assert prepared.X.index.tolist() == [
+        10,
+        20,
+        30,
+    ]
+
+    assert prepared.y.index.tolist() == [
+        10,
+        20,
+        30,
+    ]
+
+    assert prepared.y.tolist() == [
+        0,
+        1,
+        1,
+    ]
+
+    assert prepared.features == prepared.X.columns.tolist()
+
+    assert "tipo_transacao_TED" in prepared.features
+
+    assert "hora" in prepared.features
+
+    assert all(pd.api.types.is_numeric_dtype(dtype) for dtype in prepared.X.dtypes)
+
+
+def test_criar_classificador_triagem_preserva_configuracao_operacional():
+    from sklearn.tree import DecisionTreeClassifier
+
+    from src.models.classification import (
+        criar_classificador_triagem,
+    )
+
+    modelo = criar_classificador_triagem()
+
+    assert isinstance(
+        modelo,
+        DecisionTreeClassifier,
+    )
+
+    assert modelo.max_depth == 4
+    assert modelo.random_state == 42
+    assert modelo.class_weight == "balanced"

@@ -32,7 +32,7 @@ from .data.repository import SocDataRepository
 from .db_connector import DBConnector
 from .features.engineering import criar_features
 from .models.anomaly_detection import executar_detectores_anomalia
-from .models.classification import treinar_classificador_triagem
+from .models.classification import ESTRATEGIA_TEMPORAL, treinar_classificador_triagem
 from .models.evaluation import selecionar_melhor_detector_benchmark
 from .models.regression import treinar_regressao_severidade
 from .reporting.charts import (
@@ -127,7 +127,10 @@ class SecurityDetector:
             "(features históricas + sinais de log)..."
         )
 
-        resultado = treinar_classificador_triagem(df)
+        resultado = treinar_classificador_triagem(
+            df,
+            estrategia_validacao=ESTRATEGIA_TEMPORAL,
+        )
 
         self.modelo_classificacao = resultado["modelo"]
         self.metricas["classificacao"] = resultado["metricas"]

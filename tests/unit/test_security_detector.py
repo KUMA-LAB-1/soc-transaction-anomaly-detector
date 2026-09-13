@@ -629,9 +629,16 @@ def test_treinar_classificacao_integra_resultado_no_detector(monkeypatch):
         "importancias": [0.4, 0.6],
     }
 
+    chamada_treinador = {}
+
+    def fake_treinar_classificador(dataframe, **kwargs):
+        chamada_treinador["dataframe"] = dataframe
+        chamada_treinador.update(kwargs)
+        return resultado_fake
+
     monkeypatch.setattr(
         "src.security_detector.treinar_classificador_triagem",
-        lambda dataframe: resultado_fake,
+        fake_treinar_classificador,
     )
 
     grafico = {}
@@ -652,6 +659,9 @@ def test_treinar_classificacao_integra_resultado_no_detector(monkeypatch):
     )
 
     resultado = detector._treinar_classificacao(df)
+
+    assert chamada_treinador["dataframe"] is df
+    assert chamada_treinador.get("estrategia_validacao") == "temporal"
 
     assert detector.modelo_classificacao is modelo_fake
     assert detector.metricas["classificacao"] == resultado_fake["metricas"]
@@ -689,7 +699,7 @@ def test_treinar_classificacao_classe_unica_ativa_aviso(monkeypatch):
 
     monkeypatch.setattr(
         "src.security_detector.treinar_classificador_triagem",
-        lambda dataframe: resultado_fake,
+        lambda dataframe, **kwargs: resultado_fake,
     )
 
     monkeypatch.setattr(

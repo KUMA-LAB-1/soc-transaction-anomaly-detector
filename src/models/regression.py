@@ -29,6 +29,9 @@ FEATURES_REGRESSAO = [
     "qtd_transacoes_anteriores",
     "dia_semana",
     "falhas_login_recentes",
+    "dispositivo_novo_flag",
+    "alteracao_limite_flag",
+    "mudanca_localizacao_flag",
 ]
 
 ESTRATEGIA_RANDOM = "random"
@@ -66,6 +69,14 @@ def treinar_regressao_severidade(
         raise ValueError("estrategia_validacao deve ser 'random' ou 'temporal'.")
 
     df = df.copy()
+
+    for coluna in (
+        "dispositivo_novo_flag",
+        "alteracao_limite_flag",
+        "mudanca_localizacao_flag",
+    ):
+        if coluna not in df.columns:
+            df[coluna] = False
 
     df["severidade_real"] = (
         df["status_transacao"].map(MAPA_SEVERIDADE_STATUS).fillna(SEVERIDADE_PADRAO)

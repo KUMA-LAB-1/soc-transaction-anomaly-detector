@@ -34,7 +34,12 @@ from .features.engineering import criar_features
 from .models.anomaly_detection import executar_detectores_anomalia
 from .models.classification import ESTRATEGIA_TEMPORAL, treinar_classificador_triagem
 from .models.evaluation import selecionar_melhor_detector_benchmark
-from .models.regression import treinar_regressao_severidade
+from .models.regression import (
+    ESTRATEGIA_TEMPORAL as ESTRATEGIA_TEMPORAL_REGRESSAO,
+)
+from .models.regression import (
+    treinar_regressao_severidade,
+)
 from .reporting.charts import (
     gerar_grafico_comparacao,
     gerar_grafico_detector,
@@ -295,7 +300,10 @@ class SecurityDetector:
     def _treinar_regressao(self, df: pd.DataFrame) -> pd.DataFrame:
         print("⚙️ Treinando regressão de severidade de risco...")
 
-        resultado = treinar_regressao_severidade(df)
+        resultado = treinar_regressao_severidade(
+            df,
+            estrategia_validacao=ESTRATEGIA_TEMPORAL_REGRESSAO,
+        )
         metricas = resultado["metricas"]
 
         self.modelo_regressao = resultado["modelo"]

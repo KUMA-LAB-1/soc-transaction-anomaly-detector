@@ -25,7 +25,7 @@ from src.synthetic.label_policy import (
 )
 
 
-def test_classification_benchmark_usa_holdout_temporal_com_baseline_decision_tree():
+def test_classification_benchmark_usa_holdout_temporal_com_candidatos_canonicos():
     dataset = generate_synthetic_dataset_v3(
         seed=1,
         quantidade=200,
@@ -52,12 +52,33 @@ def test_classification_benchmark_usa_holdout_temporal_com_baseline_decision_tre
     assert tuple(candidate.model for candidate in result.candidates) == (
         "decision_tree",
         "logistic_regression",
+        "random_forest",
     )
 
     baseline = result.candidates[0]
 
     assert baseline.model == "decision_tree"
     assert baseline.status == "ok"
+
+
+def test_criar_classificador_random_forest_benchmark_expoe_configuracao_canonica():
+    from sklearn.ensemble import RandomForestClassifier
+
+    from src.models.classification_benchmark import (
+        criar_classificador_random_forest_benchmark,
+    )
+
+    model = criar_classificador_random_forest_benchmark()
+
+    assert isinstance(model, RandomForestClassifier)
+
+    params = model.get_params()
+
+    assert params["n_estimators"] == 100
+    assert params["max_depth"] == 4
+    assert params["class_weight"] == "balanced"
+    assert params["random_state"] == 42
+    assert params["n_jobs"] == 1
 
 
 def test_classification_benchmark_avalia_truth_separada_e_alinhada_por_id(
@@ -837,7 +858,7 @@ def test_classification_benchmark_executor_retorna_zero_sem_classe_positiva(
     assert execution.elapsed_seconds == pytest.approx(0.1)
 
 
-def test_classification_benchmark_baseline_usa_executor_comparavel_em_vez_do_trainer_operacional(
+def test_classification_benchmark_candidatos_usam_executor_comparavel_em_vez_do_trainer_operacional(
     monkeypatch,
 ):
     import src.models.classification_benchmark as classification_benchmark
@@ -898,6 +919,7 @@ def test_classification_benchmark_baseline_usa_executor_comparavel_em_vez_do_tra
         assert model_factory.__name__ in {
             "criar_classificador_triagem",
             "criar_classificador_logistic_benchmark",
+            "criar_classificador_random_forest_benchmark",
         }
 
         assert len(X) == 200
@@ -959,6 +981,11 @@ def test_classification_benchmark_baseline_usa_executor_comparavel_em_vez_do_tra
             "n_rows": 200,
             "n_train": 150,
         },
+        {
+            "factory_name": "criar_classificador_random_forest_benchmark",
+            "n_rows": 200,
+            "n_train": 150,
+        },
     ]
 
     assert result.n_train == 150
@@ -970,7 +997,7 @@ def test_classification_benchmark_baseline_usa_executor_comparavel_em_vez_do_tra
     assert candidate.elapsed_seconds == pytest.approx(0.125)
 
 
-def test_classification_benchmark_executa_decision_tree_e_logistic_regression_no_mesmo_contrato(
+def test_classification_benchmark_executa_candidatos_no_mesmo_contrato(
     monkeypatch,
 ):
     from src.models.classification_benchmark import (
@@ -1041,7 +1068,7 @@ def test_classification_benchmark_executa_decision_tree_e_logistic_regression_no
                 len(X),
                 dtype=float,
             ),
-            elapsed_seconds=(0.1 if len(executor_calls) == 1 else 0.2),
+            elapsed_seconds=0.1 * len(executor_calls),
         )
 
     monkeypatch.setattr(
@@ -1061,6 +1088,7 @@ def test_classification_benchmark_executa_decision_tree_e_logistic_regression_no
     assert [call["factory_name"] for call in executor_calls] == [
         "criar_classificador_triagem",
         "criar_classificador_logistic_benchmark",
+        "criar_classificador_random_forest_benchmark",
     ]
 
     assert {call["x_id"] for call in executor_calls}.__len__() == 1
@@ -1074,6 +1102,7 @@ def test_classification_benchmark_executa_decision_tree_e_logistic_regression_no
     assert tuple(candidate.model for candidate in result.candidates) == (
         "decision_tree",
         "logistic_regression",
+        "random_forest",
     )
 
     assert result.n_train == 150
@@ -1082,3 +1111,5 @@ def test_classification_benchmark_executa_decision_tree_e_logistic_regression_no
     assert result.candidates[0].elapsed_seconds == pytest.approx(0.1)
 
     assert result.candidates[1].elapsed_seconds == pytest.approx(0.2)
+
+    assert result.candidates[2].elapsed_seconds == pytest.approx(0.3)

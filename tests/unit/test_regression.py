@@ -70,6 +70,9 @@ def criar_dataset_regressao_com_extrapolacao() -> pd.DataFrame:
     df["qtd_transacoes_anteriores"] = 0
     df["dia_semana"] = 1
     df["falhas_login_recentes"] = 0
+    df["dispositivo_novo_flag"] = False
+    df["alteracao_limite_flag"] = False
+    df["mudanca_localizacao_flag"] = False
 
     indices = np.arange(len(df))
     _, indices_teste = train_test_split(
@@ -100,6 +103,47 @@ def test_regressao_retorna_predicao_para_todos_os_registros():
     resultado = treinar_regressao_severidade(df)
 
     assert len(resultado["score_risco_predito"]) == len(df)
+
+
+def test_regressao_inclui_flags_comportamentais_no_contrato_de_features():
+    df = criar_dataset_regressao()
+
+    df["dispositivo_novo_flag"] = False
+    df["alteracao_limite_flag"] = False
+    df["mudanca_localizacao_flag"] = False
+
+    resultado = treinar_regressao_severidade(df)
+
+    features_modelo = set(resultado["modelo"].feature_names_in_)
+
+    assert {
+        "dispositivo_novo_flag",
+        "alteracao_limite_flag",
+        "mudanca_localizacao_flag",
+    }.issubset(features_modelo)
+
+
+def test_regressao_flags_ausentes_equivalem_a_flags_falsas():
+    df_legado = criar_dataset_regressao()
+
+    df_flags_falsas = df_legado.copy()
+    df_flags_falsas["dispositivo_novo_flag"] = False
+    df_flags_falsas["alteracao_limite_flag"] = False
+    df_flags_falsas["mudanca_localizacao_flag"] = False
+
+    resultado_legado = treinar_regressao_severidade(
+        df_legado,
+        estrategia_validacao="temporal",
+    )
+    resultado_flags_falsas = treinar_regressao_severidade(
+        df_flags_falsas,
+        estrategia_validacao="temporal",
+    )
+
+    assert np.allclose(
+        resultado_legado["score_risco_predito"],
+        resultado_flags_falsas["score_risco_predito"],
+    )
 
 
 def test_scores_preditos_ficam_entre_zero_e_cem():

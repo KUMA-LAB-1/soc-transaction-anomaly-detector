@@ -68,10 +68,36 @@ def test_summarize_classification_benchmark_runs_agrega_por_modelo():
             false_negatives=32,
             elapsed_seconds=0.004,
         ),
+        _candidate(
+            "random_forest",
+            precision=0.80,
+            recall=0.76,
+            f1=0.78,
+            roc_auc=0.87,
+            pr_auc=0.85,
+            positive_count=105,
+            positive_rate=0.42,
+            false_positives=18,
+            false_negatives=26,
+            elapsed_seconds=0.020,
+        ),
     )
 
     # Ordem invertida de propósito.
     run_2 = (
+        _candidate(
+            "random_forest",
+            precision=0.82,
+            recall=0.78,
+            f1=0.80,
+            roc_auc=0.89,
+            pr_auc=0.87,
+            positive_count=108,
+            positive_rate=0.432,
+            false_positives=17,
+            false_negatives=24,
+            elapsed_seconds=0.022,
+        ),
         _candidate(
             "logistic_regression",
             precision=0.78,
@@ -110,6 +136,7 @@ def test_summarize_classification_benchmark_runs_agrega_por_modelo():
     assert tuple(entry.model for entry in summary) == (
         "decision_tree",
         "logistic_regression",
+        "random_forest",
     )
 
     assert all(
@@ -144,6 +171,13 @@ def test_summarize_classification_benchmark_runs_agrega_por_modelo():
     assert logistic.f1.mean == pytest.approx(0.74)
     assert logistic.roc_auc.mean == pytest.approx(0.84)
     assert logistic.pr_auc.mean == pytest.approx(0.82)
+
+    random_forest = summary[2]
+
+    assert random_forest.run_count == 2
+    assert random_forest.f1.mean == pytest.approx(0.79)
+    assert random_forest.roc_auc.mean == pytest.approx(0.88)
+    assert random_forest.pr_auc.mean == pytest.approx(0.86)
 
 
 def test_summarize_classification_benchmark_runs_rejeita_candidato_duplicado():

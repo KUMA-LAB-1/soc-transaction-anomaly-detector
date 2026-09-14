@@ -54,6 +54,14 @@ def test_summarize_classification_benchmark_stability_conta_vitorias_por_metrica
                 roc_auc=0.82,
                 pr_auc=0.80,
             ),
+            _candidate(
+                "random_forest",
+                precision=0.80,
+                recall=0.76,
+                f1=0.78,
+                roc_auc=0.87,
+                pr_auc=0.85,
+            ),
         ),
         (
             # Ordem invertida de propósito.
@@ -72,6 +80,14 @@ def test_summarize_classification_benchmark_stability_conta_vitorias_por_metrica
                 f1=0.77,
                 roc_auc=0.79,
                 pr_auc=0.76,
+            ),
+            _candidate(
+                "random_forest",
+                precision=0.75,
+                recall=0.74,
+                f1=0.75,
+                roc_auc=0.78,
+                pr_auc=0.77,
             ),
         ),
     )
@@ -104,6 +120,11 @@ def test_summarize_classification_benchmark_stability_conta_vitorias_por_metrica
         ),
         ClassificationBenchmarkModelStability(
             model="logistic_regression",
+            win_count=0,
+            tie_count=0,
+        ),
+        ClassificationBenchmarkModelStability(
+            model="random_forest",
             win_count=1,
             tie_count=0,
         ),

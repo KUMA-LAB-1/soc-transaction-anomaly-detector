@@ -5,6 +5,7 @@ from time import perf_counter
 
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     auc,
@@ -48,6 +49,17 @@ def criar_classificador_logistic_benchmark() -> Pipeline:
                 ),
             ),
         ]
+    )
+
+
+def criar_classificador_random_forest_benchmark() -> RandomForestClassifier:
+    """Cria o challenger RandomForest exclusivo do benchmark."""
+    return RandomForestClassifier(
+        n_estimators=100,
+        max_depth=4,
+        class_weight="balanced",
+        random_state=42,
+        n_jobs=1,
     )
 
 
@@ -302,6 +314,10 @@ def run_synthetic_classification_benchmark(
         (
             "logistic_regression",
             criar_classificador_logistic_benchmark,
+        ),
+        (
+            "random_forest",
+            criar_classificador_random_forest_benchmark,
         ),
     )
 

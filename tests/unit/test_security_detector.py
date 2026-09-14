@@ -736,9 +736,16 @@ def test_treinar_regressao_integra_resultado_no_detector(monkeypatch):
         },
     }
 
+    chamada_treinador = {}
+
+    def fake_treinar_regressao(dataframe, **kwargs):
+        chamada_treinador["dataframe"] = dataframe
+        chamada_treinador.update(kwargs)
+        return resultado_fake
+
     monkeypatch.setattr(
         "src.security_detector.treinar_regressao_severidade",
-        lambda dataframe: resultado_fake,
+        fake_treinar_regressao,
     )
 
     dumps = []
@@ -751,6 +758,9 @@ def test_treinar_regressao_integra_resultado_no_detector(monkeypatch):
     df = pd.DataFrame({"valor": [1, 2]})
 
     resultado = detector._treinar_regressao(df)
+
+    assert chamada_treinador["dataframe"] is df
+    assert chamada_treinador.get("estrategia_validacao") == "temporal"
 
     assert detector.modelo_regressao is modelo_fake
 
@@ -788,7 +798,7 @@ def test_regressao_cv_negativo_emite_aviso(monkeypatch, capsys):
 
     monkeypatch.setattr(
         "src.security_detector.treinar_regressao_severidade",
-        lambda dataframe: resultado_fake,
+        lambda dataframe, **kwargs: resultado_fake,
     )
 
     monkeypatch.setattr(

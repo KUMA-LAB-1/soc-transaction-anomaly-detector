@@ -79,3 +79,35 @@ def test_build_evidence_context_preserva_identidade_da_origem():
 
     assert contexto.alert_id == alerta.alert_id
     assert contexto.source_schema_version == alerta.schema_version
+
+
+def test_build_evidence_context_preserva_fatos_do_evento():
+    alerta = criar_alerta(
+        criar_registro(),
+        detector="isolation_forest",
+        alert_id="ALT-EVIDENCE-EVENT-001",
+        created_at=datetime(
+            2026,
+            8,
+            18,
+            13,
+            0,
+            tzinfo=UTC,
+        ),
+    )
+
+    contexto = build_evidence_context(alerta)
+
+    assert contexto.event == alerta.event
+    assert contexto.event.transaction_id == 101
+    assert contexto.event.customer_pseudonym == "cliente-01"
+    assert contexto.event.transaction_type == "Pix"
+    assert contexto.event.transaction_value == 5000.0
+    assert contexto.event.transaction_timestamp == datetime(
+        2026,
+        8,
+        18,
+        12,
+        0,
+        tzinfo=UTC,
+    )

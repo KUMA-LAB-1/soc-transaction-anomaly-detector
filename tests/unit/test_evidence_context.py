@@ -58,3 +58,24 @@ def test_build_evidence_context_preserva_evidencia_nao_observada():
         "alteracao_limite_flag",
         "mudanca_localizacao_flag",
     )
+
+
+def test_build_evidence_context_preserva_identidade_da_origem():
+    alerta = criar_alerta(
+        criar_registro(),
+        detector="isolation_forest",
+        alert_id="ALT-EVIDENCE-TRACE-001",
+        created_at=datetime(
+            2026,
+            8,
+            18,
+            13,
+            0,
+            tzinfo=UTC,
+        ),
+    )
+
+    contexto = build_evidence_context(alerta)
+
+    assert contexto.alert_id == alerta.alert_id
+    assert contexto.source_schema_version == alerta.schema_version

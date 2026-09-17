@@ -8,6 +8,7 @@ from .alerts.contract import (
     AlertEvent,
     AlertEvidence,
     AlertQuality,
+    AlertRisk,
 )
 
 
@@ -17,6 +18,7 @@ class EvidenceContext:
     source_schema_version: str
     event: AlertEvent
     detection: AlertDetection
+    risk: AlertRisk
     evidence: AlertEvidence
     quality: AlertQuality
 
@@ -28,6 +30,7 @@ def build_evidence_context(alert: Alert) -> EvidenceContext:
         source_schema_version=alert.schema_version,
         event=alert.event,
         detection=alert.detection,
+        risk=alert.risk,
         evidence=alert.evidence,
         quality=alert.quality,
     )

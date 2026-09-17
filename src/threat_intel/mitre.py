@@ -93,6 +93,7 @@ def enriquecer_com_mitre(
                 "fonte": "banco de dados (dinâmico)",
                 "criterio": criterio,
                 "selection_basis": selection_basis,
+                "knowledge_source": "database",
             }
 
     except Exception as exc:

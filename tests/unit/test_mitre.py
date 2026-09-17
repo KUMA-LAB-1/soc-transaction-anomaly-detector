@@ -241,3 +241,22 @@ def test_enriquecimento_declara_base_de_selecao_por_tipo_de_transacao_fallback()
     )
 
     assert resultado["selection_basis"] == "transaction_type_fallback"
+
+
+def test_enriquecimento_declara_banco_como_fonte_de_conhecimento():
+    engine = FakeEngine(
+        row=(
+            "T1110",
+            "Brute Force",
+            "Credential Access",
+            "Aplicar MFA.",
+        )
+    )
+
+    resultado = enriquecer_com_mitre(
+        engine=engine,
+        tipo_evento="Pix",
+        sinais={"falhas_login_recentes": 3},
+    )
+
+    assert resultado["knowledge_source"] == "database"

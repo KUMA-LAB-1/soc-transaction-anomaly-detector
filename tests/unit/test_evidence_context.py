@@ -156,3 +156,26 @@ def test_build_evidence_context_preserva_avaliacao_de_risco():
     assert contexto.risk == alerta.risk
     assert contexto.risk.score == 92.0
     assert contexto.risk.severity == alerta.risk.severity
+
+
+def test_build_evidence_context_preserva_timestamp_de_criacao_do_alerta():
+    created_at = datetime(
+        2026,
+        8,
+        18,
+        13,
+        0,
+        tzinfo=UTC,
+    )
+
+    alerta = criar_alerta(
+        criar_registro(),
+        detector="isolation_forest",
+        alert_id="ALT-EVIDENCE-TIME-001",
+        created_at=created_at,
+    )
+
+    contexto = build_evidence_context(alerta)
+
+    assert contexto.alert_created_at == alerta.created_at
+    assert contexto.alert_created_at == created_at

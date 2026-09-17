@@ -53,7 +53,9 @@ def enriquecer_com_mitre(
 
     termo_busca, criterio = determinar_padrao_por_correlacao(sinais)
 
-    selection_basis = "behavioral_correlation" if termo_busca else None
+    selection_basis = (
+        "behavioral_correlation" if termo_busca else "transaction_type_fallback"
+    )
 
     if not termo_busca:
         criterio = "tipo de transação (fallback, sem correlação de log disponível)"

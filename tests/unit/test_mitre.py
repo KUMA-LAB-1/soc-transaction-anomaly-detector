@@ -222,3 +222,22 @@ def test_enriquecimento_declara_base_de_selecao_por_correlacao_comportamental():
     )
 
     assert resultado["selection_basis"] == "behavioral_correlation"
+
+
+def test_enriquecimento_declara_base_de_selecao_por_tipo_de_transacao_fallback():
+    engine = FakeEngine(
+        row=(
+            "T1565",
+            "Data Manipulation",
+            "Impact",
+            "Aplicar controles adicionais.",
+        )
+    )
+
+    resultado = enriquecer_com_mitre(
+        engine=engine,
+        tipo_evento="Pix",
+        sinais={},
+    )
+
+    assert resultado["selection_basis"] == "transaction_type_fallback"

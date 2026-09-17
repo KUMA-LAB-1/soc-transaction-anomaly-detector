@@ -203,3 +203,22 @@ def test_enriquecimento_preserva_familia_correlacionada_no_fallback_local():
     assert resultado["mitre_id"].startswith("T1110")
     assert resultado["fonte"] == "fallback local"
     assert "falhas de login" in resultado["criterio"]
+
+
+def test_enriquecimento_declara_base_de_selecao_por_correlacao_comportamental():
+    engine = FakeEngine(
+        row=(
+            "T1110",
+            "Brute Force",
+            "Credential Access",
+            "Aplicar MFA.",
+        )
+    )
+
+    resultado = enriquecer_com_mitre(
+        engine=engine,
+        tipo_evento="Pix",
+        sinais={"falhas_login_recentes": 3},
+    )
+
+    assert resultado["selection_basis"] == "behavioral_correlation"

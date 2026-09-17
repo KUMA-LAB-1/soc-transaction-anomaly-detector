@@ -96,6 +96,18 @@ def enriquecer_com_mitre(
             f"{exc}. Usando mapeamento local resiliente."
         )
 
+    if termo_busca.startswith("%T1110"):
+        return {
+            "mitre_id": "T1110.001",
+            "tecnica": ("Ataque de Força Bruta (Brute Force Credential Stuffing)"),
+            "tatica": "Acesso Inicial",
+            "procedimentos": (
+                "Bloquear temporariamente o IP de origem e forçar redefinição de senha."
+            ),
+            "fonte": "fallback local",
+            "criterio": criterio,
+        }
+
     if "Pix" in tipo_evento:
         return {
             "mitre_id": "T1565.001",

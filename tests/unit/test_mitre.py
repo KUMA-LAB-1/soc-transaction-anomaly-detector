@@ -189,3 +189,17 @@ def test_enriquecimento_transferencia_busca_t1043():
 
     assert engine.connection.executed_params["termo"] == "%T1043%"
     assert resultado["fonte"] == "fallback local"
+
+
+def test_enriquecimento_preserva_familia_correlacionada_no_fallback_local():
+    engine = FakeEngine(row=None)
+
+    resultado = enriquecer_com_mitre(
+        engine=engine,
+        tipo_evento="Pix",
+        sinais={"falhas_login_recentes": 3},
+    )
+
+    assert resultado["mitre_id"].startswith("T1110")
+    assert resultado["fonte"] == "fallback local"
+    assert "falhas de login" in resultado["criterio"]

@@ -67,6 +67,8 @@ def enriquecer_com_mitre(
         else:
             termo_busca = "%T1110%"
 
+    fallback_reason = None
+
     try:
         query = text(
             """
@@ -96,6 +98,8 @@ def enriquecer_com_mitre(
                 "knowledge_source": "database",
             }
 
+        fallback_reason = "database_no_match"
+
     except Exception as exc:
         print(
             "⚠️ Alerta ao consultar Threat Intel no banco: "
@@ -113,6 +117,7 @@ def enriquecer_com_mitre(
             "fonte": "fallback local",
             "criterio": criterio,
             "knowledge_source": "local_catalog",
+            "fallback_reason": fallback_reason,
         }
 
     if "Pix" in tipo_evento:
@@ -128,6 +133,7 @@ def enriquecer_com_mitre(
             "fonte": "fallback local",
             "criterio": criterio,
             "knowledge_source": "local_catalog",
+            "fallback_reason": fallback_reason,
         }
 
     return {
@@ -140,4 +146,5 @@ def enriquecer_com_mitre(
         "fonte": "fallback local",
         "criterio": criterio,
         "knowledge_source": "local_catalog",
+        "fallback_reason": fallback_reason,
     }

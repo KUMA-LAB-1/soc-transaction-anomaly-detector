@@ -290,3 +290,14 @@ def test_enriquecimento_declara_catalogo_local_como_fonte_de_conhecimento():
     assert all(
         resultado["knowledge_source"] == "local_catalog" for resultado in resultados
     )
+
+
+def test_enriquecimento_declara_fallback_por_ausencia_de_match_no_banco():
+    resultado = enriquecer_com_mitre(
+        engine=FakeEngine(row=None),
+        tipo_evento="Pix",
+        sinais={"falhas_login_recentes": 3},
+    )
+
+    assert resultado["knowledge_source"] == "local_catalog"
+    assert resultado["fallback_reason"] == "database_no_match"

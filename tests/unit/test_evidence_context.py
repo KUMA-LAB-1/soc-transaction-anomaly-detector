@@ -111,3 +111,26 @@ def test_build_evidence_context_preserva_fatos_do_evento():
         0,
         tzinfo=UTC,
     )
+
+
+def test_build_evidence_context_preserva_resultado_da_deteccao():
+    alerta = criar_alerta(
+        criar_registro(),
+        detector="isolation_forest",
+        alert_id="ALT-EVIDENCE-DETECTION-001",
+        created_at=datetime(
+            2026,
+            8,
+            18,
+            13,
+            0,
+            tzinfo=UTC,
+        ),
+    )
+
+    contexto = build_evidence_context(alerta)
+
+    assert contexto.detection == alerta.detection
+    assert contexto.detection.suspicious_probability == 0.90
+    assert contexto.detection.anomaly_raw_score == -0.42
+    assert contexto.detection.detector == "isolation_forest"

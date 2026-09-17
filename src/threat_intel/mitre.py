@@ -101,6 +101,8 @@ def enriquecer_com_mitre(
         fallback_reason = "database_no_match"
 
     except Exception as exc:
+        fallback_reason = "database_error"
+
         print(
             "⚠️ Alerta ao consultar Threat Intel no banco: "
             f"{exc}. Usando mapeamento local resiliente."

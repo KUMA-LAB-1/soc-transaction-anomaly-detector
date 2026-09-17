@@ -301,3 +301,18 @@ def test_enriquecimento_declara_fallback_por_ausencia_de_match_no_banco():
 
     assert resultado["knowledge_source"] == "local_catalog"
     assert resultado["fallback_reason"] == "database_no_match"
+
+
+def test_enriquecimento_declara_fallback_por_erro_no_banco():
+    class FailingEngine:
+        def connect(self):
+            raise RuntimeError("database unavailable")
+
+    resultado = enriquecer_com_mitre(
+        engine=FailingEngine(),
+        tipo_evento="Pix",
+        sinais={"falhas_login_recentes": 3},
+    )
+
+    assert resultado["knowledge_source"] == "local_catalog"
+    assert resultado["fallback_reason"] == "database_error"

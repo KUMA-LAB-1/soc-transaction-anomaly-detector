@@ -112,6 +112,7 @@ def enriquecer_com_mitre(
             ),
             "fonte": "fallback local",
             "criterio": criterio,
+            "knowledge_source": "local_catalog",
         }
 
     if "Pix" in tipo_evento:
@@ -126,6 +127,7 @@ def enriquecer_com_mitre(
             ),
             "fonte": "fallback local",
             "criterio": criterio,
+            "knowledge_source": "local_catalog",
         }
 
     return {
@@ -137,4 +139,5 @@ def enriquecer_com_mitre(
         ),
         "fonte": "fallback local",
         "criterio": criterio,
+        "knowledge_source": "local_catalog",
     }

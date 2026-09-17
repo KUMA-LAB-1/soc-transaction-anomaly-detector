@@ -260,3 +260,33 @@ def test_enriquecimento_declara_banco_como_fonte_de_conhecimento():
     )
 
     assert resultado["knowledge_source"] == "database"
+
+
+def test_enriquecimento_declara_catalogo_local_como_fonte_de_conhecimento():
+    resultado_correlacionado = enriquecer_com_mitre(
+        engine=FakeEngine(row=None),
+        tipo_evento="Pix",
+        sinais={"falhas_login_recentes": 3},
+    )
+
+    resultado_pix = enriquecer_com_mitre(
+        engine=FakeEngine(row=None),
+        tipo_evento="Pix",
+        sinais={},
+    )
+
+    resultado_generico = enriquecer_com_mitre(
+        engine=FakeEngine(row=None),
+        tipo_evento="Outro",
+        sinais={},
+    )
+
+    resultados = (
+        resultado_correlacionado,
+        resultado_pix,
+        resultado_generico,
+    )
+
+    assert all(
+        resultado["knowledge_source"] == "local_catalog" for resultado in resultados
+    )

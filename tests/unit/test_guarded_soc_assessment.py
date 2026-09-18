@@ -256,3 +256,47 @@ def test_guarded_assessment_rejeita_hipotese_com_fato_nao_observado():
         )
 
     assert assessment.hypotheses == ()
+
+
+def test_guarded_assessment_rejeita_hipotese_sem_fatos_de_suporte():
+    registro = {
+        "id_transacao": 107,
+        "cliente_pseudonimo": "cliente-07",
+        "data_hora_transacao": datetime(2026, 8, 18, 19, 0, tzinfo=UTC),
+        "tipo_transacao": "Pix",
+        "valor_transacao": 7600.0,
+        "proba_suspeita": 0.96,
+        "anomalia_score": -1,
+        "anomalia_score_bruto": -0.61,
+        "score_risco_predito": 97.0,
+        "falhas_login_recentes": 5,
+        "dispositivo_novo_flag": True,
+        "alteracao_limite_flag": False,
+        "mudanca_localizacao_flag": False,
+    }
+
+    alerta = criar_alerta(
+        registro,
+        detector="isolation_forest",
+        evidencias_observadas={
+            "falhas_login_recentes",
+            "dispositivo_novo_flag",
+        },
+        alert_id="ALT-GUARDED-HYP-004",
+        created_at=datetime(2026, 8, 18, 19, 30, tzinfo=UTC),
+    )
+
+    contexto = build_evidence_context(alerta)
+    assessment = build_guarded_assessment(contexto)
+
+    with pytest.raises(
+        ValueError,
+        match="supporting facts must not be empty",
+    ):
+        add_supported_hypothesis(
+            assessment,
+            statement="possible_account_compromise",
+            supporting_fact_names=(),
+        )
+
+    assert assessment.hypotheses == ()

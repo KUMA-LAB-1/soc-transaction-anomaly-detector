@@ -19,11 +19,18 @@ class SupportedHypothesis:
 
 
 @dataclass
+class RecommendedCheck:
+    action: str
+    evidence_name: str
+
+
+@dataclass
 class GuardedSocAssessment:
     alert_id: str
     missing_evidence: tuple[str, ...]
     facts: tuple[ObservedFact, ...]
     hypotheses: tuple[SupportedHypothesis, ...]
+    recommended_checks: tuple[RecommendedCheck, ...]
     incident_confirmed: bool
 
 
@@ -42,11 +49,20 @@ def build_guarded_assessment(context: EvidenceContext) -> GuardedSocAssessment:
         if evidence.observed
     )
 
+    recommended_checks = tuple(
+        RecommendedCheck(
+            action="collect_missing_evidence",
+            evidence_name=evidence_name,
+        )
+        for evidence_name in context.quality.missing_evidence
+    )
+
     return GuardedSocAssessment(
         alert_id=context.alert_id,
         missing_evidence=context.quality.missing_evidence,
         facts=facts,
         hypotheses=(),
+        recommended_checks=recommended_checks,
         incident_confirmed=False,
     )
 

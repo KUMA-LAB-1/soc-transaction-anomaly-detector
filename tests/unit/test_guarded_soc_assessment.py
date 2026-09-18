@@ -347,3 +347,43 @@ def test_guarded_assessment_nao_confirma_incidente_ao_adicionar_hipotese():
     assert len(assessment.facts) == 4
     assert len(assessment.hypotheses) == 1
     assert assessment.incident_confirmed is False
+
+
+def test_guarded_assessment_recomenda_coleta_para_evidencias_ausentes():
+    registro = {
+        "id_transacao": 109,
+        "cliente_pseudonimo": "cliente-09",
+        "data_hora_transacao": datetime(2026, 8, 18, 21, 0, tzinfo=UTC),
+        "tipo_transacao": "Pix",
+        "valor_transacao": 8400.0,
+        "proba_suspeita": 0.95,
+        "anomalia_score": -1,
+        "anomalia_score_bruto": -0.59,
+        "score_risco_predito": 96.0,
+        "falhas_login_recentes": 4,
+        "dispositivo_novo_flag": True,
+        "alteracao_limite_flag": True,
+        "mudanca_localizacao_flag": True,
+    }
+
+    alerta = criar_alerta(
+        registro,
+        detector="isolation_forest",
+        evidencias_observadas={
+            "falhas_login_recentes",
+        },
+        alert_id="ALT-GUARDED-CHECK-001",
+        created_at=datetime(2026, 8, 18, 21, 30, tzinfo=UTC),
+    )
+
+    contexto = build_evidence_context(alerta)
+    assessment = build_guarded_assessment(contexto)
+
+    assert assessment.missing_evidence
+    assert tuple(
+        (check.action, check.evidence_name) for check in assessment.recommended_checks
+    ) == tuple(
+        ("collect_missing_evidence", evidence_name)
+        for evidence_name in assessment.missing_evidence
+    )
+    assert assessment.incident_confirmed is False

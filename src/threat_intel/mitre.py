@@ -96,6 +96,7 @@ def enriquecer_com_mitre(
                 "criterio": criterio,
                 "selection_basis": selection_basis,
                 "knowledge_source": "database",
+                "fallback_reason": None,
             }
 
         fallback_reason = "database_no_match"

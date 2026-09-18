@@ -340,3 +340,22 @@ def test_enriquecimento_preserva_base_de_selecao_no_fallback_local():
     assert resultado_correlacionado["selection_basis"] == "behavioral_correlation"
     assert resultado_pix["selection_basis"] == "transaction_type_fallback"
     assert resultado_generico["selection_basis"] == "transaction_type_fallback"
+
+
+def test_enriquecimento_declara_ausencia_de_fallback_quando_banco_resolve():
+    resultado = enriquecer_com_mitre(
+        engine=FakeEngine(
+            row=(
+                "T1110.001",
+                "Tecnica de teste",
+                "Tatica de teste",
+                "Procedimento de teste",
+            )
+        ),
+        tipo_evento="Pix",
+        sinais={"falhas_login_recentes": 3},
+    )
+
+    assert resultado["knowledge_source"] == "database"
+    assert resultado["selection_basis"] == "behavioral_correlation"
+    assert resultado["fallback_reason"] is None

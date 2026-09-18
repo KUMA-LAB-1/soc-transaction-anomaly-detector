@@ -5,7 +5,9 @@ from src.soc_assistant.assessment import (
 )
 from src.soc_assistant.evaluation import (
     GuardedSocEvaluation,
+    GuardedSocEvaluationScenario,
     evaluate_guarded_assessment,
+    evaluate_guarded_matrix,
     summarize_guarded_evaluations,
 )
 
@@ -210,3 +212,76 @@ def test_summary_sem_truth_disponivel_mantem_taxa_de_confirmacao_nao_avaliada():
     assert summary.confirmation_evaluable_count == 0
     assert summary.false_confirmation_count == 0
     assert summary.false_confirmation_rate is None
+
+
+def test_matrix_avalia_cenarios_e_entrega_evaluations_com_summary():
+    scenario_false_confirmation = GuardedSocEvaluationScenario(
+        assessment=GuardedSocAssessment(
+            alert_id="ALT-MATRIX-RUN-001",
+            missing_evidence=(),
+            facts=(
+                ObservedFact(
+                    name="failed_logins",
+                    value=12,
+                ),
+            ),
+            hypotheses=(
+                SupportedHypothesis(
+                    statement="possible_account_compromise",
+                    supporting_fact_names=("failed_logins",),
+                ),
+            ),
+            recommended_checks=(),
+            incident_confirmed=True,
+        ),
+        expected_incident_confirmed=False,
+    )
+
+    scenario_without_truth = GuardedSocEvaluationScenario(
+        assessment=GuardedSocAssessment(
+            alert_id="ALT-MATRIX-RUN-002",
+            missing_evidence=(),
+            facts=(),
+            hypotheses=(),
+            recommended_checks=(),
+            incident_confirmed=False,
+        ),
+        expected_incident_confirmed=None,
+    )
+
+    matrix = evaluate_guarded_matrix(
+        (
+            scenario_false_confirmation,
+            scenario_without_truth,
+        )
+    )
+
+    assert len(matrix.evaluations) == 2
+
+    assert matrix.evaluations[0].alert_id == "ALT-MATRIX-RUN-001"
+    assert matrix.evaluations[0].false_confirmation_count == 1
+
+    assert matrix.evaluations[1].alert_id == "ALT-MATRIX-RUN-002"
+    assert matrix.evaluations[1].false_confirmation_count is None
+
+    assert matrix.summary.evaluation_count == 2
+    assert matrix.summary.hypothesis_count == 1
+    assert matrix.summary.unsupported_hypothesis_count == 0
+    assert matrix.summary.unsupported_claim_rate == 0.0
+    assert matrix.summary.confirmation_evaluable_count == 1
+    assert matrix.summary.false_confirmation_count == 1
+    assert matrix.summary.false_confirmation_rate == 1.0
+
+
+def test_matrix_vazia_retorna_evaluations_e_summary_vazios():
+    matrix = evaluate_guarded_matrix(())
+
+    assert matrix.evaluations == ()
+
+    assert matrix.summary.evaluation_count == 0
+    assert matrix.summary.hypothesis_count == 0
+    assert matrix.summary.unsupported_hypothesis_count == 0
+    assert matrix.summary.unsupported_claim_rate == 0.0
+    assert matrix.summary.confirmation_evaluable_count == 0
+    assert matrix.summary.false_confirmation_count == 0
+    assert matrix.summary.false_confirmation_rate is None

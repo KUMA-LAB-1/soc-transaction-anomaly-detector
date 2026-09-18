@@ -24,6 +24,18 @@ class GuardedSocEvaluationSummary:
     false_confirmation_rate: float | None
 
 
+@dataclass
+class GuardedSocEvaluationScenario:
+    assessment: GuardedSocAssessment
+    expected_incident_confirmed: bool | None = None
+
+
+@dataclass
+class GuardedSocEvaluationMatrix:
+    evaluations: tuple[GuardedSocEvaluation, ...]
+    summary: GuardedSocEvaluationSummary
+
+
 def evaluate_guarded_assessment(
     assessment: GuardedSocAssessment,
     *,
@@ -97,4 +109,21 @@ def summarize_guarded_evaluations(
         confirmation_evaluable_count=confirmation_evaluable_count,
         false_confirmation_count=false_confirmation_count,
         false_confirmation_rate=false_confirmation_rate,
+    )
+
+
+def evaluate_guarded_matrix(
+    scenarios: tuple[GuardedSocEvaluationScenario, ...],
+) -> GuardedSocEvaluationMatrix:
+    evaluations = tuple(
+        evaluate_guarded_assessment(
+            scenario.assessment,
+            expected_incident_confirmed=scenario.expected_incident_confirmed,
+        )
+        for scenario in scenarios
+    )
+
+    return GuardedSocEvaluationMatrix(
+        evaluations=evaluations,
+        summary=summarize_guarded_evaluations(evaluations),
     )

@@ -300,3 +300,50 @@ def test_guarded_assessment_rejeita_hipotese_sem_fatos_de_suporte():
         )
 
     assert assessment.hypotheses == ()
+
+
+def test_guarded_assessment_nao_confirma_incidente_ao_adicionar_hipotese():
+    registro = {
+        "id_transacao": 108,
+        "cliente_pseudonimo": "cliente-08",
+        "data_hora_transacao": datetime(2026, 8, 18, 20, 0, tzinfo=UTC),
+        "tipo_transacao": "Pix",
+        "valor_transacao": 12500.0,
+        "proba_suspeita": 0.99,
+        "anomalia_score": -1,
+        "anomalia_score_bruto": -0.82,
+        "score_risco_predito": 100.0,
+        "falhas_login_recentes": 9,
+        "dispositivo_novo_flag": True,
+        "alteracao_limite_flag": True,
+        "mudanca_localizacao_flag": True,
+    }
+
+    alerta = criar_alerta(
+        registro,
+        detector="isolation_forest",
+        evidencias_observadas={
+            "falhas_login_recentes",
+            "dispositivo_novo_flag",
+            "alteracao_limite_flag",
+            "mudanca_localizacao_flag",
+        },
+        alert_id="ALT-GUARDED-INC-001",
+        created_at=datetime(2026, 8, 18, 20, 30, tzinfo=UTC),
+    )
+
+    contexto = build_evidence_context(alerta)
+    assessment = build_guarded_assessment(contexto)
+
+    assessment = add_supported_hypothesis(
+        assessment,
+        statement="possible_account_compromise",
+        supporting_fact_names=(
+            "failed_logins",
+            "new_device",
+        ),
+    )
+
+    assert len(assessment.facts) == 4
+    assert len(assessment.hypotheses) == 1
+    assert assessment.incident_confirmed is False

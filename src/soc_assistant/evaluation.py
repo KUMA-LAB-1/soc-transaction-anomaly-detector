@@ -44,7 +44,8 @@ def evaluate_guarded_assessment(
     observed_fact_names = {fact.name for fact in assessment.facts}
 
     unsupported_hypothesis_count = sum(
-        not set(hypothesis.supporting_fact_names).issubset(observed_fact_names)
+        not hypothesis.supporting_fact_names
+        or not set(hypothesis.supporting_fact_names).issubset(observed_fact_names)
         for hypothesis in assessment.hypotheses
     )
 

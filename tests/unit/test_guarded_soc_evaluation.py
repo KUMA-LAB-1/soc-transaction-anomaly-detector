@@ -285,3 +285,25 @@ def test_matrix_vazia_retorna_evaluations_e_summary_vazios():
     assert matrix.summary.confirmation_evaluable_count == 0
     assert matrix.summary.false_confirmation_count == 0
     assert matrix.summary.false_confirmation_rate is None
+
+
+def test_evaluator_trata_hipotese_sem_evidencia_citada_como_unsupported():
+    assessment = GuardedSocAssessment(
+        alert_id="ALT-EVAL-EMPTY-SUPPORT-001",
+        missing_evidence=(),
+        facts=(),
+        hypotheses=(
+            SupportedHypothesis(
+                statement="possible_account_compromise",
+                supporting_fact_names=(),
+            ),
+        ),
+        recommended_checks=(),
+        incident_confirmed=False,
+    )
+
+    evaluation = evaluate_guarded_assessment(assessment)
+
+    assert evaluation.hypothesis_count == 1
+    assert evaluation.unsupported_hypothesis_count == 1
+    assert evaluation.unsupported_claim_rate == 1.0

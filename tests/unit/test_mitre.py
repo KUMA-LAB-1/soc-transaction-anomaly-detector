@@ -316,3 +316,27 @@ def test_enriquecimento_declara_fallback_por_erro_no_banco():
 
     assert resultado["knowledge_source"] == "local_catalog"
     assert resultado["fallback_reason"] == "database_error"
+
+
+def test_enriquecimento_preserva_base_de_selecao_no_fallback_local():
+    resultado_correlacionado = enriquecer_com_mitre(
+        engine=FakeEngine(row=None),
+        tipo_evento="Pix",
+        sinais={"falhas_login_recentes": 3},
+    )
+
+    resultado_pix = enriquecer_com_mitre(
+        engine=FakeEngine(row=None),
+        tipo_evento="Pix",
+        sinais={},
+    )
+
+    resultado_generico = enriquecer_com_mitre(
+        engine=FakeEngine(row=None),
+        tipo_evento="Outro",
+        sinais={},
+    )
+
+    assert resultado_correlacionado["selection_basis"] == "behavioral_correlation"
+    assert resultado_pix["selection_basis"] == "transaction_type_fallback"
+    assert resultado_generico["selection_basis"] == "transaction_type_fallback"

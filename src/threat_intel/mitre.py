@@ -118,6 +118,7 @@ def enriquecer_com_mitre(
             ),
             "fonte": "fallback local",
             "criterio": criterio,
+            "selection_basis": selection_basis,
             "knowledge_source": "local_catalog",
             "fallback_reason": fallback_reason,
         }
@@ -134,6 +135,7 @@ def enriquecer_com_mitre(
             ),
             "fonte": "fallback local",
             "criterio": criterio,
+            "selection_basis": selection_basis,
             "knowledge_source": "local_catalog",
             "fallback_reason": fallback_reason,
         }
@@ -147,6 +149,7 @@ def enriquecer_com_mitre(
         ),
         "fonte": "fallback local",
         "criterio": criterio,
+        "selection_basis": selection_basis,
         "knowledge_source": "local_catalog",
         "fallback_reason": fallback_reason,
     }

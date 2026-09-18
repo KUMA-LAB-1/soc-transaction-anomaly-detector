@@ -55,6 +55,11 @@ def add_supported_hypothesis(
     statement: str,
     supporting_fact_names: tuple[str, ...],
 ) -> GuardedSocAssessment:
+    observed_fact_names = {fact.name for fact in assessment.facts}
+
+    if not set(supporting_fact_names).issubset(observed_fact_names):
+        raise ValueError("supporting facts must be observed")
+
     assessment.hypotheses += (
         SupportedHypothesis(
             statement=statement,

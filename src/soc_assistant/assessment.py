@@ -13,11 +13,17 @@ class ObservedFact:
 
 
 @dataclass
+class SupportedHypothesis:
+    statement: str
+    supporting_fact_names: tuple[str, ...]
+
+
+@dataclass
 class GuardedSocAssessment:
     alert_id: str
     missing_evidence: tuple[str, ...]
     facts: tuple[ObservedFact, ...]
-    hypotheses: tuple[str, ...]
+    hypotheses: tuple[SupportedHypothesis, ...]
 
 
 def build_guarded_assessment(context: EvidenceContext) -> GuardedSocAssessment:
@@ -41,3 +47,18 @@ def build_guarded_assessment(context: EvidenceContext) -> GuardedSocAssessment:
         facts=facts,
         hypotheses=(),
     )
+
+
+def add_supported_hypothesis(
+    assessment: GuardedSocAssessment,
+    *,
+    statement: str,
+    supporting_fact_names: tuple[str, ...],
+) -> GuardedSocAssessment:
+    assessment.hypotheses += (
+        SupportedHypothesis(
+            statement=statement,
+            supporting_fact_names=supporting_fact_names,
+        ),
+    )
+    return assessment

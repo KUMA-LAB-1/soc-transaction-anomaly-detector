@@ -2,7 +2,10 @@ from datetime import UTC, datetime
 
 from src.alerts.engine import criar_alerta
 from src.evidence_context import build_evidence_context
-from src.soc_assistant.assessment import build_guarded_assessment
+from src.soc_assistant.assessment import (
+    add_supported_hypothesis,
+    build_guarded_assessment,
+)
 
 
 def test_guarded_assessment_preserva_identidade_e_lacunas_conhecidas():
@@ -156,3 +159,51 @@ def test_guarded_assessment_nao_promove_fatos_a_hipoteses_automaticamente():
 
     assert len(assessment.facts) == 4
     assert assessment.hypotheses == ()
+
+
+def test_guarded_assessment_adiciona_hipotese_com_suporte_explicito():
+    registro = {
+        "id_transacao": 105,
+        "cliente_pseudonimo": "cliente-05",
+        "data_hora_transacao": datetime(2026, 8, 18, 17, 0, tzinfo=UTC),
+        "tipo_transacao": "Pix",
+        "valor_transacao": 9800.0,
+        "proba_suspeita": 0.99,
+        "anomalia_score": -1,
+        "anomalia_score_bruto": -0.78,
+        "score_risco_predito": 99.0,
+        "falhas_login_recentes": 8,
+        "dispositivo_novo_flag": True,
+        "alteracao_limite_flag": False,
+        "mudanca_localizacao_flag": False,
+    }
+
+    alerta = criar_alerta(
+        registro,
+        detector="isolation_forest",
+        evidencias_observadas={
+            "falhas_login_recentes",
+            "dispositivo_novo_flag",
+        },
+        alert_id="ALT-GUARDED-HYP-002",
+        created_at=datetime(2026, 8, 18, 17, 30, tzinfo=UTC),
+    )
+
+    contexto = build_evidence_context(alerta)
+    assessment = build_guarded_assessment(contexto)
+
+    assessment = add_supported_hypothesis(
+        assessment,
+        statement="possible_account_compromise",
+        supporting_fact_names=(
+            "failed_logins",
+            "new_device",
+        ),
+    )
+
+    assert len(assessment.hypotheses) == 1
+    assert assessment.hypotheses[0].statement == "possible_account_compromise"
+    assert assessment.hypotheses[0].supporting_fact_names == (
+        "failed_logins",
+        "new_device",
+    )

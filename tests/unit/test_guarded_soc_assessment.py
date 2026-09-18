@@ -39,3 +39,41 @@ def test_guarded_assessment_preserva_identidade_e_lacunas_conhecidas():
 
     assert assessment.alert_id == contexto.alert_id
     assert assessment.missing_evidence == contexto.quality.missing_evidence
+
+
+def test_guarded_assessment_inclui_apenas_evidencias_observadas_como_fatos():
+    registro = {
+        "id_transacao": 102,
+        "cliente_pseudonimo": "cliente-02",
+        "data_hora_transacao": datetime(2026, 8, 18, 14, 0, tzinfo=UTC),
+        "tipo_transacao": "Pix",
+        "valor_transacao": 7500.0,
+        "proba_suspeita": 0.95,
+        "anomalia_score": -1,
+        "anomalia_score_bruto": -0.55,
+        "score_risco_predito": 96.0,
+        "falhas_login_recentes": 5,
+        "dispositivo_novo_flag": True,
+        "alteracao_limite_flag": True,
+        "mudanca_localizacao_flag": True,
+    }
+
+    alerta = criar_alerta(
+        registro,
+        detector="isolation_forest",
+        evidencias_observadas={
+            "falhas_login_recentes",
+            "dispositivo_novo_flag",
+        },
+        alert_id="ALT-GUARDED-FACTS-001",
+        created_at=datetime(2026, 8, 18, 14, 30, tzinfo=UTC),
+    )
+
+    contexto = build_evidence_context(alerta)
+
+    assessment = build_guarded_assessment(contexto)
+
+    assert assessment.facts == (
+        "failed_logins",
+        "new_device",
+    )

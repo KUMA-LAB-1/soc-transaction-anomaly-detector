@@ -1,10 +1,14 @@
-# 🛡️ SOC Transaction Anomaly Detector
+# 🛡️ KUMA-LAB — SOC Transaction Anomaly Detector
 
-Projeto de detecção de anomalias em transações financeiras orientado a apoio de investigação em SOC, desenvolvido a partir do Bootcamp **Bradesco - GenAI, Dados & Cyber**.
+**Evidence-grounded SOC investigation assistant for transaction anomaly analysis.**
 
-A versão `v2.0.0` amplia a prova de conceito original com uma arquitetura modular, controles de segurança em PostgreSQL/Supabase, automação de testes e qualidade, persistência de alertas, integração com MITRE ATT&CK e práticas de DevSecOps.
+Projeto independente de **Cybersecurity, Detection Engineering, Machine Learning e investigação SOC**, desenvolvido dentro do **KUMA-LAB**.
 
-O sistema combina Python, PostgreSQL, Machine Learning e Segurança Cibernética para analisar comportamento transacional, correlacionar sinais de segurança, comparar detectores e produzir artefatos técnicos para apoio à triagem e investigação.
+A primeira versão nasceu durante um bootcamp de GenAI, Dados e Cybersecurity. Desde então, o projeto evoluiu de forma independente, deixando de ser apenas uma entrega educacional para se tornar um laboratório técnico incremental de engenharia de detecção, geração de evidências e apoio à investigação.
+
+A linha atual de desenvolvimento é a **V3**, que expande o pipeline analítico original com geração sintética reproduzível, validação temporal, contratos de evidência, proveniência MITRE ATT&CK, o **KUMA GUARD — Guarded SOC Assistant** e uma **Evaluation Matrix** independente voltada à segurança das conclusões.
+
+O projeto continua sendo uma **prova de conceito baseada em dados sintéticos**. Ele não deve ser interpretado como sistema de detecção de fraude pronto para produção nem como mecanismo de confirmação automática de incidentes.
 
 ## 📌 Objetivo
 

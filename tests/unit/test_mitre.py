@@ -189,3 +189,207 @@ def test_enriquecimento_transferencia_busca_t1043():
 
     assert engine.connection.executed_params["termo"] == "%T1043%"
     assert resultado["fonte"] == "fallback local"
+
+
+def test_enriquecimento_preserva_familia_correlacionada_no_fallback_local():
+    engine = FakeEngine(row=None)
+
+    resultado = enriquecer_com_mitre(
+        engine=engine,
+        tipo_evento="Pix",
+        sinais={"falhas_login_recentes": 3},
+    )
+
+    assert resultado["mitre_id"].startswith("T1110")
+    assert resultado["fonte"] == "fallback local"
+    assert "falhas de login" in resultado["criterio"]
+
+
+def test_enriquecimento_declara_base_de_selecao_por_correlacao_comportamental():
+    engine = FakeEngine(
+        row=(
+            "T1110",
+            "Brute Force",
+            "Credential Access",
+            "Aplicar MFA.",
+        )
+    )
+
+    resultado = enriquecer_com_mitre(
+        engine=engine,
+        tipo_evento="Pix",
+        sinais={"falhas_login_recentes": 3},
+    )
+
+    assert resultado["selection_basis"] == "behavioral_correlation"
+
+
+def test_enriquecimento_declara_base_de_selecao_por_tipo_de_transacao_fallback():
+    engine = FakeEngine(
+        row=(
+            "T1565",
+            "Data Manipulation",
+            "Impact",
+            "Aplicar controles adicionais.",
+        )
+    )
+
+    resultado = enriquecer_com_mitre(
+        engine=engine,
+        tipo_evento="Pix",
+        sinais={},
+    )
+
+    assert resultado["selection_basis"] == "transaction_type_fallback"
+
+
+def test_enriquecimento_declara_banco_como_fonte_de_conhecimento():
+    engine = FakeEngine(
+        row=(
+            "T1110",
+            "Brute Force",
+            "Credential Access",
+            "Aplicar MFA.",
+        )
+    )
+
+    resultado = enriquecer_com_mitre(
+        engine=engine,
+        tipo_evento="Pix",
+        sinais={"falhas_login_recentes": 3},
+    )
+
+    assert resultado["knowledge_source"] == "database"
+
+
+def test_enriquecimento_declara_catalogo_local_como_fonte_de_conhecimento():
+    resultado_correlacionado = enriquecer_com_mitre(
+        engine=FakeEngine(row=None),
+        tipo_evento="Pix",
+        sinais={"falhas_login_recentes": 3},
+    )
+
+    resultado_pix = enriquecer_com_mitre(
+        engine=FakeEngine(row=None),
+        tipo_evento="Pix",
+        sinais={},
+    )
+
+    resultado_generico = enriquecer_com_mitre(
+        engine=FakeEngine(row=None),
+        tipo_evento="Outro",
+        sinais={},
+    )
+
+    resultados = (
+        resultado_correlacionado,
+        resultado_pix,
+        resultado_generico,
+    )
+
+    assert all(
+        resultado["knowledge_source"] == "local_catalog" for resultado in resultados
+    )
+
+
+def test_enriquecimento_declara_fallback_por_ausencia_de_match_no_banco():
+    resultado = enriquecer_com_mitre(
+        engine=FakeEngine(row=None),
+        tipo_evento="Pix",
+        sinais={"falhas_login_recentes": 3},
+    )
+
+    assert resultado["knowledge_source"] == "local_catalog"
+    assert resultado["fallback_reason"] == "database_no_match"
+
+
+def test_enriquecimento_declara_fallback_por_erro_no_banco():
+    class FailingEngine:
+        def connect(self):
+            raise RuntimeError("database unavailable")
+
+    resultado = enriquecer_com_mitre(
+        engine=FailingEngine(),
+        tipo_evento="Pix",
+        sinais={"falhas_login_recentes": 3},
+    )
+
+    assert resultado["knowledge_source"] == "local_catalog"
+    assert resultado["fallback_reason"] == "database_error"
+
+
+def test_enriquecimento_preserva_base_de_selecao_no_fallback_local():
+    resultado_correlacionado = enriquecer_com_mitre(
+        engine=FakeEngine(row=None),
+        tipo_evento="Pix",
+        sinais={"falhas_login_recentes": 3},
+    )
+
+    resultado_pix = enriquecer_com_mitre(
+        engine=FakeEngine(row=None),
+        tipo_evento="Pix",
+        sinais={},
+    )
+
+    resultado_generico = enriquecer_com_mitre(
+        engine=FakeEngine(row=None),
+        tipo_evento="Outro",
+        sinais={},
+    )
+
+    assert resultado_correlacionado["selection_basis"] == "behavioral_correlation"
+    assert resultado_pix["selection_basis"] == "transaction_type_fallback"
+    assert resultado_generico["selection_basis"] == "transaction_type_fallback"
+
+
+def test_enriquecimento_declara_ausencia_de_fallback_quando_banco_resolve():
+    resultado = enriquecer_com_mitre(
+        engine=FakeEngine(
+            row=(
+                "T1110.001",
+                "Tecnica de teste",
+                "Tatica de teste",
+                "Procedimento de teste",
+            )
+        ),
+        tipo_evento="Pix",
+        sinais={"falhas_login_recentes": 3},
+    )
+
+    assert resultado["knowledge_source"] == "database"
+    assert resultado["selection_basis"] == "behavioral_correlation"
+    assert resultado["fallback_reason"] is None
+
+
+def test_fallback_local_nao_troca_familia_mitre_selecionada():
+    casos = (
+        (
+            "T1098",
+            "Pix",
+            {
+                "dispositivo_novo_flag": True,
+                "alteracao_limite_flag": True,
+            },
+        ),
+        (
+            "T1078",
+            "Pix",
+            {
+                "mudanca_localizacao_flag": True,
+            },
+        ),
+        (
+            "T1043",
+            "Transferência",
+            {},
+        ),
+    )
+
+    for familia_esperada, tipo_evento, sinais in casos:
+        resultado = enriquecer_com_mitre(
+            engine=FakeEngine(row=None),
+            tipo_evento=tipo_evento,
+            sinais=sinais,
+        )
+
+        assert resultado["mitre_id"].startswith(familia_esperada)

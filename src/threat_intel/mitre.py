@@ -53,6 +53,10 @@ def enriquecer_com_mitre(
 
     termo_busca, criterio = determinar_padrao_por_correlacao(sinais)
 
+    selection_basis = (
+        "behavioral_correlation" if termo_busca else "transaction_type_fallback"
+    )
+
     if not termo_busca:
         criterio = "tipo de transação (fallback, sem correlação de log disponível)"
 
@@ -62,6 +66,8 @@ def enriquecer_com_mitre(
             termo_busca = "%T1043%"
         else:
             termo_busca = "%T1110%"
+
+    fallback_reason = None
 
     try:
         query = text(
@@ -88,13 +94,53 @@ def enriquecer_com_mitre(
                 "procedimentos": limpar_texto_mitre(result[3]),
                 "fonte": "banco de dados (dinâmico)",
                 "criterio": criterio,
+                "selection_basis": selection_basis,
+                "knowledge_source": "database",
+                "fallback_reason": None,
             }
 
+        fallback_reason = "database_no_match"
+
     except Exception as exc:
+        fallback_reason = "database_error"
+
         print(
             "⚠️ Alerta ao consultar Threat Intel no banco: "
             f"{exc}. Usando mapeamento local resiliente."
         )
+
+    if termo_busca.startswith("%T1110"):
+        return {
+            "mitre_id": "T1110.001",
+            "tecnica": ("Ataque de Força Bruta (Brute Force Credential Stuffing)"),
+            "tatica": "Acesso Inicial",
+            "procedimentos": (
+                "Bloquear temporariamente o IP de origem e forçar redefinição de senha."
+            ),
+            "fonte": "fallback local",
+            "criterio": criterio,
+            "selection_basis": selection_basis,
+            "knowledge_source": "local_catalog",
+            "fallback_reason": fallback_reason,
+        }
+
+    candidate_family = termo_busca.strip("%")
+
+    if candidate_family not in {"T1110", "T1565"}:
+        return {
+            "mitre_id": candidate_family,
+            "tecnica": "Candidato MITRE não resolvido no catálogo local",
+            "tatica": "Não resolvida",
+            "procedimentos": (
+                "Consultar uma fonte MITRE disponível antes de interpretar "
+                "o candidato selecionado."
+            ),
+            "fonte": "fallback local",
+            "criterio": criterio,
+            "selection_basis": selection_basis,
+            "knowledge_source": "local_catalog",
+            "fallback_reason": fallback_reason,
+        }
 
     if "Pix" in tipo_evento:
         return {
@@ -108,15 +154,7 @@ def enriquecer_com_mitre(
             ),
             "fonte": "fallback local",
             "criterio": criterio,
+            "selection_basis": selection_basis,
+            "knowledge_source": "local_catalog",
+            "fallback_reason": fallback_reason,
         }
-
-    return {
-        "mitre_id": "T1110.001",
-        "tecnica": ("Ataque de Força Bruta (Brute Force Credential Stuffing)"),
-        "tatica": "Acesso Inicial",
-        "procedimentos": (
-            "Bloquear temporariamente o IP de origem e forçar redefinição de senha."
-        ),
-        "fonte": "fallback local",
-        "criterio": criterio,
-    }

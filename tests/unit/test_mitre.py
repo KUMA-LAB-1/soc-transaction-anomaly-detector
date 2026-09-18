@@ -359,3 +359,37 @@ def test_enriquecimento_declara_ausencia_de_fallback_quando_banco_resolve():
     assert resultado["knowledge_source"] == "database"
     assert resultado["selection_basis"] == "behavioral_correlation"
     assert resultado["fallback_reason"] is None
+
+
+def test_fallback_local_nao_troca_familia_mitre_selecionada():
+    casos = (
+        (
+            "T1098",
+            "Pix",
+            {
+                "dispositivo_novo_flag": True,
+                "alteracao_limite_flag": True,
+            },
+        ),
+        (
+            "T1078",
+            "Pix",
+            {
+                "mudanca_localizacao_flag": True,
+            },
+        ),
+        (
+            "T1043",
+            "Transferência",
+            {},
+        ),
+    )
+
+    for familia_esperada, tipo_evento, sinais in casos:
+        resultado = enriquecer_com_mitre(
+            engine=FakeEngine(row=None),
+            tipo_evento=tipo_evento,
+            sinais=sinais,
+        )
+
+        assert resultado["mitre_id"].startswith(familia_esperada)

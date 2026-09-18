@@ -13,8 +13,21 @@ A primeira versão nasceu durante um bootcamp de GenAI, Dados e Cybersecurity. D
 > - Última release formal registrada: **v2.0.0**
 > - Linha ativa de desenvolvimento: **V3**
 > - Estado da V3: núcleo defensivo certificado; documentação, arquitetura pública e pitch técnico em fechamento
+> - README público: alinhado à linha V3
+> - PDF público versionado: ainda é o snapshot histórico da **v2.0.0**
 >
 > O projeto continua sendo uma **prova de conceito baseada em dados sintéticos**. Não deve ser interpretado como sistema de detecção de fraude pronto para produção nem como mecanismo de confirmação automática de incidentes.
+
+### 🧭 Leitura rápida
+
+- [Arquitetura V3](#️-arquitetura-v3)
+- [KUMA GUARD](#-kuma-guard---guarded-soc-assistant)
+- [Evaluation Matrix](#-evaluation-matrix)
+- [DevSecOps e segurança](#️-devsecops-e-segurança)
+- [Estado da documentação](#-estado-da-documentação-e-fonte-de-verdade)
+- [Artefatos públicos e estratégia do PDF](#-artefatos-públicos-e-estratégia-do-pdf)
+- [Como executar](#️-como-executar)
+- [Roadmap](#️-roadmap)
 
 ---
 
@@ -40,7 +53,8 @@ Entre as capacidades implementadas estão:
 - **KUMA GUARD - Guarded SOC Assistant**;
 - **Evaluation Matrix** independente para avaliar claims sem suporte e falsas confirmações;
 - teste E2E do contrato defensivo da V3;
-- geração de métricas, gráficos, CSV, JSON e relatório PDF;
+- geração de métricas, gráficos, CSV e JSON;
+- geração de relatório PDF analítico pelo pipeline legado, ainda não equivalente ao snapshot documental da V3;
 - controles DevSecOps de qualidade, segurança, supply chain e container.
 
 A implementação atual utiliza PostgreSQL/Supabase como infraestrutura principal de dados. A evolução arquitetural busca limitar o acoplamento ao fornecedor e manter contratos que permitam adapters e integrações futuras.
@@ -146,7 +160,7 @@ O MITRE ATT&CK funciona como contexto de Threat Intelligence e mantém sua prove
 | `src/threat_intel/` | Correlação e enriquecimento MITRE ATT&CK |
 | `src/soc_assistant/assessment.py` | KUMA GUARD: fatos, hipóteses suportadas, evidência ausente e checks recomendados |
 | `src/soc_assistant/evaluation.py` | Evaluation Matrix independente do runtime do assistente |
-| `src/reporting/` | Métricas, gráficos e relatório PDF |
+| `src/reporting/` | Métricas, gráficos e relatório PDF analítico legado; a consolidação documental V3 é uma trilha separada |
 | `.github/workflows/ci.yml` | Quality gates, testes, segurança, SBOM e container security |
 
 ---
@@ -457,6 +471,22 @@ Visão de alto nível:
 
 ---
 
+## 📚 Estado da documentação e fonte de verdade
+
+Nem todo artefato do repositório representa a mesma geração do projeto. Para evitar mistura entre a V3 ativa e snapshots históricos, a leitura pública deve seguir esta hierarquia:
+
+| Superfície | Papel atual | Estado |
+| --- | --- | --- |
+| `README.md` | visão pública, escopo, capacidades e status da linha ativa | **V3 atual** |
+| `docs/architecture/` | documentação técnica detalhada da arquitetura | base existente em consolidação para refletir integralmente a V3 |
+| `docs/devsecops/` | documentação dos controles de qualidade e segurança | documentação técnica complementar; código e CI continuam sendo a referência executável |
+| `reports/resultado_multimodelo/` | artefatos públicos de uma execução certificada anterior | **snapshot histórico v2.0.0** |
+| `src/reporting/pdf_report.py` | gerador de relatório analítico de execução | formato legado do pipeline; ainda não representa o contrato defensivo completo da V3 |
+
+A regra de documentação da linha V3 é simples: **não promover um artefato histórico a “V3” apenas porque o código ao redor evoluiu**. O snapshot V3 só será publicado quando conteúdo, proveniência, validação e identidade de versão estiverem sincronizados.
+
+---
+
 ## 📚 Documentação técnica
 
 ### Arquitetura
@@ -477,9 +507,9 @@ A documentação de arquitetura será consolidada para refletir integralmente o 
 
 ---
 
-## 📦 Artefatos públicos e o PDF atual
+## 📦 Artefatos públicos e estratégia do PDF
 
-Os arquivos em `reports/resultado_multimodelo/` são um **snapshot experimental público da v2.0.0**, preservado para histórico e reprodutibilidade.
+Os arquivos em `reports/resultado_multimodelo/` formam um **snapshot experimental público e congelado da v2.0.0**, preservado para histórico, auditoria e reprodutibilidade.
 
 Isso inclui:
 
@@ -489,31 +519,79 @@ Isso inclui:
 - gráficos analíticos da execução v2.0.0;
 - histórico de métricas daquele snapshot.
 
-> **Importante:** o PDF atual foi gerado em **21/08/2026** e **não representa a arquitetura completa da V3**. Ele não documenta EvidenceContext, MITRE provenance, KUMA GUARD, Evaluation Matrix ou o E2E defensivo.
+> **Importante:** o PDF público atual foi gerado em **21/08/2026** e **não representa a arquitetura completa da V3**. Ele não documenta `EvidenceContext`, MITRE provenance, KUMA GUARD, Evaluation Matrix ou o E2E defensivo.
 
-### Estratégia para o relatório V3
+### Dois artefatos diferentes
 
-O snapshot v2.0.0 será preservado. A V3 deverá gerar um **novo conjunto de artefatos versionados**, em vez de sobrescrever silenciosamente o relatório anterior.
+A V3 passa a distinguir explicitamente dois conceitos que antes ficavam misturados:
 
-A sequência planejada é:
+1. **Relatório de execução analítica**  
+   É produzido pelo pipeline atual por `src/reporting/pdf_report.py`. Resume métricas, anomalias, severidade e correlação MITRE daquela execução. O formato ainda é herdado da linha v2 e não deve ser apresentado como documentação completa da V3.
+
+2. **Snapshot documental da versão**  
+   É o artefato público que representa um checkpoint certificado do projeto. Deve registrar arquitetura, contratos defensivos, proveniência, validações, limitações e evidências de qualidade da versão publicada.
+
+Essa separação evita que uma execução recente gere um PDF com aparência de “versão atual” sem conter os contratos defensivos que definem a V3.
+
+### Comportamento do gerador atual
+
+Ao executar o pipeline completo, o código ainda pode gerar:
+
+```text
+reports/Relatorio_Incidente_SOC.pdf
+```
+
+Esse arquivo é **output de execução**, não substitui automaticamente o snapshot histórico em `reports/resultado_multimodelo/` e, no estado atual do gerador, **não deve ser promovido ou commitado como relatório V3**.
+
+### Estratégia para o snapshot V3
+
+O snapshot v2.0.0 será preservado sem sobrescrita. A publicação da V3 deve utilizar um diretório versionado próprio, por exemplo:
+
+```text
+reports/
+├── resultado_multimodelo/        # snapshot histórico v2.0.0
+└── snapshots/
+    └── v3.0.0/                   # futuro snapshot certificado V3
+```
+
+O relatório V3 deverá nascer de um contrato de reporting atualizado e incluir, no mínimo:
+
+- versão e checkpoint de origem;
+- metadados reproduzíveis da execução/dataset sintético;
+- métricas analíticas e validação temporal;
+- contrato de alertas;
+- `EvidenceContext`;
+- proveniência MITRE ATT&CK;
+- avaliação do KUMA GUARD;
+- métricas da Evaluation Matrix;
+- resultado do E2E defensivo e quality gates relevantes;
+- limitações e distinção explícita entre fato, hipótese e confirmação.
+
+A sequência planejada passa a ser:
 
 ```text
 arquitetura V3 consolidada
         │
         ▼
-estado funcional certificado
+contrato de reporting V3
         │
         ▼
-novo relatório V3
+gerador V3 desacoplado do formato legado
+        │
+        ▼
+checkpoint funcional certificado
+        │
+        ▼
+snapshot versionado
         │
         ▼
 validação visual + técnica
         │
         ▼
-publicação como snapshot V3
+publicação
 ```
 
-Até essa etapa, qualquer resultado numérico ou gráfico existente em `reports/resultado_multimodelo/` deve ser lido como resultado histórico da v2.0.0.
+Até essa etapa, resultados numéricos e gráficos em `reports/resultado_multimodelo/` devem ser lidos exclusivamente como resultados históricos da v2.0.0.
 
 ### Snapshot visual v2.0.0
 
@@ -577,6 +655,8 @@ uv run python src/ingest_mitre.py
 uv run python -m src.security_detector
 ```
 
+> O pipeline pode gerar `reports/Relatorio_Incidente_SOC.pdf`. No estado atual, esse PDF é um **relatório analítico de execução no formato legado**, não o snapshot documental V3. Não o trate como substituto do relatório público versionado.
+
 ### 8. Executar a suíte global
 
 ```bash
@@ -608,7 +688,7 @@ Principais limitações:
 - a regressão de severidade permanece experimental;
 - ainda não existe monitoramento operacional de data drift ou concept drift;
 - o backend atual utiliza PostgreSQL/Supabase e a camada de adapters multi-backend é uma evolução futura;
-- o PDF público disponível ainda é o snapshot histórico da v2.0.0;
+- o PDF público disponível ainda é o snapshot histórico da v2.0.0, e o gerador PDF do pipeline ainda usa o formato analítico legado;
 - frontend / Visual SOC Console permanece fora do núcleo atual da V3.
 
 ---
@@ -657,7 +737,7 @@ Em fechamento:
 - README e identidade pública;
 - consolidação da arquitetura V3;
 - pitch técnico / portfólio;
-- novo snapshot documental e relatório V3;
+- contrato de reporting V3, novo snapshot documental e relatório V3 versionado;
 - V3 Completion Gate.
 
 ### 🔭 Pós-V3 / V3.1+

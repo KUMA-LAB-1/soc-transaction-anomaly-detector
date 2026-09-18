@@ -17,6 +17,7 @@ class GuardedSocAssessment:
     alert_id: str
     missing_evidence: tuple[str, ...]
     facts: tuple[ObservedFact, ...]
+    hypotheses: tuple[str, ...]
 
 
 def build_guarded_assessment(context: EvidenceContext) -> GuardedSocAssessment:
@@ -38,4 +39,5 @@ def build_guarded_assessment(context: EvidenceContext) -> GuardedSocAssessment:
         alert_id=context.alert_id,
         missing_evidence=context.quality.missing_evidence,
         facts=facts,
+        hypotheses=(),
     )

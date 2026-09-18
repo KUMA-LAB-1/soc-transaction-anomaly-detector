@@ -1,575 +1,691 @@
-# 🛡️ KUMA-LAB — SOC Transaction Anomaly Detector
+# 🛡️ KUMA-LAB | SOC Transaction Anomaly Detector
 
 **Evidence-grounded SOC investigation assistant for transaction anomaly analysis.**
 
+[![CI](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/actions/workflows/ci.yml/badge.svg)](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/actions/workflows/ci.yml)
+
 Projeto independente de **Cybersecurity, Detection Engineering, Machine Learning e investigação SOC**, desenvolvido dentro do **KUMA-LAB**.
 
-A primeira versão nasceu durante um bootcamp de GenAI, Dados e Cybersecurity. Desde então, o projeto evoluiu de forma independente, deixando de ser apenas uma entrega educacional para se tornar um laboratório técnico incremental de engenharia de detecção, geração de evidências e apoio à investigação.
+A primeira versão nasceu durante um bootcamp de GenAI, Dados e Cybersecurity. Desde então, o projeto evoluiu de forma independente para se tornar um laboratório técnico incremental de engenharia de detecção, dados sintéticos, geração de evidências e apoio à investigação.
 
-A linha atual de desenvolvimento é a **V3**, que expande o pipeline analítico original com geração sintética reproduzível, validação temporal, contratos de evidência, proveniência MITRE ATT&CK, o **KUMA GUARD — Guarded SOC Assistant** e uma **Evaluation Matrix** independente voltada à segurança das conclusões.
-
-O projeto continua sendo uma **prova de conceito baseada em dados sintéticos**. Ele não deve ser interpretado como sistema de detecção de fraude pronto para produção nem como mecanismo de confirmação automática de incidentes.
-
-## 📌 Objetivo
-
-O objetivo do projeto é construir um pipeline capaz de:
-
-- carregar transações a partir de PostgreSQL/Supabase;
-- validar, limpar e preparar os dados;
-- criar features comportamentais;
-- executar classificação supervisionada para triagem;
-- executar detectores não supervisionados de anomalia;
-- comparar resultados e selecionar automaticamente o detector mais adequado segundo critérios definidos no pipeline;
-- estimar severidade de risco;
-- correlacionar sinais com MITRE ATT&CK;
-- gerar alertas SOC estruturados;
-- persistir alertas opcionalmente em JSONL ou SQLite;
-- registrar auditoria de acesso ao dataset operacional;
-- gerar gráficos, métricas, CSV, JSON e relatório PDF;
-- executar verificações automatizadas de qualidade e segurança por meio do pipeline DevSecOps.
-
-O projeto permanece uma **prova de conceito baseada em dados sintéticos** e não deve ser interpretado como sistema de detecção de fraude pronto para produção.
-
-## 🧪 Natureza dos dados
-
-A base utilizada neste projeto é composta por **dados sintéticos**, criados exclusivamente para fins educacionais e experimentais.
-
-O banco foi populado com:
-
-- transações consideradas normais;
-- transações classificadas como suspeitas;
-- eventos de autenticação;
-- falhas recentes de login;
-- uso de dispositivo novo;
-- alterações de limite;
-- mudanças de localização.
-
-Nos modelos não supervisionados, o status da transação não participa do treinamento. Ele é utilizado apenas posteriormente para auditoria e comparação dos resultados.
+> **Status de versionamento**
+>
+> - Última release formal registrada: **v2.0.0**
+> - Linha ativa de desenvolvimento: **V3**
+> - Estado da V3: núcleo defensivo certificado; documentação, arquitetura pública e pitch técnico em fechamento
+>
+> O projeto continua sendo uma **prova de conceito baseada em dados sintéticos**. Não deve ser interpretado como sistema de detecção de fraude pronto para produção nem como mecanismo de confirmação automática de incidentes.
 
 ---
 
-## 🏗️ Arquitetura
+## 📌 O que este projeto faz
+
+O projeto combina análise transacional, detecção de anomalias e investigação orientada por evidências para explorar como um SOC pode transformar sinais técnicos em contexto investigativo sem confundir suspeita com confirmação.
+
+Entre as capacidades implementadas estão:
+
+- preparação e validação de dados transacionais;
+- engenharia de features comportamentais;
+- geração sintética reproduzível com truth conhecida;
+- cenários sintéticos, severidade, intensidade, população e diagnósticos estatísticos;
+- classificação supervisionada para triagem;
+- múltiplos detectores de anomalia;
+- avaliação experimental e comparação de detectores;
+- regressão de severidade;
+- holdout e validação cruzada temporal;
+- geração de alertas SOC estruturados;
+- persistência opcional de alertas em JSONL ou SQLite;
+- `EvidenceContext` para projetar evidências de um alerta sem reinterpretá-las;
+- correlação MITRE ATT&CK com proveniência explícita da seleção;
+- **KUMA GUARD - Guarded SOC Assistant**;
+- **Evaluation Matrix** independente para avaliar claims sem suporte e falsas confirmações;
+- teste E2E do contrato defensivo da V3;
+- geração de métricas, gráficos, CSV, JSON e relatório PDF;
+- controles DevSecOps de qualidade, segurança, supply chain e container.
+
+A implementação atual utiliza PostgreSQL/Supabase como infraestrutura principal de dados. A evolução arquitetural busca limitar o acoplamento ao fornecedor e manter contratos que permitam adapters e integrações futuras.
+
+---
+
+## 🧭 Princípio central: evidência antes de conclusão
+
+O núcleo defensivo da V3 foi construído para preservar uma separação explícita entre fatos, lacunas de evidência, hipóteses e confirmação.
 
 ```text
-PostgreSQL / Supabase
+evidência observada
         │
         ▼
-View operacional de investigação do SOC
+      fato
+        │
+        ├───────────────┐
+        │               │
+        ▼               ▼
+pode suportar       evidência ausente
+uma hipótese             │
+        │                ▼
+        │        recommended check
+        ▼
+    hipótese
         │
         ▼
-Validação e preparação dos dados
-        │
-        ▼
+NÃO confirma incidente automaticamente
+```
+
+Em outras palavras:
+
+- observado pode virar fato;
+- ausente gera investigação;
+- hipótese precisa de suporte explícito;
+- score alto não confirma incidente;
+- anomalia não confirma incidente;
+- hipótese plausível não confirma incidente.
+
+Esse contrato é o "truth firewall" do KUMA GUARD.
+
+---
+
+## 🏗️ Arquitetura V3
+
+A V3 possui dois eixos complementares: o pipeline analítico e o eixo defensivo de investigação.
+
+```text
+Dados / geração sintética
+          │
+          ▼
+Validação e preparação
+          │
+          ▼
 Engenharia de features
-        │
-        ├── Classificador supervisionado de triagem
-        ├── Detectores não supervisionados / novelty detection
-        └── Regressão de severidade
-                │
-                ▼
-Comparação de métricas
-                │
-                ▼
-Seleção automática do melhor detector
-                │
-                ├──────────────────────┐
-                ▼                      ▼
-       Correlação MITRE ATT&CK    Geração de alertas SOC
-                │                      │
-                │                Persistência opcional
-                │                  JSONL / SQLite
-                │                      │
-                └───────────┬──────────┘
-                            ▼
-                  Gráficos, métricas,
-                  JSON, CSV e PDF
+          │
+          ├── Classificação de triagem
+          ├── Detectores de anomalia
+          └── Regressão de severidade
+          │
+          ▼
+Avaliação + validação temporal
+          │
+          ▼
+Contrato de alerta SOC
+          │
+          ├──────────────► Persistência opcional
+          │                 JSONL / SQLite
+          │
+          ├──────────────► MITRE ATT&CK
+          │                 seleção + provenance
+          │
+          ▼
+EvidenceContext
+          │
+          ▼
+KUMA GUARD
+GuardedSocAssessment
+          │
+          ▼
+Evaluation Matrix
+          │
+          ▼
+Auditoria de claims
+e confirmação
 ```
----
-A arquitetura de banco aplica separação de responsabilidades entre o runtime do SOC, a ingestão de Threat Intelligence e os componentes de auditoria.
 
-O runtime utiliza uma view operacional minimizada e uma identidade PostgreSQL dedicada, enquanto a ingestão do MITRE ATT&CK utiliza uma credencial independente com permissões específicas. Essa separação reduz a exposição de dados e aplica o princípio de menor privilégio.
+O MITRE ATT&CK funciona como contexto de Threat Intelligence e mantém sua proveniência separada do `EvidenceContext`. O contexto de evidência projeta o alerta sem transformar enriquecimento externo em fato observado.
 
 ---
 
-## 📂 Estrutura do repositório
+## 🧩 Componentes principais
+
+| Componente | Responsabilidade |
+| --- | --- |
+| `src/security_detector.py` | Orquestra o pipeline analítico principal |
+| `src/data/` | Acesso, validação e preparação estrutural dos dados |
+| `src/features/` | Engenharia de features comportamentais |
+| `src/models/` | Classificação, anomaly detection, regressão, benchmarks e validação |
+| `src/synthetic/` | Geração sintética, truth, cenários, população, severidade, diagnósticos e benchmarks |
+| `src/alerts/` | Contrato, geração, serialização, consulta e persistência de alertas |
+| `src/evidence_context.py` | Projeção de um `Alert` em contexto de evidência sem reinterpretar seus dados |
+| `src/threat_intel/` | Correlação e enriquecimento MITRE ATT&CK |
+| `src/soc_assistant/assessment.py` | KUMA GUARD: fatos, hipóteses suportadas, evidência ausente e checks recomendados |
+| `src/soc_assistant/evaluation.py` | Evaluation Matrix independente do runtime do assistente |
+| `src/reporting/` | Métricas, gráficos e relatório PDF |
+| `.github/workflows/ci.yml` | Quality gates, testes, segurança, SBOM e container security |
+
+---
+
+## 🐻 KUMA GUARD - Guarded SOC Assistant
+
+O **KUMA GUARD** recebe um `EvidenceContext` e constrói um `GuardedSocAssessment` com cinco dimensões explícitas:
+
+- fatos observados;
+- evidências ausentes;
+- hipóteses suportadas;
+- verificações recomendadas;
+- estado de confirmação do incidente.
+
+Por padrão:
+
+```python
+incident_confirmed = False
+```
+
+Uma hipótese só pode ser adicionada quando declara quais fatos observados a suportam. Suporte vazio ou referência a fato não observado é rejeitado.
+
+Exemplo conceitual:
 
 ```text
-.
-├── .github/
-│   ├── dependabot.yml
-│   └── workflows/
-│       └── ci.yml
-│
-├── src/
-│   ├── alerts/
-│   │   ├── bootstrap.py
-│   │   ├── config.py
-│   │   ├── contract.py
-│   │   ├── engine.py
-│   │   ├── factory.py
-│   │   ├── jsonl_repository.py
-│   │   ├── query.py
-│   │   ├── repository.py
-│   │   ├── serialization.py
-│   │   ├── sqlite_query.py
-│   │   └── sqlite_repository.py
-│   │
-│   ├── data/
-│   │   ├── columns.py
-│   │   ├── repository.py
-│   │   └── validation.py
-│   │
-│   ├── features/
-│   │   └── engineering.py
-│   │
-│   ├── models/
-│   │   ├── anomaly_detection.py
-│   │   ├── classification.py
-│   │   ├── evaluation.py
-│   │   └── regression.py
-│   │
-│   ├── reporting/
-│   │   ├── charts.py
-│   │   ├── metrics.py
-│   │   └── pdf_report.py
-│   │
-│   ├── threat_intel/
-│   │   └── mitre.py
-│   │
-│   ├── db_connector.py
-│   ├── ingest_mitre.py
-│   └── security_detector.py
-│
-├── database/
-│   ├── queries/
-│   │   └── forensic_investigation.sql
-│   ├── schema/
-│   │   ├── 00_extensions.sql
-│   │   ├── 01_schema.sql
-│   │   ├── 02_threat_intelligence.sql
-│   │   ├── 03_audit.sql
-│   │   ├── 04_soc_view.sql
-│   │   └── 05_security.sql
-│   └── seeds/
-│       ├── 01_base_entities.sql
-│       ├── exemplo_popular_normal_banco.sql
-│       └── exemplo_popular_anomalia_banco.sql
-│
-├── docs/
-│   ├── architecture/
-│   │   ├── ml-models.md
-│   │   ├── overview.md
-│   │   └── pipeline.md
-│   └── devsecops/
-│       ├── ci-pipeline.md
-│       ├── container-security.md
-│       ├── overview.md
-│       ├── security-controls.md
-│       └── supply-chain.md
-│
-├── reports/
-│   └── resultado_multimodelo/
-│
-├── tests/
-│   ├── integration/
-│   └── unit/
-│
-├── .dockerignore
-├── .env.example
-├── .gitattributes
-├── .gitignore
-├── CHANGELOG.md
-├── Dockerfile
-├── README.md
-├── pyproject.toml
-├── requirements.txt
-├── uv.lock
-└── LICENSE
+failed_logins = observado
+new_device    = observado
+
+        │
+        ▼
+
+possible_account_compromise
+suportada por:
+- failed_logins
+- new_device
+
+        │
+        ▼
+
+continua sendo hipótese
 ```
----
-A estrutura reflete a modularização introduzida na v2.0.0, separando responsabilidades de dados, Machine Learning, Threat Intelligence, geração e persistência de alertas, reporting, segurança e testes.
 
 ---
 
-## 🔎 Engenharia de features
+## 🧪 Evaluation Matrix
 
-O pipeline utiliza atributos originais e derivados do comportamento histórico dos clientes:
+A Evaluation Matrix funciona como um avaliador independente do resultado do KUMA GUARD.
 
-- valor da transação;
-- horário do evento;
-- dia da semana;
-- média histórica por cliente;
-- desvio-padrão histórico;
-- Z-Score do valor da transação;
-- quantidade de transações anteriores;
-- falhas recentes de login;
-- uso de dispositivo novo;
-- alteração de limite;
-- mudança de localização;
-- tipo da transação.
+O núcleo atual mede:
 
-O Z-Score mede quanto o valor atual se afasta do comportamento histórico do cliente.
+- quantidade de hipóteses;
+- hipóteses sem suporte observável;
+- `unsupported_claim_rate`;
+- falsas confirmações quando existe truth externa;
+- `false_confirmation_rate`;
+- agregação de múltiplas avaliações;
+- execução de cenários de avaliação.
 
----
+Quando a truth de confirmação não existe, o evaluator preserva a ausência de informação:
 
-## 🤖 Modelos implementados
+```text
+false_confirmation_rate = None
+```
 
-### Classificador supervisionado
-
-Foi utilizado um `DecisionTreeClassifier` para reproduzir decisões históricas de triagem.
-
-O objetivo desse classificador não é descobrir ataques inéditos, mas avaliar quais features mais contribuíram para a classificação das transações já rotuladas.
-
-### Detectores não supervisionados
-
-Foram comparados quatro modelos:
-
-| Modelo | Característica principal |
-|---|---|
-| Isolation Forest | Isola observações incomuns por particionamento aleatório |
-| Local Outlier Factor | Identifica desvios em relação à densidade local |
-| One-Class SVM | Aprende uma fronteira para representar o comportamento normal |
-| Elliptic Envelope | Modela a distribuição dos dados por uma região elíptica robusta |
-
-### Regressão de severidade
-
-Foi utilizada uma regressão linear para estimar um score de risco entre 0 e 100.
-
-Essa parte é experimental e deverá ser reavaliada com uma base maior e modelos mais adequados para níveis ordinais de risco.
+Ele não converte "truth ausente" em uma falsa certeza numérica.
 
 ---
 
-## 📊 Resultados experimentais
+## 🎯 MITRE ATT&CK e provenance
 
-Os detectores utilizaram o mesmo conjunto de features e foram avaliados com o mesmo conjunto de dados.
-
-| Modelo | Anomalias | Precision | Recall | F1-score | ROC-AUC | Tempo |
-|---|---:|---:|---:|---:|---:|---:|
-| Elliptic Envelope | 225 | **0,996** | **0,448** | **0,618** | **0,9992** | 0,096 s |
-| Isolation Forest | 225 | **0,996** | **0,448** | **0,618** | 0,9989 | 0,234 s |
-| One-Class SVM | 224 | 0,875 | 0,392 | 0,541 | 0,7431 | **0,040 s** |
-| Local Outlier Factor | 208 | 0,587 | 0,244 | 0,345 | 0,5938 | 0,047 s |
-
-### Modelo selecionado
-
-O modelo selecionado automaticamente foi:
-
-> **Elliptic Envelope**
-
-O critério utilizado foi:
-
-1. maior F1-score;
-2. maior recall;
-3. maior precision;
-4. menor tempo de execução.
-
-O Elliptic Envelope apresentou F1-score, recall e precision equivalentes aos do Isolation Forest no conjunto sintético utilizado. Como esses critérios permaneceram empatados, a seleção automática foi definida pelo menor tempo de execução.
-
----
-
-## 📑 Documentação
-
-- 📄 [Relatório Executivo SOC (PDF)](reports/resultado_multimodelo/Relatorio_Incidente_SOC.pdf)
-  
----
-## 📈 Comparação visual
-
-![Comparação dos detectores](reports/resultado_multimodelo/comparacao_detectores.png)
-
----
-
-## 🌲 Isolation Forest
-
-![Isolation Forest](reports/resultado_multimodelo/anomalias_isolation_forest.png)
-
----
-
-## 📐 Elliptic Envelope
-
-![Elliptic Envelope](reports/resultado_multimodelo/anomalias_elliptic_envelope.png)
-
----
-
-## 🧭 Local Outlier Factor
-
-![Local Outlier Factor](reports/resultado_multimodelo/anomalias_local_outlier_factor.png)
-
----
-
-## 🧠 One-Class SVM
-
-![One-Class SVM](reports/resultado_multimodelo/anomalias_one_class_svm.png)
-
----
-
-## 🔬 Importância das features
-
-O classificador de triagem atingiu ROC-AUC próximo de `0,99`.
-
-![Importância das features](reports/resultado_multimodelo/importancia_features_classificador.png)
-
-A feature `zscore_valor_cliente` concentrou aproximadamente 98,7% da importância do classificador na execução final da v2.0.0.
-
-Esse resultado indica que, no conjunto sintético utilizado, a separação entre transações normais e suspeitas está fortemente associada ao desvio do valor da transação em relação ao histórico do cliente.
-
-Embora o desempenho seja positivo para a prova de conceito, essa concentração também representa uma limitação experimental: o classificador apresenta forte dependência de uma única variável, o que reduz a diversidade dos sinais utilizados na decisão.
-
----
-
-## 🛡️ Segurança e privacidade
-
-A v2.0.0 aplica controles de segurança em diferentes camadas do projeto:
-
-- conexão SSL obrigatória com PostgreSQL/Supabase;
-- credenciais mantidas fora do código por meio de variáveis de ambiente;
-- separação de identidades PostgreSQL por responsabilidade;
-- princípio de menor privilégio;
-- Row Level Security (RLS);
-- revogação de privilégios padrão desnecessários;
-- view operacional minimizada para o runtime do SOC;
-- pseudonimização persistente dos clientes;
-- auditoria de acessos ao dataset;
-- separação entre runtime do SOC, ingestão MITRE ATT&CK e auditoria;
-- consultas forenses privilegiadas isoladas do fluxo operacional;
-- minimização da exposição de dados nos relatórios;
-- secret scanning, análise estática, auditoria de dependências e scan de container no pipeline de CI/CD.
-
-Os dados utilizados são sintéticos e não representam clientes, contas ou operações reais.
-
----
-
-## 🎯 MITRE ATT&CK
-
-O pipeline utiliza dados do MITRE ATT&CK armazenados no PostgreSQL.
-
-A correlação considera sinais como:
+A correlação MITRE utiliza sinais como:
 
 - múltiplas falhas de login;
 - dispositivo novo;
 - alteração de limite;
 - mudança de localização;
-- possível comprometimento de conta.
+- tipo de transação como fallback.
 
-O mapeamento é utilizado como apoio à investigação e não representa confirmação automática de ataque.
+A V3 registra também **por que** um candidato foi selecionado e **de onde** o conhecimento foi resolvido.
+
+Entre os campos de provenance estão:
+
+- `selection_basis`: base utilizada para selecionar o candidato;
+- `knowledge_source`: fonte que resolveu o conhecimento;
+- `fallback_reason`: motivo pelo qual um fallback foi necessário.
+
+Quando uma família MITRE não é resolvida pelo catálogo local, o sistema preserva o candidato como **não resolvido**, em vez de inventar uma técnica terminal.
+
+O mapeamento MITRE é contexto investigativo. Ele não representa confirmação automática de ataque.
+
+---
+
+## ⏱️ Validação temporal
+
+A V3 já implementa validação temporal.
+
+O projeto possui:
+
+- holdout temporal;
+- folds temporais com janela de treino expansiva;
+- suporte a `gap`;
+- tratamento de timestamps empatados nas fronteiras;
+- avaliação futura dos detectores após fit no passado;
+- integração com features históricas causais.
+
+Conceitualmente:
+
+```text
+passado
+   │
+   ▼
+treino
+   │
+   ▼
+fronteira temporal
+   │
+   ▼
+futuro
+   │
+   ▼
+avaliação
+```
+
+Isso corrige uma limitação presente em versões anteriores do projeto e reduz risco de leakage temporal.
+
+---
+
+## 🧬 Dados sintéticos
+
+Os datasets utilizados são **sintéticos** e destinados a experimentação, testes e validação arquitetural.
+
+A V3 possui uma camada dedicada em `src/synthetic/` para controlar e diagnosticar aspectos como:
+
+- população;
+- cenários;
+- intensidade;
+- severidade;
+- efeitos de cenário;
+- observáveis;
+- flags comportamentais;
+- política de labels;
+- estratégia de seeds;
+- composição;
+- truth;
+- qualidade estatística;
+- comparação entre datasets;
+- benchmark e estabilidade.
+
+Nos modelos não supervisionados, a truth sintética não é usada como target de treinamento. Ela é consumida posteriormente para avaliação retrospectiva e experimentação controlada.
+
+---
+
+## 🤖 Modelos analíticos
+
+### Classificação supervisionada
+
+O pipeline possui classificação supervisionada voltada à triagem e análise das features associadas às decisões históricas representadas no dataset.
+
+### Detecção de anomalias
+
+O projeto trabalha com múltiplos detectores, incluindo:
+
+| Modelo | Papel experimental |
+| --- | --- |
+| Isolation Forest | Isolamento de observações incomuns por particionamento |
+| Local Outlier Factor | Desvio em relação à densidade local |
+| One-Class SVM | Fronteira de comportamento normal |
+| Elliptic Envelope | Região robusta baseada em covariância |
+
+A seleção experimental compara métricas comuns em vez de assumir um detector universalmente superior.
+
+### Regressão de severidade
+
+A regressão estima um score de severidade em uma escala de risco. Essa etapa permanece experimental e deve ser interpretada dentro das limitações do dataset sintético.
+
+---
+
+## 🛡️ DevSecOps e segurança
+
+O pipeline de CI aplica controles em diferentes superfícies.
+
+```text
+Código
+  ├── Ruff
+  ├── Pytest
+  ├── Coverage
+  └── Bandit
+
+Dependências
+  ├── uv.lock
+  ├── pip-audit
+  ├── CycloneDX SBOM
+  └── Dependabot
+
+Repositório
+  └── Gitleaks
+
+Container
+  ├── multi-stage build
+  ├── runtime non-root
+  ├── exclusão de secrets
+  └── Trivy
+```
+
+Também são aplicados:
+
+- GitHub Actions fixadas por commit SHA;
+- `GITHUB_TOKEN` com menor privilégio;
+- timeouts explícitos;
+- concurrency;
+- security gate para vulnerabilidades HIGH/CRITICAL corrigíveis no container;
+- separação entre runtime e ferramentas de desenvolvimento;
+- credenciais fora do código;
+- hardening PostgreSQL/Supabase;
+- RLS e least privilege;
+- separação entre runtime SOC, Threat Intelligence e auditoria.
+
+### Último checkpoint certificado da linha V3
+
+Em **18/09/2026**, após o E2E defensivo e a rodada de atualizações de dependências:
+
+- **1456 testes** aprovados;
+- **99,00%** de coverage total;
+- Ruff lint aprovado;
+- Ruff format check aprovado;
+- diff-check aprovado;
+- CI com Quality + Unit Tests, Integration Smoke, Secret Scanning, SBOM e Container Security aprovados.
+
+Esses números representam um checkpoint do desenvolvimento e podem evoluir com novos commits.
+
+---
+
+## 🔗 E2E defensivo da V3
+
+O contrato de integração da linha V3 atravessa:
+
+```text
+Alert
+  │
+  ▼
+EvidenceContext
+  │
+  ▼
+KUMA GUARD
+  │
+  ▼
+SupportedHypothesis
+  │
+  ▼
+Evaluation Matrix
+```
+
+O teste E2E valida que:
+
+- os fatos vêm das evidências observadas;
+- evidências ausentes geram checks recomendados;
+- hipóteses carregam suporte explícito;
+- o incidente não é confirmado automaticamente;
+- o evaluator independente não detecta claim sem suporte no cenário válido;
+- a truth externa permite avaliar falsa confirmação.
+
+Arquivo:
+
+```text
+tests/integration/test_kuma_guard_e2e.py
+```
+
+---
+
+## 📂 Estrutura do repositório
+
+Visão de alto nível:
+
+```text
+.
+├── .github/
+│   └── workflows/
+├── database/
+│   ├── queries/
+│   ├── schema/
+│   └── seeds/
+├── docs/
+│   ├── architecture/
+│   └── devsecops/
+├── reports/
+│   └── resultado_multimodelo/
+├── src/
+│   ├── alerts/
+│   ├── data/
+│   ├── features/
+│   ├── models/
+│   ├── reporting/
+│   ├── soc_assistant/
+│   ├── synthetic/
+│   ├── threat_intel/
+│   ├── evidence_context.py
+│   ├── ingest_mitre.py
+│   └── security_detector.py
+├── tests/
+│   ├── integration/
+│   └── unit/
+├── Dockerfile
+├── CHANGELOG.md
+├── pyproject.toml
+├── README.md
+└── uv.lock
+```
+
+---
+
+## 📚 Documentação técnica
+
+### Arquitetura
+
+- [Visão geral](docs/architecture/overview.md)
+- [Pipeline](docs/architecture/pipeline.md)
+- [Modelos e validação](docs/architecture/ml-models.md)
+
+### DevSecOps
+
+- [Visão geral](docs/devsecops/overview.md)
+- [Pipeline de CI](docs/devsecops/ci-pipeline.md)
+- [Controles de segurança](docs/devsecops/security-controls.md)
+- [Software supply chain](docs/devsecops/supply-chain.md)
+- [Container security](docs/devsecops/container-security.md)
+
+A documentação de arquitetura será consolidada para refletir integralmente o eixo defensivo da V3 antes do **V3 Completion Gate**.
+
+---
+
+## 📦 Artefatos públicos e o PDF atual
+
+Os arquivos em `reports/resultado_multimodelo/` são um **snapshot experimental público da v2.0.0**, preservado para histórico e reprodutibilidade.
+
+Isso inclui:
+
+- [Relatório SOC v2.0.0 - snapshot histórico em PDF](reports/resultado_multimodelo/Relatorio_Incidente_SOC.pdf)
+- [Comparação dos detectores em CSV](reports/resultado_multimodelo/comparacao_detectores.csv)
+- [Comparação dos detectores em JSON](reports/resultado_multimodelo/comparacao_detectores.json)
+- gráficos analíticos da execução v2.0.0;
+- histórico de métricas daquele snapshot.
+
+> **Importante:** o PDF atual foi gerado em **21/08/2026** e **não representa a arquitetura completa da V3**. Ele não documenta EvidenceContext, MITRE provenance, KUMA GUARD, Evaluation Matrix ou o E2E defensivo.
+
+### Estratégia para o relatório V3
+
+O snapshot v2.0.0 será preservado. A V3 deverá gerar um **novo conjunto de artefatos versionados**, em vez de sobrescrever silenciosamente o relatório anterior.
+
+A sequência planejada é:
+
+```text
+arquitetura V3 consolidada
+        │
+        ▼
+estado funcional certificado
+        │
+        ▼
+novo relatório V3
+        │
+        ▼
+validação visual + técnica
+        │
+        ▼
+publicação como snapshot V3
+```
+
+Até essa etapa, qualquer resultado numérico ou gráfico existente em `reports/resultado_multimodelo/` deve ser lido como resultado histórico da v2.0.0.
+
+### Snapshot visual v2.0.0
+
+![Comparação histórica dos detectores](reports/resultado_multimodelo/comparacao_detectores.png)
+
+![Importância histórica das features](reports/resultado_multimodelo/importancia_features_classificador.png)
 
 ---
 
 ## ⚙️ Como executar
 
-### 1. Clonar o repositório
+### 1. Clonar
 
 ```bash
 git clone https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector.git
 cd soc-transaction-anomaly-detector
 ```
 
-### 2. Preparar o ambiente Python
+### 2. Sincronizar o runtime
 
-A versão 2.0.0 utiliza Python 3.12.
-
-#### Opção recomendada: `uv`
-
-Com o `uv` instalado:
+Requer Python **3.12** e `uv`.
 
 ```bash
-uv sync
+uv sync --locked
 ```
 
-Esse comando cria ou sincroniza o ambiente virtual do projeto a partir de `pyproject.toml` e `uv.lock`, preservando as versões resolvidas para a v2.0.0.
-
-Para executar comandos dentro desse ambiente, utilize:
+### 3. Ambiente de desenvolvimento em paridade com o CI
 
 ```bash
-uv run <comando>
+uv sync --locked --group lint --group test --group security
 ```
 
-#### Alternativa: `venv` + `pip`
+### 4. Configurar o ambiente
 
-No Windows:
+Copie `.env.example` para `.env` e configure as conexões necessárias.
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-```
+Principais variáveis:
 
-No Linux ou macOS:
+- `SOC_DATABASE_URL`: runtime do pipeline SOC;
+- `MITRE_DATABASE_URL`: ingestão de Threat Intelligence;
+- `SOC_PIPELINE_USER`: identidade lógica de auditoria;
+- `ALERT_STORAGE`: backend opcional para persistência dos alertas.
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+O arquivo `.env` não deve ser versionado.
 
-O arquivo `requirements.txt` permanece disponível como alternativa simplificada para instalação das dependências de runtime.
+### 5. Preparar PostgreSQL/Supabase
 
-### 3. Configurar as variáveis de ambiente
+Execute os scripts em `database/schema/` na ordem numérica e carregue os seeds necessários em `database/seeds/`.
 
-Copie `.env.example` para um arquivo `.env` na raiz do projeto.
+As consultas em `database/queries/forensic_investigation.sql` são destinadas a investigação privilegiada e não fazem parte do fluxo normal de inicialização.
 
-Depois configure as credenciais de banco de acordo com a responsabilidade de cada componente:
-
-- `SOC_DATABASE_URL`: conexão utilizada pelo runtime principal do pipeline SOC, associada a uma identidade PostgreSQL com a capability `soc_pipeline`;
-- `MITRE_DATABASE_URL`: conexão utilizada exclusivamente pela rotina de ingestão do MITRE ATT&CK, associada a uma identidade PostgreSQL com a capability `threat_intel_writer`;
-- `SOC_PIPELINE_USER`: identidade lógica registrada nos eventos de auditoria do pipeline.
-
-Essa separação aplica o princípio de menor privilégio, evitando que o pipeline operacional e a rotina de ingestão de inteligência de ameaças compartilhem uma credencial de banco com permissões excessivas.
-
-Além das credenciais de banco, a persistência de alertas pode ser configurada por meio de:
-
-- `ALERT_STORAGE`: backend de persistência dos alertas;
-- `ALERT_JSONL_PATH`: caminho utilizado para persistência em JSONL;
-- demais opções de armazenamento documentadas no `.env.example`.
-
-Por padrão, `ALERT_STORAGE=none`, permitindo executar o pipeline sem persistir alertas localmente.
-
-> O arquivo `.env` não deve ser versionado. Utilize `.env.example` apenas como referência de configuração.
-
-### 4. Preparar o banco
-
-Execute os scripts de `database/schema/` nesta ordem:
-
-```text
-00_extensions.sql
-01_schema.sql
-02_threat_intelligence.sql
-03_audit.sql
-04_soc_view.sql
-05_security.sql
-```
-
-Depois carregue os dados sintéticos em `database/seeds/`, começando por:
-
-```text
-01_base_entities.sql
-```
-
-Em seguida, execute os seeds de transações normais e anômalas.
-
-As consultas disponíveis em:
-
-```text
-database/queries/forensic_investigation.sql
-```
-
-são destinadas a investigação forense manual e privilegiada e não fazem parte do fluxo normal de inicialização do banco.
-
-### 5. Importar o MITRE ATT&CK
-
-Com `uv`:
+### 6. Ingestão MITRE ATT&CK
 
 ```bash
 uv run python src/ingest_mitre.py
 ```
 
-Ou, com o ambiente virtual já ativado:
-
-```bash
-python src/ingest_mitre.py
-```
-
-### 6. Executar o detector
-
-Com `uv`:
+### 7. Executar o pipeline principal
 
 ```bash
 uv run python -m src.security_detector
 ```
 
-Ou, com o ambiente virtual já ativado:
+### 8. Executar a suíte global
 
 ```bash
-python -m src.security_detector
+uv run pytest
 ```
 
-Os artefatos de execução são gerados em `reports/`.
+### 9. Quality gates locais
 
-O snapshot público utilizado na documentação e no README é mantido em `reports/resultado_multimodelo/`.
-
----
-
-## 📄 Relatório
-
-O pipeline gera automaticamente um relatório contendo:
-
-- resumo executivo;
-- transações sinalizadas;
-- pseudônimos dos clientes;
-- score de risco;
-- probabilidade de suspeita;
-- comparação dos modelos;
-- métricas de validação;
-- correlação com MITRE ATT&CK.
-
-Arquivo gerado:
-
-```text
-reports/resultado_multimodelo/Relatorio_Incidente_SOC.pdf
+```bash
+uv run ruff check .
+uv run ruff format --check .
+git diff --check
 ```
 
 ---
 
-## ⚠️ Limitações
+## ⚠️ Limitações atuais
 
-Este projeto é uma prova de conceito baseada em dados sintéticos.
+Este projeto continua sendo uma prova de conceito.
 
-As principais limitações são:
+Principais limitações:
 
-- as anomalias foram simuladas;
-- a base ainda não representa toda a diversidade de fraudes reais;
-- os resultados não podem ser generalizados para ambiente produtivo;
-- o parâmetro `contamination=0.15` influencia a quantidade de alertas;
-- o classificador apresentou forte dependência do Z-Score;
-- a regressão de severidade necessita de validação adicional;
-- não foi realizada validação temporal;
-- não há monitoramento de data drift ou concept drift.
-
----
-
-## 🧾 Conclusão
-
-A comparação mostrou que o Elliptic Envelope apresentou o melhor equilíbrio entre precision e recall na base sintética utilizada.
-
-O Isolation Forest também apresentou bom desempenho e demonstrou maior flexibilidade para distribuições menos restritivas.
-
-O resultado do Elliptic Envelope deve ser interpretado dentro do cenário experimental, pois esse modelo pressupõe que os dados normais possam ser representados por uma distribuição aproximadamente elíptica.
-
-Por isso, a seleção atual representa o melhor resultado para esta base, não uma conclusão universal sobre detecção de fraudes.
+- datasets e incidentes são sintéticos;
+- resultados experimentais não podem ser generalizados diretamente para produção;
+- o pipeline não está conectado a um SOC real;
+- ainda não existem conectores operacionais de SIEM, EDR ou XDR;
+- KUMA GUARD não confirma incidentes automaticamente;
+- a Evaluation Matrix atual cobre um núcleo de métricas de segurança e não pretende representar uma avaliação completa de agentes;
+- a regressão de severidade permanece experimental;
+- ainda não existe monitoramento operacional de data drift ou concept drift;
+- o backend atual utiliza PostgreSQL/Supabase e a camada de adapters multi-backend é uma evolução futura;
+- o PDF público disponível ainda é o snapshot histórico da v2.0.0;
+- frontend / Visual SOC Console permanece fora do núcleo atual da V3.
 
 ---
 
 ## 🗺️ Roadmap
 
-### ✅ v1.0.0 — Análise de Dados e Segurança
+### ✅ v1.0.0 - Análise de Dados e Segurança
 
-- preparação dos dados;
+- preparação e validação de dados;
 - engenharia de features;
-- comparação entre detectores;
-- geração de métricas e gráficos;
-- PostgreSQL;
-- relatório PDF;
+- modelos analíticos;
+- PostgreSQL/Supabase;
 - MITRE ATT&CK;
+- relatório PDF;
 - pseudonimização e auditoria.
 
-### ✅ v2.0.0 — DevSecOps
+### ✅ v2.0.0 - DevSecOps e arquitetura modular
 
+- modularização;
 - testes automatizados;
-- análise estática;
-- auditoria de dependências;
+- CI/CD;
+- Ruff;
+- Bandit;
+- pip-audit;
+- Gitleaks;
+- CycloneDX SBOM;
 - Docker;
-- GitHub Actions;
-- scan de segurança;
-- pipeline CI/CD;
-- hardening do PostgreSQL/Supabase com RLS e least privilege;
-- separação de identidades e permissões por responsabilidade.
+- Trivy;
+- RLS e least privilege;
+- persistência estruturada de alertas;
+- documentação de arquitetura e DevSecOps.
 
-### 🔮 v3.0.0 — Projeto final
+### 🚧 V3 - Linha ativa
 
-- API REST;
-- dashboard;
-- autenticação;
-- monitoramento;
-- deploy.
+Concluído:
+
+- Core Integrity Checkpoint;
+- Evidence Context Foundation;
+- MITRE Provenance Foundation;
+- KUMA GUARD - Guarded SOC Assistant MVP;
+- Evaluation Matrix V3;
+- E2E do contrato defensivo.
+
+Em fechamento:
+
+- README e identidade pública;
+- consolidação da arquitetura V3;
+- pitch técnico / portfólio;
+- novo snapshot documental e relatório V3;
+- V3 Completion Gate.
+
+### 🔭 Pós-V3 / V3.1+
+
+Possíveis evoluções, guiadas por necessidade e evidência:
+
+- adapters para SIEM, EDR e XDR;
+- laboratório com ferramentas open source;
+- novos cenários e replay de investigação;
+- Continuous Bug Hunter / Quality Sentinel;
+- KUMA DEF como ecossistema defensivo mais amplo;
+- Visual SOC Console read-only após boundary/API estável;
+- novos backends de dados por adapters;
+- métricas adicionais para avaliação de investigação e agentes.
+
+---
+
+## 🔎 Rastreabilidade da evolução V3
+
+Alguns checkpoints principais da linha V3 foram integrados por Pull Requests separados:
+
+- [PR #56 - Evidence Context Foundation](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/56)
+- [PR #57 - MITRE Provenance Foundation](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/57)
+- [PR #58 - KUMA GUARD MVP](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/58)
+- [PR #59 - Evaluation Matrix V3](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/59)
+- [PR #65 - E2E do contrato defensivo](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/65)
+
+A estratégia de evolução privilegia mudanças pequenas, contratos explícitos, testes, revisão e certificação antes de expandir o escopo.
 
 ---
 
@@ -577,4 +693,6 @@ Por isso, a seleção atual representa o melhor resultado para esta base, não u
 
 **Wellington Hikaru Kumagai**
 
-Projeto desenvolvido durante o Bootcamp Bradesco - GenAI, Dados & Cyber.
+Projeto independente do **KUMA-LAB**.
+
+A primeira versão nasceu durante um bootcamp de GenAI, Dados e Cybersecurity. Desde então, o projeto evoluiu de forma independente dentro do KUMA-LAB.

@@ -261,7 +261,7 @@ A V3 possui infraestrutura de validação temporal para os modelos, com:
 - folds temporais com janela de treino expansiva;
 - suporte a `gap`;
 - tratamento de timestamps empatados nas fronteiras;
-- avaliação futura após fit no passado;
+- avaliação em período posterior ao treino após fit no passado;
 - integração com features históricas causais.
 
 No fluxo operacional atual do `SecurityDetector`:
@@ -488,7 +488,7 @@ Nem todo artefato do repositório representa a mesma geração do projeto. Para 
 | Superfície | Papel atual | Estado |
 | --- | --- | --- |
 | `README.md` | visão pública, escopo, capacidades e status da linha ativa | **V3 atual** |
-| `docs/architecture/` | documentação técnica detalhada da arquitetura | base existente em consolidação para refletir integralmente a V3 |
+| `docs/architecture/` | documentação técnica detalhada da arquitetura | documentação existente; parcialmente desatualizada em relação à V3 atual |
 | `docs/devsecops/` | documentação dos controles de qualidade e segurança | documentação técnica complementar; código e CI continuam sendo a referência executável |
 | `reports/resultado_multimodelo/` | artefatos públicos de uma execução versionada anterior | **snapshot histórico v2.0.0** |
 | `src/reporting/pdf_report.py` | gerador atual de relatório analítico de execução | código mais recente que o snapshot público v2; não é sistema de case management nem trilha operacional completa |

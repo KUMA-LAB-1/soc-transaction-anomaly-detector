@@ -12,9 +12,9 @@ A primeira versão nasceu durante um bootcamp de GenAI, Dados e Cybersecurity. D
 >
 > - Última release formal registrada: **v2.0.0**
 > - Linha ativa de desenvolvimento: **V3**
-> - Estado da V3: núcleo defensivo certificado; documentação, arquitetura pública e pitch técnico em fechamento
-> - README público: alinhado à linha V3
-> - PDF público versionado: ainda é o snapshot histórico da **v2.0.0**
+> - Estado da V3: núcleo defensivo validado por testes automatizados e CI; linha V3 ainda em fechamento
+> - PDF público versionado: permanece como snapshot histórico da **v2.0.0**
+> - Camada conversacional com LLM: **ainda não integrada** ao KUMA GUARD
 >
 > O projeto continua sendo uma **prova de conceito baseada em dados sintéticos**. Não deve ser interpretado como sistema de detecção de fraude pronto para produção nem como mecanismo de confirmação automática de incidentes.
 
@@ -25,9 +25,9 @@ A primeira versão nasceu durante um bootcamp de GenAI, Dados e Cybersecurity. D
 - [Evaluation Matrix](#-evaluation-matrix)
 - [DevSecOps e segurança](#️-devsecops-e-segurança)
 - [Estado da documentação](#-estado-da-documentação-e-fonte-de-verdade)
-- [Artefatos públicos e estratégia do PDF](#-artefatos-públicos-e-estratégia-do-pdf)
+- [Artefatos públicos e reporting](#-artefatos-públicos-e-reporting)
 - [Como executar](#️-como-executar)
-- [Roadmap](#️-roadmap)
+- [Evolução do projeto](#️-evolução-do-projeto)
 
 ---
 
@@ -54,10 +54,10 @@ Entre as capacidades implementadas estão:
 - **Evaluation Matrix** independente para avaliar claims sem suporte e falsas confirmações;
 - teste E2E do contrato defensivo da V3;
 - geração de métricas, gráficos, CSV e JSON;
-- geração de relatório PDF analítico pelo pipeline legado, ainda não equivalente ao snapshot documental da V3;
+- geração de relatório PDF analítico de execução pelo pipeline;
 - controles DevSecOps de qualidade, segurança, supply chain e container.
 
-A implementação atual utiliza PostgreSQL/Supabase como infraestrutura principal de dados. A evolução arquitetural busca limitar o acoplamento ao fornecedor e manter contratos que permitam adapters e integrações futuras.
+A implementação atual utiliza PostgreSQL/Supabase como infraestrutura principal de dados.
 
 ---
 
@@ -124,9 +124,6 @@ Contrato de alerta SOC
           ├──────────────► Persistência opcional
           │                 JSONL / SQLite
           │
-          ├──────────────► MITRE ATT&CK
-          │                 seleção + provenance
-          │
           ▼
 EvidenceContext
           │
@@ -140,6 +137,9 @@ Evaluation Matrix
           ▼
 Auditoria de claims
 e confirmação
+
+Trilha separada de enriquecimento contextual:
+MITRE ATT&CK → seleção + provenance → reporting/contexto
 ```
 
 O MITRE ATT&CK funciona como contexto de Threat Intelligence e mantém sua proveniência separada do `EvidenceContext`. O contexto de evidência projeta o alerta sem transformar enriquecimento externo em fato observado.
@@ -160,7 +160,7 @@ O MITRE ATT&CK funciona como contexto de Threat Intelligence e mantém sua prove
 | `src/threat_intel/` | Correlação e enriquecimento MITRE ATT&CK |
 | `src/soc_assistant/assessment.py` | KUMA GUARD: fatos, hipóteses suportadas, evidência ausente e checks recomendados |
 | `src/soc_assistant/evaluation.py` | Evaluation Matrix independente do runtime do assistente |
-| `src/reporting/` | Métricas, gráficos e relatório PDF analítico legado; a consolidação documental V3 é uma trilha separada |
+| `src/reporting/` | Métricas, gráficos e relatório PDF analítico de execução |
 | `.github/workflows/ci.yml` | Quality gates, testes, segurança, SBOM e container security |
 
 ---
@@ -239,7 +239,7 @@ A correlação MITRE utiliza sinais como:
 - mudança de localização;
 - tipo de transação como fallback.
 
-A V3 registra também **por que** um candidato foi selecionado e **de onde** o conhecimento foi resolvido.
+O enriquecimento MITRE retorna também **por que** um candidato foi selecionado e **de onde** o conhecimento foi resolvido.
 
 Entre os campos de provenance estão:
 
@@ -255,16 +255,20 @@ O mapeamento MITRE é contexto investigativo. Ele não representa confirmação 
 
 ## ⏱️ Validação temporal
 
-A V3 já implementa validação temporal.
-
-O projeto possui:
+A V3 possui infraestrutura de validação temporal para os modelos, com:
 
 - holdout temporal;
 - folds temporais com janela de treino expansiva;
 - suporte a `gap`;
 - tratamento de timestamps empatados nas fronteiras;
-- avaliação futura dos detectores após fit no passado;
+- avaliação futura após fit no passado;
 - integração com features históricas causais.
+
+No fluxo operacional atual do `SecurityDetector`:
+
+- **classificação** solicita validação temporal explicitamente;
+- **regressão** solicita validação temporal explicitamente;
+- a API de **detecção de anomalias** suporta avaliação temporal, mas o fluxo operacional ainda usa o modo `in_sample` padrão nessa etapa.
 
 Conceitualmente:
 
@@ -284,7 +288,7 @@ futuro
 avaliação
 ```
 
-Isso corrige uma limitação presente em versões anteriores do projeto e reduz risco de leakage temporal.
+Essa infraestrutura corrige uma limitação presente em versões anteriores e reduz risco de leakage temporal onde a estratégia temporal é aplicada.
 
 ---
 
@@ -317,11 +321,13 @@ Nos modelos não supervisionados, a truth sintética não é usada como target d
 
 ### Classificação supervisionada
 
-O pipeline possui classificação supervisionada voltada à triagem e análise das features associadas às decisões históricas representadas no dataset.
+O classificador operacional de triagem utiliza `DecisionTreeClassifier`. No fluxo do `SecurityDetector`, sua avaliação solicita validação temporal explicitamente.
+
+A zona experimental de benchmark permanece separada do caminho operacional e compara candidatos como `DecisionTree`, `LogisticRegression` e `RandomForest` sob contratos comuns. Resultado de benchmark **não promove automaticamente** um challenger para uso operacional.
 
 ### Detecção de anomalias
 
-O projeto trabalha com múltiplos detectores, incluindo:
+O projeto trabalha com múltiplos detectores:
 
 | Modelo | Papel experimental |
 | --- | --- |
@@ -330,11 +336,15 @@ O projeto trabalha com múltiplos detectores, incluindo:
 | One-Class SVM | Fronteira de comportamento normal |
 | Elliptic Envelope | Região robusta baseada em covariância |
 
-A seleção experimental compara métricas comuns em vez de assumir um detector universalmente superior.
+O pipeline separa `melhor_detector_benchmark` de `detector_operacional`: benchmark mede desempenho retrospectivo; a escolha operacional permanece explícita.
 
 ### Regressão de severidade
 
-A regressão estima um score de severidade em uma escala de risco. Essa etapa permanece experimental e deve ser interpretada dentro das limitações do dataset sintético.
+A regressão operacional utiliza `LinearRegression` e limita o score produzido à faixa `[0, 100]`. No `SecurityDetector`, a avaliação usa validação temporal explícita.
+
+O contrato atual inclui sinais comportamentais como `dispositivo_novo_flag`, `alteracao_limite_flag` e `mudanca_localizacao_flag`, mantendo compatibilidade com datasets legados quando esses campos não existem.
+
+A regressão permanece experimental e deve ser interpretada dentro das limitações dos dados sintéticos.
 
 ---
 
@@ -378,7 +388,7 @@ Também são aplicados:
 - RLS e least privilege;
 - separação entre runtime SOC, Threat Intelligence e auditoria.
 
-### Último checkpoint certificado da linha V3
+### Último checkpoint técnico validado da linha V3
 
 Em **18/09/2026**, após o E2E defensivo e a rodada de atualizações de dependências:
 
@@ -480,10 +490,10 @@ Nem todo artefato do repositório representa a mesma geração do projeto. Para 
 | `README.md` | visão pública, escopo, capacidades e status da linha ativa | **V3 atual** |
 | `docs/architecture/` | documentação técnica detalhada da arquitetura | base existente em consolidação para refletir integralmente a V3 |
 | `docs/devsecops/` | documentação dos controles de qualidade e segurança | documentação técnica complementar; código e CI continuam sendo a referência executável |
-| `reports/resultado_multimodelo/` | artefatos públicos de uma execução certificada anterior | **snapshot histórico v2.0.0** |
-| `src/reporting/pdf_report.py` | gerador de relatório analítico de execução | formato legado do pipeline; ainda não representa o contrato defensivo completo da V3 |
+| `reports/resultado_multimodelo/` | artefatos públicos de uma execução versionada anterior | **snapshot histórico v2.0.0** |
+| `src/reporting/pdf_report.py` | gerador atual de relatório analítico de execução | código mais recente que o snapshot público v2; não é sistema de case management nem trilha operacional completa |
 
-A regra de documentação da linha V3 é simples: **não promover um artefato histórico a “V3” apenas porque o código ao redor evoluiu**. O snapshot V3 só será publicado quando conteúdo, proveniência, validação e identidade de versão estiverem sincronizados.
+A regra de documentação da linha V3 é simples: **não promover um artefato histórico a “V3” apenas porque o código ao redor evoluiu**. Quando houver divergência entre documentação, código e comportamento executável, código, testes e CI atuais são a referência técnica principal.
 
 ---
 
@@ -503,13 +513,13 @@ A regra de documentação da linha V3 é simples: **não promover um artefato hi
 - [Software supply chain](docs/devsecops/supply-chain.md)
 - [Container security](docs/devsecops/container-security.md)
 
-A documentação de arquitetura será consolidada para refletir integralmente o eixo defensivo da V3 antes do **V3 Completion Gate**.
+Os documentos de arquitetura existentes ainda não refletem integralmente todas as mudanças da linha V3; por isso, devem ser lidos em conjunto com o código, testes e este README.
 
 ---
 
-## 📦 Artefatos públicos e estratégia do PDF
+## 📦 Artefatos públicos e reporting
 
-Os arquivos em `reports/resultado_multimodelo/` formam um **snapshot experimental público e congelado da v2.0.0**, preservado para histórico, auditoria e reprodutibilidade.
+Os arquivos em `reports/resultado_multimodelo/` formam um **snapshot experimental público e congelado da v2.0.0**, preservado para histórico e reprodutibilidade.
 
 Isso inclui:
 
@@ -519,79 +529,23 @@ Isso inclui:
 - gráficos analíticos da execução v2.0.0;
 - histórico de métricas daquele snapshot.
 
-> **Importante:** o PDF público atual foi gerado em **21/08/2026** e **não representa a arquitetura completa da V3**. Ele não documenta `EvidenceContext`, MITRE provenance, KUMA GUARD, Evaluation Matrix ou o E2E defensivo.
+> **Importante:** o PDF público atual foi gerado em **21/08/2026** e não representa a arquitetura completa da V3. Ele também é visualmente anterior a correções posteriores realizadas no gerador atual, incluindo ajuste de conteúdo em tabelas para evitar extrapolação de identificadores/pseudônimos.
 
-### Dois artefatos diferentes
+### Gerador atual
 
-A V3 passa a distinguir explicitamente dois conceitos que antes ficavam misturados:
+O pipeline atual utiliza `src/reporting/pdf_report.py` para produzir um relatório analítico de execução com métricas, alertas, severidade e contexto MITRE.
 
-1. **Relatório de execução analítica**  
-   É produzido pelo pipeline atual por `src/reporting/pdf_report.py`. Resume métricas, anomalias, severidade e correlação MITRE daquela execução. O formato ainda é herdado da linha v2 e não deve ser apresentado como documentação completa da V3.
-
-2. **Snapshot documental da versão**  
-   É o artefato público que representa um checkpoint certificado do projeto. Deve registrar arquitetura, contratos defensivos, proveniência, validações, limitações e evidências de qualidade da versão publicada.
-
-Essa separação evita que uma execução recente gere um PDF com aparência de “versão atual” sem conter os contratos defensivos que definem a V3.
-
-### Comportamento do gerador atual
-
-Ao executar o pipeline completo, o código ainda pode gerar:
+Por padrão, uma execução pode escrever:
 
 ```text
 reports/Relatorio_Incidente_SOC.pdf
 ```
 
-Esse arquivo é **output de execução**, não substitui automaticamente o snapshot histórico em `reports/resultado_multimodelo/` e, no estado atual do gerador, **não deve ser promovido ou commitado como relatório V3**.
+Esse arquivo representa **aquela execução do pipeline**. Ele não é automaticamente versionado, não substitui o snapshot histórico em `reports/resultado_multimodelo/` e não deve ser tratado como estado vivo de uma investigação.
 
-### Estratégia para o snapshot V3
+No estado atual do projeto, ainda não existe um workflow completo de case management ou reporting operacional para SOC que defina, por exemplo, lifecycle de investigação, revisões, handoff entre analistas ou histórico documental imutável.
 
-O snapshot v2.0.0 será preservado sem sobrescrita. A publicação da V3 deve utilizar um diretório versionado próprio, por exemplo:
-
-```text
-reports/
-├── resultado_multimodelo/        # snapshot histórico v2.0.0
-└── snapshots/
-    └── v3.0.0/                   # futuro snapshot certificado V3
-```
-
-O relatório V3 deverá nascer de um contrato de reporting atualizado e incluir, no mínimo:
-
-- versão e checkpoint de origem;
-- metadados reproduzíveis da execução/dataset sintético;
-- métricas analíticas e validação temporal;
-- contrato de alertas;
-- `EvidenceContext`;
-- proveniência MITRE ATT&CK;
-- avaliação do KUMA GUARD;
-- métricas da Evaluation Matrix;
-- resultado do E2E defensivo e quality gates relevantes;
-- limitações e distinção explícita entre fato, hipótese e confirmação.
-
-A sequência planejada passa a ser:
-
-```text
-arquitetura V3 consolidada
-        │
-        ▼
-contrato de reporting V3
-        │
-        ▼
-gerador V3 desacoplado do formato legado
-        │
-        ▼
-checkpoint funcional certificado
-        │
-        ▼
-snapshot versionado
-        │
-        ▼
-validação visual + técnica
-        │
-        ▼
-publicação
-```
-
-Até essa etapa, resultados numéricos e gráficos em `reports/resultado_multimodelo/` devem ser lidos exclusivamente como resultados históricos da v2.0.0.
+O PDF deve ser entendido como **uma representação analítica derivada dos dados e resultados disponíveis**, não como banco operacional ou fonte primária de verdade.
 
 ### Snapshot visual v2.0.0
 
@@ -655,7 +609,7 @@ uv run python src/ingest_mitre.py
 uv run python -m src.security_detector
 ```
 
-> O pipeline pode gerar `reports/Relatorio_Incidente_SOC.pdf`. No estado atual, esse PDF é um **relatório analítico de execução no formato legado**, não o snapshot documental V3. Não o trate como substituto do relatório público versionado.
+> O pipeline pode gerar `reports/Relatorio_Incidente_SOC.pdf`. Esse arquivo é um **relatório analítico da execução atual**, não substitui automaticamente o snapshot público versionado da v2.0.0 e não representa um sistema completo de case management.
 
 ### 8. Executar a suíte global
 
@@ -684,16 +638,17 @@ Principais limitações:
 - o pipeline não está conectado a um SOC real;
 - ainda não existem conectores operacionais de SIEM, EDR ou XDR;
 - KUMA GUARD não confirma incidentes automaticamente;
-- a Evaluation Matrix atual cobre um núcleo de métricas de segurança e não pretende representar uma avaliação completa de agentes;
+- KUMA GUARD ainda não possui camada conversacional integrada a um LLM;
+- a Evaluation Matrix atual cobre um núcleo de métricas de segurança e não representa uma avaliação completa de uma camada generativa que ainda não foi integrada;
 - a regressão de severidade permanece experimental;
 - ainda não existe monitoramento operacional de data drift ou concept drift;
-- o backend atual utiliza PostgreSQL/Supabase e a camada de adapters multi-backend é uma evolução futura;
-- o PDF público disponível ainda é o snapshot histórico da v2.0.0, e o gerador PDF do pipeline ainda usa o formato analítico legado;
-- frontend / Visual SOC Console permanece fora do núcleo atual da V3.
+- o backend atual utiliza PostgreSQL/Supabase;
+- o PDF público disponível permanece como snapshot histórico da v2.0.0;
+- o gerador atual de PDF produz relatório analítico de execução, mas ainda não existe case management/reporting operacional completo.
 
 ---
 
-## 🗺️ Roadmap
+## 🗺️ Evolução do projeto
 
 ### ✅ v1.0.0 - Análise de Dados e Segurança
 
@@ -723,7 +678,7 @@ Principais limitações:
 
 ### 🚧 V3 - Linha ativa
 
-Concluído:
+Já implementado e validado:
 
 - Core Integrity Checkpoint;
 - Evidence Context Foundation;
@@ -732,26 +687,7 @@ Concluído:
 - Evaluation Matrix V3;
 - E2E do contrato defensivo.
 
-Em fechamento:
-
-- README e identidade pública;
-- consolidação da arquitetura V3;
-- pitch técnico / portfólio;
-- contrato de reporting V3, novo snapshot documental e relatório V3 versionado;
-- V3 Completion Gate.
-
-### 🔭 Pós-V3 / V3.1+
-
-Possíveis evoluções, guiadas por necessidade e evidência:
-
-- adapters para SIEM, EDR e XDR;
-- laboratório com ferramentas open source;
-- novos cenários e replay de investigação;
-- Continuous Bug Hunter / Quality Sentinel;
-- KUMA DEF como ecossistema defensivo mais amplo;
-- Visual SOC Console read-only após boundary/API estável;
-- novos backends de dados por adapters;
-- métricas adicionais para avaliação de investigação e agentes.
+A V3 ainda não foi publicada como nova release formal. O estado público atual deve ser interpretado pelos contratos, testes, CI e limitações documentadas neste README.
 
 ---
 
@@ -765,7 +701,7 @@ Alguns checkpoints principais da linha V3 foram integrados por Pull Requests sep
 - [PR #59 - Evaluation Matrix V3](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/59)
 - [PR #65 - E2E do contrato defensivo](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/65)
 
-A estratégia de evolução privilegia mudanças pequenas, contratos explícitos, testes, revisão e certificação antes de expandir o escopo.
+A estratégia de evolução privilegia mudanças pequenas, contratos explícitos, testes, revisão e validação antes de expandir o escopo.
 
 ---
 

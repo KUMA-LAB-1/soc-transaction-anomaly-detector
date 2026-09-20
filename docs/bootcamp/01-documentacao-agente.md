@@ -139,7 +139,6 @@ O protótipo acadêmico:
 - não opera como sistema completo de case management;
 - não deve ser interpretado como solução pronta para produção;
 - utiliza dados sintéticos no cenário de demonstração;
-- não depende de acesso de escrita a SIEM, EDR ou XDR para cumprir a entrega acadêmica.
 
 ---
 

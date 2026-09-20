@@ -13,7 +13,7 @@ A primeira versão nasceu durante um bootcamp de GenAI, Dados e Cybersecurity. D
 > - Última release formal registrada: **v2.0.0**
 > - Linha ativa de desenvolvimento: **V3**
 > - Estado da V3: núcleo defensivo validado por testes automatizados e CI; linha V3 ainda em fechamento
-> - PDF público versionado: permanece como snapshot histórico da **v2.0.0**
+> - PDF público versionado: relatório analítico atualizado em **08/09/2026**; os demais artefatos multimodelo permanecem históricos da **v2.0.0**
 > - Camada conversacional com LLM: **ainda não integrada** ao KUMA GUARD
 >
 > O projeto continua sendo uma **prova de conceito baseada em dados sintéticos**. Não deve ser interpretado como sistema de detecção de fraude pronto para produção nem como mecanismo de confirmação automática de incidentes.
@@ -490,8 +490,8 @@ Nem todo artefato do repositório representa a mesma geração do projeto. Para 
 | `README.md` | visão pública, escopo, capacidades e status da linha ativa | **V3 atual** |
 | `docs/architecture/` | documentação técnica detalhada da arquitetura | documentação existente; parcialmente desatualizada em relação à V3 atual |
 | `docs/devsecops/` | documentação dos controles de qualidade e segurança | documentação técnica complementar; código e CI continuam sendo a referência executável |
-| `reports/resultado_multimodelo/` | artefatos públicos de uma execução versionada anterior | **snapshot histórico v2.0.0** |
-| `src/reporting/pdf_report.py` | gerador atual de relatório analítico de execução | código mais recente que o snapshot público v2; não é sistema de case management nem trilha operacional completa |
+| `reports/resultado_multimodelo/` | artefatos públicos de reporting | PDF analítico atualizado em 08/09/2026; CSV, JSON e gráficos permanecem históricos da v2.0.0 |
+| `src/reporting/pdf_report.py` | gerador atual de relatório analítico de execução | origem do formato do PDF analítico atual; não é sistema de case management nem trilha operacional completa |
 
 A regra de documentação da linha V3 é simples: **não promover um artefato histórico a “V3” apenas porque o código ao redor evoluiu**. Quando houver divergência entre documentação, código e comportamento executável, código, testes e CI atuais são a referência técnica principal.
 
@@ -519,17 +519,17 @@ Os documentos de arquitetura existentes ainda não refletem integralmente todas 
 
 ## 📦 Artefatos públicos e reporting
 
-Os arquivos em `reports/resultado_multimodelo/` formam um **snapshot experimental público e congelado da v2.0.0**, preservado para histórico e reprodutibilidade.
+A pasta `reports/resultado_multimodelo/` reúne artefatos públicos de momentos distintos do projeto. O PDF analítico foi atualizado em **08/09/2026**, enquanto CSV, JSON, gráficos e histórico de métricas permanecem preservados como artefatos da **v2.0.0**.
 
 Isso inclui:
 
-- [Relatório SOC v2.0.0 - snapshot histórico em PDF](reports/resultado_multimodelo/Relatorio_Incidente_SOC.pdf)
+- [Relatório SOC - execução analítica pública atualizada em 08/09/2026](reports/resultado_multimodelo/Relatorio_Incidente_SOC.pdf)
 - [Comparação dos detectores em CSV](reports/resultado_multimodelo/comparacao_detectores.csv)
 - [Comparação dos detectores em JSON](reports/resultado_multimodelo/comparacao_detectores.json)
 - gráficos analíticos da execução v2.0.0;
 - histórico de métricas daquele snapshot.
 
-> **Importante:** o PDF público atual foi gerado em **21/08/2026** e não representa a arquitetura completa da V3. Ele também é visualmente anterior a correções posteriores realizadas no gerador atual, incluindo ajuste de conteúdo em tabelas para evitar extrapolação de identificadores/pseudônimos.
+> **Importante:** o PDF público atual foi atualizado a partir da execução de **08/09/2026**. Ele é mais recente que os demais artefatos multimodelo preservados na pasta, mas continua sendo um **relatório analítico de execução** e não representa a arquitetura completa nem o contrato defensivo integral da V3.
 
 ### Gerador atual
 
@@ -541,7 +541,7 @@ Por padrão, uma execução pode escrever:
 reports/Relatorio_Incidente_SOC.pdf
 ```
 
-Esse arquivo representa **aquela execução do pipeline**. Ele não é automaticamente versionado, não substitui o snapshot histórico em `reports/resultado_multimodelo/` e não deve ser tratado como estado vivo de uma investigação.
+Esse arquivo representa **aquela execução do pipeline**. Uma nova execução local não é automaticamente promovida para `reports/resultado_multimodelo/` e o PDF não deve ser tratado como estado vivo de uma investigação.
 
 No estado atual do projeto, ainda não existe um workflow completo de case management ou reporting operacional para SOC que defina, por exemplo, lifecycle de investigação, revisões, handoff entre analistas ou histórico documental imutável.
 
@@ -609,7 +609,7 @@ uv run python src/ingest_mitre.py
 uv run python -m src.security_detector
 ```
 
-> O pipeline pode gerar `reports/Relatorio_Incidente_SOC.pdf`. Esse arquivo é um **relatório analítico da execução atual**, não substitui automaticamente o snapshot público versionado da v2.0.0 e não representa um sistema completo de case management.
+> O pipeline pode gerar `reports/Relatorio_Incidente_SOC.pdf`. Esse arquivo é um **relatório analítico da execução atual** e não é automaticamente promovido para o artefato público versionado em `reports/resultado_multimodelo/`. Ele também não representa um sistema completo de case management.
 
 ### 8. Executar a suíte global
 
@@ -643,7 +643,7 @@ Principais limitações:
 - a regressão de severidade permanece experimental;
 - ainda não existe monitoramento operacional de data drift ou concept drift;
 - o backend atual utiliza PostgreSQL/Supabase;
-- o PDF público disponível permanece como snapshot histórico da v2.0.0;
+- o PDF público disponível é um relatório analítico de execução atualizado em 08/09/2026 e não representa o contrato completo da V3;
 - o gerador atual de PDF produz relatório analítico de execução, mas ainda não existe case management/reporting operacional completo.
 
 ---

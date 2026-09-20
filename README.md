@@ -14,7 +14,7 @@ A primeira versão nasceu durante um bootcamp de GenAI, Dados e Cybersecurity. D
 > - Linha ativa de desenvolvimento: **V3**
 > - Estado da V3: núcleo defensivo validado por testes automatizados e CI; linha V3 ainda em fechamento
 > - PDF público versionado: relatório analítico atualizado em **08/09/2026**, já com correções de reporting realizadas na linha **V3**; os demais artefatos multimodelo permanecem históricos da **v2.0.0**
-> - Camada conversacional com LLM: **ainda não integrada** ao KUMA GUARD
+> - Camada conversacional com LLM: **integrada** por contrato provider-neutral, adapter Gemini e interface Streamlit; avaliação generativa formal ainda pendente
 >
 > O projeto continua sendo uma **prova de conceito baseada em dados sintéticos**. Não deve ser interpretado como sistema de detecção de fraude pronto para produção nem como mecanismo de confirmação automática de incidentes.
 
@@ -51,6 +51,10 @@ Entre as capacidades implementadas estão:
 - `EvidenceContext` para projetar evidências de um alerta sem reinterpretá-las;
 - correlação MITRE ATT&CK com proveniência explícita da seleção;
 - **KUMA GUARD - Guarded SOC Assistant**;
+- contratos provider-neutral para integração com LLM;
+- construção de contexto conversacional grounded a partir do `GuardedSocAssessment`;
+- adapter Gemini via API REST;
+- interface conversacional Streamlit para demonstração interativa;
 - **Evaluation Matrix** independente para avaliar claims sem suporte e falsas confirmações;
 - teste E2E do contrato defensivo da V3;
 - geração de métricas, gráficos, CSV e JSON;
@@ -131,12 +135,25 @@ EvidenceContext
 KUMA GUARD
 GuardedSocAssessment
           │
-          ▼
-Evaluation Matrix
+          ├──────────────► Evaluation Matrix
+          │                  │
+          │                  ▼
+          │              Auditoria de claims
+          │              e confirmação
           │
           ▼
-Auditoria de claims
-e confirmação
+Conversation Context
+          │
+          ▼
+LlmAdapter
+          │
+          ├──────────────► Gemini REST
+          │
+          ▼
+Streamlit
+          │
+          ▼
+Grounded Response
 
 Trilha separada de enriquecimento contextual:
 MITRE ATT&CK → seleção + provenance → reporting/contexto
@@ -160,6 +177,8 @@ O MITRE ATT&CK funciona como contexto de Threat Intelligence e mantém sua prove
 | `src/threat_intel/` | Correlação e enriquecimento MITRE ATT&CK |
 | `src/soc_assistant/assessment.py` | KUMA GUARD: fatos, hipóteses suportadas, evidência ausente e checks recomendados |
 | `src/soc_assistant/evaluation.py` | Evaluation Matrix independente do runtime do assistente |
+| `src/genai/` | Contratos de LLM, construção de contexto, orquestração conversacional, runtime e providers |
+| `streamlit_app.py` | Interface conversacional demonstrável do KUMA GUARD |
 | `src/reporting/` | Métricas, gráficos e relatório PDF analítico de execução |
 | `.github/workflows/ci.yml` | Quality gates, testes, segurança, SBOM e container security |
 
@@ -180,6 +199,10 @@ Por padrão:
 ```python
 incident_confirmed = False
 ```
+
+A camada conversacional usa esse assessment estruturado como autoridade factual. O LLM recebe contexto derivado do estado defensivo e atua como camada de linguagem e interação; ele não altera o estado de confirmação nem transforma hipótese, anomalia ou score em incidente confirmado.
+
+A interface Streamlit mantém histórico visual da sessão. No estágio atual, cada nova pergunta continua sendo grounded no `GuardedSocAssessment` atual, sem tratar mensagens anteriores do chat como nova evidência factual.
 
 Uma hipótese só pode ser adicionada quando declara quais fatos observados a suportam. Suporte vazio ou referência a fato não observado é rejeitado.
 
@@ -390,16 +413,16 @@ Também são aplicados:
 
 ### Último checkpoint técnico validado da linha V3
 
-Em **18/09/2026**, após o E2E defensivo e a rodada de atualizações de dependências:
+Em **20/09/2026**, após a integração da fundação conversacional GenAI na `main` pelo PR #70:
 
-- **1456 testes** aprovados;
-- **99,00%** de coverage total;
+- **1467 testes** aprovados;
+- **99,01%** de coverage total;
 - Ruff lint aprovado;
 - Ruff format check aprovado;
 - diff-check aprovado;
 - CI com Quality + Unit Tests, Integration Smoke, Secret Scanning, SBOM e Container Security aprovados.
 
-Esses números representam um checkpoint do desenvolvimento e podem evoluir com novos commits.
+Esses números representam o último checkpoint global validado da `main` anterior ao bloco da interface Streamlit e podem evoluir com novos commits.
 
 ---
 
@@ -461,6 +484,7 @@ Visão de alto nível:
 │   ├── alerts/
 │   ├── data/
 │   ├── features/
+│   ├── genai/
 │   ├── models/
 │   ├── reporting/
 │   ├── soc_assistant/
@@ -474,6 +498,7 @@ Visão de alto nível:
 │   └── unit/
 ├── Dockerfile
 ├── CHANGELOG.md
+├── streamlit_app.py
 ├── pyproject.toml
 ├── README.md
 └── uv.lock
@@ -587,9 +612,11 @@ Principais variáveis:
 - `SOC_DATABASE_URL`: runtime do pipeline SOC;
 - `MITRE_DATABASE_URL`: ingestão de Threat Intelligence;
 - `SOC_PIPELINE_USER`: identidade lógica de auditoria;
-- `ALERT_STORAGE`: backend opcional para persistência dos alertas.
+- `ALERT_STORAGE`: backend opcional para persistência dos alertas;
+- `GEMINI_API_KEY`: credencial local para a demo conversacional;
+- `GEMINI_MODEL`: modelo Gemini utilizado pelo adapter, com `gemini-3.8-flash` como padrão atual.
 
-O arquivo `.env` não deve ser versionado.
+O arquivo `.env` não deve ser versionado. A interface Streamlit atual lê a configuração GenAI do ambiente do processo; o `.env.example` serve como referência segura e não deve conter credenciais reais.
 
 ### 5. Preparar PostgreSQL/Supabase
 
@@ -611,13 +638,28 @@ uv run python -m src.security_detector
 
 > O pipeline pode gerar `reports/Relatorio_Incidente_SOC.pdf`. Esse arquivo é um **relatório analítico da execução atual** e não é automaticamente promovido para o artefato público versionado em `reports/resultado_multimodelo/`. Ele também não representa um sistema completo de case management.
 
-### 8. Executar a suíte global
+### 8. Executar a interface conversacional
+
+A demo usa um cenário sintético canônico. Sem `GEMINI_API_KEY`, a interface continua abrindo em modo seguro e informa que a configuração está ausente. Para conversar com o provider Gemini, exponha a chave apenas no ambiente local.
+
+No PowerShell:
+
+```powershell
+$env:GEMINI_API_KEY = "<SUA_CHAVE_LOCAL>"
+$env:GEMINI_MODEL = "gemini-3.8-flash"
+
+uv run streamlit run streamlit_app.py
+```
+
+A chave não deve ser adicionada ao Git nem registrada em arquivos públicos.
+
+### 9. Executar a suíte global
 
 ```bash
 uv run pytest
 ```
 
-### 9. Quality gates locais
+### 10. Quality gates locais
 
 ```bash
 uv run ruff check .
@@ -638,8 +680,9 @@ Principais limitações:
 - o pipeline não está conectado a um SOC real;
 - ainda não existem conectores operacionais de SIEM, EDR ou XDR;
 - KUMA GUARD não confirma incidentes automaticamente;
-- KUMA GUARD ainda não possui camada conversacional integrada a um LLM;
-- a Evaluation Matrix atual cobre um núcleo de métricas de segurança e não representa uma avaliação completa de uma camada generativa que ainda não foi integrada;
+- a interface conversacional atual é uma demo Streamlit baseada em cenário sintético e integração Gemini;
+- o histórico do chat é visual; ainda não existe memória conversacional semântica incorporada ao estado factual da investigação;
+- a Evaluation Matrix atual cobre o núcleo defensivo determinístico; a avaliação generativa formal da camada LLM ainda precisa ser executada e registrada;
 - a regressão de severidade permanece experimental;
 - ainda não existe monitoramento operacional de data drift ou concept drift;
 - o backend atual utiliza PostgreSQL/Supabase;
@@ -685,7 +728,11 @@ Já implementado e validado:
 - MITRE Provenance Foundation;
 - KUMA GUARD - Guarded SOC Assistant MVP;
 - Evaluation Matrix V3;
-- E2E do contrato defensivo.
+- E2E do contrato defensivo;
+- contrato provider-neutral para LLM;
+- builder de contexto grounded e `ConversationService`;
+- adapter Gemini via API REST;
+- interface conversacional Streamlit com testes de integração.
 
 A V3 ainda não foi publicada como nova release formal. O estado público atual deve ser interpretado pelos contratos, testes, CI e limitações documentadas neste README.
 
@@ -700,6 +747,8 @@ Alguns checkpoints principais da linha V3 foram integrados por Pull Requests sep
 - [PR #58 - KUMA GUARD MVP](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/58)
 - [PR #59 - Evaluation Matrix V3](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/59)
 - [PR #65 - E2E do contrato defensivo](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/65)
+- [PR #69 - Contrato provider-neutral para LLM](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/69)
+- [PR #70 - Fundação conversacional GenAI](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/70)
 
 A estratégia de evolução privilegia mudanças pequenas, contratos explícitos, testes, revisão e validação antes de expandir o escopo.
 

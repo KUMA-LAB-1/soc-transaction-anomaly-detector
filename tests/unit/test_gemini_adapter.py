@@ -64,7 +64,7 @@ def test_gemini_adapter_traduz_request_para_api():
 
     adapter = GeminiLlmAdapter(
         api_key="test-api-key",
-        model="gemini-2.5-flash",
+        model="gemini-3.8-flash",
         session=session,
     )
 
@@ -80,7 +80,7 @@ def test_gemini_adapter_traduz_request_para_api():
 
     assert call["url"] == (
         "https://generativelanguage.googleapis.com/"
-        "v1beta/models/gemini-2.5-flash:generateContent"
+        "v1beta/models/gemini-3.8-flash:generateContent"
     )
     assert call["headers"] == {
         "Content-Type": "application/json",
@@ -169,4 +169,4 @@ def test_gemini_adapter_usa_modelo_padrao_estavel():
 
     adapter.generate(build_request())
 
-    assert session.calls[0]["url"].endswith("/models/gemini-2.5-flash:generateContent")
+    assert session.calls[0]["url"].endswith("/models/gemini-3.8-flash:generateContent")

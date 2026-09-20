@@ -182,7 +182,6 @@ def test_gemini_adapter_usa_modelo_padrao_estavel():
     assert session.calls[0]["url"].endswith("/models/gemini-3.8-flash:generateContent")
 
 
-
 class SequenceSession:
     def __init__(self, responses):
         self.responses = list(responses)

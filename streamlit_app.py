@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import dotenv
 import requests
@@ -20,7 +21,12 @@ st.set_page_config(
     layout="wide",
 )
 
-dotenv.load_dotenv(override=False)
+ENV_PATH = Path(__file__).resolve().parent / ".env"
+
+dotenv.load_dotenv(
+    dotenv_path=ENV_PATH,
+    override=False,
+)
 
 assessment = build_demo_assessment()
 

@@ -58,11 +58,13 @@ def test_streamlit_app_carrega_configuracao_local_dotenv(monkeypatch):
     app.run()
 
     assert not app.exception
-    assert calls == [{"override": False}]
-    assert not any(
-        "GEMINI_API_KEY" in warning.value
-        for warning in app.warning
-    )
+    assert calls == [
+        {
+            "dotenv_path": APP_PATH.parent / ".env",
+            "override": False,
+        }
+    ]
+    assert not any("GEMINI_API_KEY" in warning.value for warning in app.warning)
 
 
 def test_streamlit_app_envia_pergunta_ao_servico_sem_rede(
@@ -119,7 +121,6 @@ def test_streamlit_app_envia_pergunta_ao_servico_sem_rede(
     assert app.chat_message[1].markdown[0].value == ("O incidente não está confirmado.")
 
 
-
 def test_streamlit_app_exibe_erro_especifico_quando_gemini_retorna_503(
     monkeypatch,
 ):
@@ -149,17 +150,12 @@ def test_streamlit_app_exibe_erro_especifico_quando_gemini_retorna_503(
 
     assert not app.exception
 
-    app.chat_input[0].set_value(
-        "Quais fatos foram observados?"
-    ).run()
+    app.chat_input[0].set_value("Quais fatos foram observados?").run()
 
     assert not app.exception
     assert len(app.chat_message) == 2
 
-    assistant_message = app.chat_message[1]
-
     assert any(
-        "503" in markdown.value
-        and "temporariamente indisponível" in markdown.value.lower()
-        for markdown in assistant_message.markdown
+        "503" in error.value and "temporariamente indisponível" in error.value.lower()
+        for error in app.error
     )

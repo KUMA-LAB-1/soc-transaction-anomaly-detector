@@ -86,23 +86,14 @@ class GeminiLlmAdapter:
                     "status_code",
                     None,
                 )
-                retryable = (
-                    status_code == 429
-                    or (
-                        status_code is not None
-                        and 500 <= status_code < 600
-                    )
+                retryable = status_code == 429 or (
+                    status_code is not None and 500 <= status_code < 600
                 )
 
-                if (
-                    not retryable
-                    or attempt >= self._max_attempts
-                ):
+                if not retryable or attempt >= self._max_attempts:
                     raise
 
-                delay = self._backoff_base_seconds * (
-                    2 ** (attempt - 1)
-                )
+                delay = self._backoff_base_seconds * (2 ** (attempt - 1))
                 self._sleep_fn(delay)
 
         data = response.json()

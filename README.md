@@ -13,7 +13,7 @@ A primeira versão nasceu durante um bootcamp de GenAI, Dados e Cybersecurity. D
 > - Última release formal registrada: **v2.0.0**
 > - Linha ativa de desenvolvimento: **V3**
 > - Estado da V3: núcleo defensivo validado por testes automatizados e CI; linha V3 ainda em fechamento
-> - PDF público versionado: relatório analítico atualizado em **08/09/2026**; os demais artefatos multimodelo permanecem históricos da **v2.0.0**
+> - PDF público versionado: relatório analítico atualizado em **08/09/2026**, já com correções de reporting realizadas na linha **V3**; os demais artefatos multimodelo permanecem históricos da **v2.0.0**
 > - Camada conversacional com LLM: **ainda não integrada** ao KUMA GUARD
 >
 > O projeto continua sendo uma **prova de conceito baseada em dados sintéticos**. Não deve ser interpretado como sistema de detecção de fraude pronto para produção nem como mecanismo de confirmação automática de incidentes.
@@ -490,7 +490,7 @@ Nem todo artefato do repositório representa a mesma geração do projeto. Para 
 | `README.md` | visão pública, escopo, capacidades e status da linha ativa | **V3 atual** |
 | `docs/architecture/` | documentação técnica detalhada da arquitetura | documentação existente; parcialmente desatualizada em relação à V3 atual |
 | `docs/devsecops/` | documentação dos controles de qualidade e segurança | documentação técnica complementar; código e CI continuam sendo a referência executável |
-| `reports/resultado_multimodelo/` | artefatos públicos de reporting | PDF analítico atualizado em 08/09/2026; CSV, JSON e gráficos permanecem históricos da v2.0.0 |
+| `reports/resultado_multimodelo/` | artefatos públicos de reporting | PDF analítico atualizado em 08/09/2026 com correções de reporting da V3; CSV, JSON e gráficos permanecem históricos da v2.0.0 |
 | `src/reporting/pdf_report.py` | gerador atual de relatório analítico de execução | origem do formato do PDF analítico atual; não é sistema de case management nem trilha operacional completa |
 
 A regra de documentação da linha V3 é simples: **não promover um artefato histórico a “V3” apenas porque o código ao redor evoluiu**. Quando houver divergência entre documentação, código e comportamento executável, código, testes e CI atuais são a referência técnica principal.
@@ -529,7 +529,7 @@ Isso inclui:
 - gráficos analíticos da execução v2.0.0;
 - histórico de métricas daquele snapshot.
 
-> **Importante:** o PDF público atual foi atualizado a partir da execução de **08/09/2026**. Ele é mais recente que os demais artefatos multimodelo preservados na pasta, mas continua sendo um **relatório analítico de execução** e não representa a arquitetura completa nem o contrato defensivo integral da V3.
+> **Importante:** o PDF público atual foi atualizado a partir da execução de **08/09/2026** e já incorpora correções realizadas na linha **V3** no gerador de PDF, incluindo o ajuste de conteúdo em tabelas para manter identificadores/pseudônimos dentro das células em vez de ultrapassar suas bordas. Ele continua sendo um **relatório analítico de execução** e, isoladamente, não representa toda a arquitetura nem o contrato defensivo integral da V3.
 
 ### Gerador atual
 
@@ -643,7 +643,7 @@ Principais limitações:
 - a regressão de severidade permanece experimental;
 - ainda não existe monitoramento operacional de data drift ou concept drift;
 - o backend atual utiliza PostgreSQL/Supabase;
-- o PDF público disponível é um relatório analítico de execução atualizado em 08/09/2026 e não representa o contrato completo da V3;
+- o PDF público disponível é um relatório analítico de execução atualizado em 08/09/2026, já incorpora correções de reporting da V3, mas não representa sozinho o contrato completo da V3;
 - o gerador atual de PDF produz relatório analítico de execução, mas ainda não existe case management/reporting operacional completo.
 
 ---

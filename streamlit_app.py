@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 
+import dotenv
 import requests
 import streamlit as st
 
@@ -18,6 +19,8 @@ st.set_page_config(
     page_icon="🐻",
     layout="wide",
 )
+
+dotenv.load_dotenv(override=False)
 
 assessment = build_demo_assessment()
 

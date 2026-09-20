@@ -1,0 +1,134 @@
+from __future__ import annotations
+
+import os
+
+import requests
+import streamlit as st
+
+from src.genai.conversation import ConversationService
+from src.genai.demo import build_demo_assessment
+from src.genai.providers.gemini import GeminiLlmAdapter
+from src.genai.runtime import (
+    GenAiConfigurationError,
+    load_genai_runtime_config,
+)
+
+st.set_page_config(
+    page_title="KUMA GUARD",
+    page_icon="🐻",
+    layout="wide",
+)
+
+assessment = build_demo_assessment()
+
+st.title("KUMA GUARD")
+st.caption(
+    "Assistente GenAI para apoio à investigação e triagem defensiva de alertas SOC."
+)
+
+st.subheader("Estado factual da investigação")
+
+alert_col, confirmation_col = st.columns(2)
+
+with alert_col:
+    st.metric(
+        "Alert ID",
+        assessment.alert_id,
+    )
+
+with confirmation_col:
+    st.metric(
+        "Incidente confirmado",
+        "SIM" if assessment.incident_confirmed else "NÃO",
+    )
+
+with st.expander(
+    "Fatos observados",
+    expanded=True,
+):
+    for fact in assessment.facts:
+        st.write(f"- `{fact.name}` = `{fact.value}`")
+
+with st.expander(
+    "Hipóteses suportadas",
+    expanded=True,
+):
+    for hypothesis in assessment.hypotheses:
+        supporting_facts = ", ".join(hypothesis.supporting_fact_names)
+
+        st.write(f"- `{hypothesis.statement}` | suporte: `{supporting_facts}`")
+
+with st.expander(
+    "Evidências ausentes",
+):
+    for evidence_name in assessment.missing_evidence:
+        st.write(f"- `{evidence_name}`")
+
+with st.expander(
+    "Verificações recomendadas",
+):
+    for check in assessment.recommended_checks:
+        st.write(f"- `{check.action}` → `{check.evidence_name}`")
+
+try:
+    runtime_config = load_genai_runtime_config(
+        os.environ,
+    )
+except GenAiConfigurationError as exc:
+    runtime_config = None
+    st.warning(str(exc))
+
+st.divider()
+st.subheader("Conversa com o KUMA GUARD")
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+user_message = st.chat_input(
+    "Pergunte sobre o alerta...",
+    disabled=runtime_config is None,
+)
+
+if user_message:
+    st.session_state.messages.append(
+        {
+            "role": "user",
+            "content": user_message,
+        }
+    )
+
+    with st.chat_message("user"):
+        st.markdown(user_message)
+
+    adapter = GeminiLlmAdapter(
+        api_key=runtime_config.gemini_api_key,
+        model=runtime_config.gemini_model,
+    )
+    service = ConversationService(adapter)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Analisando o contexto defensivo..."):
+            try:
+                response = service.ask(
+                    assessment,
+                    user_message=user_message,
+                )
+                assistant_message = response.content
+                st.markdown(assistant_message)
+            except requests.RequestException:
+                assistant_message = (
+                    "Não foi possível consultar o provider GenAI. "
+                    "Tente novamente após verificar a conexão."
+                )
+                st.error(assistant_message)
+
+    st.session_state.messages.append(
+        {
+            "role": "assistant",
+            "content": assistant_message,
+        }
+    )

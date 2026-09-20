@@ -20,7 +20,7 @@ O agente não precisa consultar um conjunto aberto de documentos para responder 
 
 ---
 
-## Estratégia de integração
+## Integração dos dados
 
 ### Como os dados são carregados
 
@@ -111,7 +111,7 @@ Isso permite:
 
 - evitar exposição de dados pessoais reais;
 - executar testes reproduzíveis;
-- conhecer a truth de cenários controlados;
+- trabalhar com resultados esperados conhecidos em cenários controlados;
 - avaliar comportamento do agente sem depender de informações sensíveis.
 
 ---
@@ -132,5 +132,3 @@ Exemplos:
 ## Escopo acadêmico
 
 Para o protótipo do bootcamp, o contexto estruturado é suficiente para demonstrar integração entre dados, KUMA GUARD e IA generativa.
-
-Não é requisito desta entrega acadêmica adicionar banco vetorial, RAG amplo ou ingestão universal de documentos.

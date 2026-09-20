@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
 from typing import Any
 
 import requests
@@ -20,11 +22,17 @@ class GeminiLlmAdapter:
         model: str = DEFAULT_GEMINI_MODEL,
         session: Any = None,
         timeout: int = 30,
+        max_attempts: int = 3,
+        backoff_base_seconds: float = 1.0,
+        sleep_fn: Callable[[float], None] = time.sleep,
     ):
         self._api_key = api_key
         self._model = model
         self._session = session or requests
         self._timeout = timeout
+        self._max_attempts = max_attempts
+        self._backoff_base_seconds = backoff_base_seconds
+        self._sleep_fn = sleep_fn
 
     def generate(self, request: LlmRequest) -> LlmResponse:
         """Traduz LlmRequest para a API Gemini e normaliza a resposta."""
@@ -56,17 +64,37 @@ class GeminiLlmAdapter:
             ],
         }
 
-        response = self._session.post(
-            url,
-            headers={
-                "Content-Type": "application/json",
-                "x-goog-api-key": self._api_key,
-            },
-            json=payload,
-            timeout=self._timeout,
-        )
+        response = None
 
-        response.raise_for_status()
+        for attempt in range(1, self._max_attempts + 1):
+            response = self._session.post(
+                url,
+                headers={
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": self._api_key,
+                },
+                json=payload,
+                timeout=self._timeout,
+            )
+
+            try:
+                response.raise_for_status()
+                break
+            except requests.HTTPError:
+                status_code = getattr(
+                    response,
+                    "status_code",
+                    None,
+                )
+                retryable = status_code == 429 or (
+                    status_code is not None and 500 <= status_code < 600
+                )
+
+                if not retryable or attempt >= self._max_attempts:
+                    raise
+
+                delay = self._backoff_base_seconds * (2 ** (attempt - 1))
+                self._sleep_fn(delay)
 
         data = response.json()
 

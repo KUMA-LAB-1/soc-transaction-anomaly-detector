@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
+import dotenv
 import requests
 import streamlit as st
 
@@ -17,6 +19,13 @@ st.set_page_config(
     page_title="KUMA GUARD",
     page_icon="🐻",
     layout="wide",
+)
+
+ENV_PATH = Path(__file__).resolve().parent / ".env"
+
+dotenv.load_dotenv(
+    dotenv_path=ENV_PATH,
+    override=False,
 )
 
 assessment = build_demo_assessment()
@@ -119,11 +128,25 @@ if user_message:
                 )
                 assistant_message = response.content
                 st.markdown(assistant_message)
-            except requests.RequestException:
-                assistant_message = (
-                    "Não foi possível consultar o provider GenAI. "
-                    "Tente novamente após verificar a conexão."
+            except requests.RequestException as exc:
+                status_code = getattr(
+                    getattr(exc, "response", None),
+                    "status_code",
+                    None,
                 )
+
+                if status_code == 503:
+                    assistant_message = (
+                        "Gemini temporariamente indisponível (HTTP 503). "
+                        "As tentativas automáticas foram esgotadas. "
+                        "Tente novamente em alguns instantes."
+                    )
+                else:
+                    assistant_message = (
+                        "Não foi possível consultar o provider GenAI. "
+                        "Tente novamente após verificar a conexão."
+                    )
+
                 st.error(assistant_message)
 
     st.session_state.messages.append(

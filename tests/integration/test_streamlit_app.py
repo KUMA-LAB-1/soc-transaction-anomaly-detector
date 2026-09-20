@@ -1,13 +1,21 @@
 from pathlib import Path
 
+import requests
 from streamlit.testing.v1 import AppTest
 
 APP_PATH = Path(__file__).resolve().parents[2] / "streamlit_app.py"
 
 
 def test_streamlit_app_renderiza_demo_sem_api_key(monkeypatch):
+    import dotenv
+
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    monkeypatch.setattr(
+        dotenv,
+        "load_dotenv",
+        lambda *args, **kwargs: False,
+    )
 
     app = AppTest.from_file(APP_PATH)
     app.run()
@@ -17,6 +25,46 @@ def test_streamlit_app_renderiza_demo_sem_api_key(monkeypatch):
     assert len(app.chat_input) == 1
 
     assert any("GEMINI_API_KEY" in warning.value for warning in app.warning)
+
+
+def test_streamlit_app_carrega_configuracao_local_dotenv(monkeypatch):
+    import dotenv
+
+    calls = []
+
+    def fake_load_dotenv(*args, **kwargs):
+        calls.append(kwargs)
+        monkeypatch.setenv(
+            "GEMINI_API_KEY",
+            "test-dotenv-key",
+        )
+        return True
+
+    monkeypatch.delenv(
+        "GEMINI_API_KEY",
+        raising=False,
+    )
+    monkeypatch.delenv(
+        "GEMINI_MODEL",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        dotenv,
+        "load_dotenv",
+        fake_load_dotenv,
+    )
+
+    app = AppTest.from_file(APP_PATH)
+    app.run()
+
+    assert not app.exception
+    assert calls == [
+        {
+            "dotenv_path": APP_PATH.parent / ".env",
+            "override": False,
+        }
+    ]
+    assert not any("GEMINI_API_KEY" in warning.value for warning in app.warning)
 
 
 def test_streamlit_app_envia_pergunta_ao_servico_sem_rede(
@@ -71,3 +119,43 @@ def test_streamlit_app_envia_pergunta_ao_servico_sem_rede(
     assert len(app.chat_message) == 2
     assert app.chat_message[0].markdown[0].value == ("Este incidente está confirmado?")
     assert app.chat_message[1].markdown[0].value == ("O incidente não está confirmado.")
+
+
+def test_streamlit_app_exibe_erro_especifico_quando_gemini_retorna_503(
+    monkeypatch,
+):
+    from src.genai.providers.gemini import GeminiLlmAdapter
+
+    response = requests.Response()
+    response.status_code = 503
+
+    def fake_generate(self, request):
+        raise requests.HTTPError(
+            "HTTP 503",
+            response=response,
+        )
+
+    monkeypatch.setenv(
+        "GEMINI_API_KEY",
+        "test-streamlit-key",
+    )
+    monkeypatch.setattr(
+        GeminiLlmAdapter,
+        "generate",
+        fake_generate,
+    )
+
+    app = AppTest.from_file(APP_PATH)
+    app.run()
+
+    assert not app.exception
+
+    app.chat_input[0].set_value("Quais fatos foram observados?").run()
+
+    assert not app.exception
+    assert len(app.chat_message) == 2
+
+    assert any(
+        "503" in error.value and "temporariamente indisponível" in error.value.lower()
+        for error in app.error
+    )

@@ -6,8 +6,15 @@ APP_PATH = Path(__file__).resolve().parents[2] / "streamlit_app.py"
 
 
 def test_streamlit_app_renderiza_demo_sem_api_key(monkeypatch):
+    import dotenv
+
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    monkeypatch.setattr(
+        dotenv,
+        "load_dotenv",
+        lambda *args, **kwargs: False,
+    )
 
     app = AppTest.from_file(APP_PATH)
     app.run()
@@ -17,6 +24,44 @@ def test_streamlit_app_renderiza_demo_sem_api_key(monkeypatch):
     assert len(app.chat_input) == 1
 
     assert any("GEMINI_API_KEY" in warning.value for warning in app.warning)
+
+
+def test_streamlit_app_carrega_configuracao_local_dotenv(monkeypatch):
+    import dotenv
+
+    calls = []
+
+    def fake_load_dotenv(*args, **kwargs):
+        calls.append(kwargs)
+        monkeypatch.setenv(
+            "GEMINI_API_KEY",
+            "test-dotenv-key",
+        )
+        return True
+
+    monkeypatch.delenv(
+        "GEMINI_API_KEY",
+        raising=False,
+    )
+    monkeypatch.delenv(
+        "GEMINI_MODEL",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        dotenv,
+        "load_dotenv",
+        fake_load_dotenv,
+    )
+
+    app = AppTest.from_file(APP_PATH)
+    app.run()
+
+    assert not app.exception
+    assert calls == [{"override": False}]
+    assert not any(
+        "GEMINI_API_KEY" in warning.value
+        for warning in app.warning
+    )
 
 
 def test_streamlit_app_envia_pergunta_ao_servico_sem_rede(

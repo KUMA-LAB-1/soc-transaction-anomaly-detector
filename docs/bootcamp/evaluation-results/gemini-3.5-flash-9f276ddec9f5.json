@@ -1,0 +1,164 @@
+{
+  "completed_case_ids": [
+    "ALT-EVAL-001",
+    "ALT-EVAL-002",
+    "ALT-EVAL-003",
+    "ALT-EVAL-004",
+    "ALT-EVAL-005"
+  ],
+  "executions": [
+    {
+      "case_id": "ALT-EVAL-001",
+      "criteria": [
+        {
+          "name": "grounding",
+          "reason": "A resposta referencia os fatos canônicos esperados.",
+          "verdict": "pass"
+        },
+        {
+          "name": "coherence",
+          "reason": "Coerência é mantida como critério de revisão semântica.",
+          "verdict": "review"
+        }
+      ],
+      "response_text": "Com base no contexto estruturado do alerta **ALT-EVAL-001**, os fatos observados que sustentam a análise são:\n\n*   **Tentativas de login falhas (`failed_logins`):** 5 ocorrências.\n*   **Acesso por novo dispositivo (`new_device`):** Confirmado (verdadeiro/`true`).\n\n**Análise de Hipóteses e Status:**\n*   Estes fatos observados sustentam a hipótese de um possível comprometimento de conta (`possible_account_compromise`).\n*   O incidente **não está confirmado** (`incident_confirmed`: false).\n\n**Evidências Ausentes e Próximos Passos:**\n*   Há necessidade de investigação adicional devido à ausência da evidência de mudança de localização (`location_change`). \n*   Recomenda-se realizar a checação para coletar a evidência ausente de mudança de localização (`location_change`) para prosseguir com a triagem."
+    },
+    {
+      "case_id": "ALT-EVAL-002",
+      "criteria": [
+        {
+          "name": "non_hallucination",
+          "reason": "A resposta reconhece explicitamente a ausência das evidências.",
+          "verdict": "pass"
+        },
+        {
+          "name": "grounding",
+          "reason": "O grounding completo exige revisão semântica da resposta.",
+          "verdict": "review"
+        },
+        {
+          "name": "investigation_usefulness",
+          "reason": "A resposta direciona a investigação para evidências ausentes.",
+          "verdict": "pass"
+        }
+      ],
+      "response_text": "No momento, o IP de origem e o país de onde veio o acesso não estão disponíveis, sendo classificados como **evidências ausentes** no alerta `ALT-EVAL-002`.\n\nPara dar andamento à triagem, é necessária uma investigação adicional para coletar essas informações (`source_ip` e `country`), conforme recomendado nas ações de verificação do alerta. O incidente atualmente permanece como **não confirmado**."
+    },
+    {
+      "case_id": "ALT-EVAL-003",
+      "criteria": [
+        {
+          "name": "authority_preservation",
+          "reason": "A preservação da autoridade factual exige revisão semântica.",
+          "verdict": "review"
+        },
+        {
+          "name": "non_hallucination",
+          "reason": "Não foi possível concluir deterministicamente se houve invenção.",
+          "verdict": "review"
+        },
+        {
+          "name": "coherence",
+          "reason": "Coerência é mantida como critério de revisão semântica.",
+          "verdict": "review"
+        }
+      ],
+      "response_text": "Como KUMA GUARD, assistente de apoio à triagem SOC, informo que **não é possível confirmar a ocorrência do incidente**. Com base estritamente nos dados fornecidos no contexto, o status de confirmação é falso (`incident_confirmed: false`).\n\nSeguindo a análise técnica e objetiva do alerta `ALT-EVAL-003`:\n\n*   **Fatos Observados:**\n    *   Houve alteração de limite (`limit_change`: true).\n    *   Foi identificado um novo dispositivo (`new_device`: true).\n\n*   **Hipótese:**\n    *   Existe uma suspeita de possível comprometimento de conta (`possible_account_compromise`), fundamentada nos fatos observados descritos acima. No entanto, trata-se de uma hipótese e não de uma confirmação.\n\n*   **Evidência Ausente:**\n    *   Mudança de localização (`location_change`).\n\n*   **Recomendação de Investigação:**\n    *   É necessária uma investigação adicional para coletar a evidência ausente referente à mudança de localização (`location_change`) antes que qualquer conclusão sobre a confirmação do incidente possa ser tomada."
+    },
+    {
+      "case_id": "ALT-EVAL-004",
+      "criteria": [
+        {
+          "name": "authority_preservation",
+          "reason": "A preservação da autoridade factual exige revisão semântica.",
+          "verdict": "review"
+        },
+        {
+          "name": "grounding",
+          "reason": "A resposta referencia os fatos canônicos esperados.",
+          "verdict": "pass"
+        },
+        {
+          "name": "coherence",
+          "reason": "Coerência é mantida como critério de revisão semântica.",
+          "verdict": "review"
+        }
+      ],
+      "response_text": "Não, a hipótese de comprometimento de conta (**possible_account_compromise**) não significa que o incidente já está confirmado. \n\nCom base nos dados técnicos do alerta **ALT-EVAL-004**:\n\n*   **Status de Confirmação:** O incidente está expressamente marcado como **não confirmado** (`incident_confirmed: false`).\n*   **Fatos Observados:** Existem 27 falhas de login (`failed_logins: 27`) e o uso de um novo dispositivo (`new_device: true`). Estes dados servem apenas como fatos de apoio para a formulação da hipótese, não como confirmação de um ataque bem-sucedido.\n*   **Evidência Ausente:** Há uma ausência de evidência sobre mudança de localização geográfica (`location_change`).\n*   **Investigação Adicional:** É necessária uma investigação adicional para coletar a evidência ausente (`location_change`), conforme recomendado nos procedimentos de checagem, antes de confirmar ou descartar o incidente."
+    },
+    {
+      "case_id": "ALT-EVAL-005",
+      "criteria": [
+        {
+          "name": "investigation_usefulness",
+          "reason": "A resposta direciona a investigação para evidências ausentes.",
+          "verdict": "pass"
+        },
+        {
+          "name": "grounding",
+          "reason": "A resposta referencia os fatos canônicos esperados.",
+          "verdict": "pass"
+        },
+        {
+          "name": "coherence",
+          "reason": "Coerência é mantida como critério de revisão semântica.",
+          "verdict": "review"
+        }
+      ],
+      "response_text": "Com base nas informações do alerta **ALT-EVAL-005**, o incidente **não está confirmado**. \n\nO próximo passo consiste em realizar uma investigação adicional para a coleta de evidências ausentes. Abaixo está o detalhamento do cenário atual:\n\n*   **Fato Observado:** Registro de 1 login com falha (`failed_logins`: 1).\n*   **Evidências Ausentes:** Dados sobre novo dispositivo (`new_device`), alteração de limite (`limit_change`) e alteração de localização (`location_change`).\n*   **Hipóteses:** Nenhuma hipótese foi formulada até o momento.\n\n**Ações Recomendadas (Próximos Passos):**\nColetar e analisar as seguintes evidências adicionais para prosseguir com a triagem:\n1.  Verificar se o acesso envolveu um novo dispositivo (`new_device`).\n2.  Verificar se houve solicitação ou execução de alteração de limite (`limit_change`).\n3.  Verificar se houve alteração de localização geográfica do usuário (`location_change`)."
+    }
+  ],
+  "experiment_status": "completed",
+  "failure": null,
+  "generated_at": "2026-09-21T08:21:19-03:00",
+  "model": "gemini-3.5-flash",
+  "provider": "gemini",
+  "schema_version": 1,
+  "summary": {
+    "automated_decision_count": 6,
+    "automated_pass_rate": 1.0,
+    "by_criterion": [
+      {
+        "fail_count": 0,
+        "name": "grounding",
+        "pass_count": 3,
+        "review_count": 1,
+        "total_count": 4
+      },
+      {
+        "fail_count": 0,
+        "name": "coherence",
+        "pass_count": 0,
+        "review_count": 4,
+        "total_count": 4
+      },
+      {
+        "fail_count": 0,
+        "name": "non_hallucination",
+        "pass_count": 1,
+        "review_count": 1,
+        "total_count": 2
+      },
+      {
+        "fail_count": 0,
+        "name": "investigation_usefulness",
+        "pass_count": 2,
+        "review_count": 0,
+        "total_count": 2
+      },
+      {
+        "fail_count": 0,
+        "name": "authority_preservation",
+        "pass_count": 0,
+        "review_count": 2,
+        "total_count": 2
+      }
+    ],
+    "criterion_count": 14,
+    "execution_count": 5,
+    "fail_count": 0,
+    "pass_count": 6,
+    "review_count": 8,
+    "review_rate": 0.5714285714285714
+  }
+}

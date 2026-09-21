@@ -14,7 +14,7 @@ A primeira versão nasceu durante um bootcamp de GenAI, Dados e Cybersecurity. D
 > - Linha ativa de desenvolvimento: **V3**
 > - Estado da V3: núcleo defensivo validado por testes automatizados e CI; linha V3 ainda em fechamento
 > - PDF público versionado: relatório analítico atualizado em **08/09/2026**, já com correções de reporting realizadas na linha **V3**; os demais artefatos multimodelo permanecem históricos da **v2.0.0**
-> - Camada conversacional com LLM: **integrada** por contrato provider-neutral, adapter Gemini e interface Streamlit; avaliação generativa formal ainda pendente
+> - Camada conversacional com LLM: **integrada e avaliada formalmente** por contrato provider-neutral, adapter Gemini e interface Streamlit; experimento generativo controlado concluído e versionado
 >
 > O projeto continua sendo uma **prova de conceito baseada em dados sintéticos**. Não deve ser interpretado como sistema de detecção de fraude pronto para produção nem como mecanismo de confirmação automática de incidentes.
 
@@ -55,6 +55,7 @@ Entre as capacidades implementadas estão:
 - construção de contexto conversacional grounded a partir do `GuardedSocAssessment`;
 - adapter Gemini via API REST;
 - interface conversacional Streamlit para demonstração interativa;
+- avaliação generativa formal com casos sintéticos, métricas automáticas, revisão humana e artefatos auditáveis;
 - **Evaluation Matrix** independente para avaliar claims sem suporte e falsas confirmações;
 - teste E2E do contrato defensivo da V3;
 - geração de métricas, gráficos, CSV e JSON;
@@ -413,16 +414,15 @@ Também são aplicados:
 
 ### Último checkpoint técnico validado da linha V3
 
-Em **20/09/2026**, após a integração da fundação conversacional GenAI na `main` pelo PR #70:
+Em **21/09/2026**, durante o fechamento local do bloco de avaliação generativa formal da V3:
 
-- **1467 testes** aprovados;
-- **99,01%** de coverage total;
+- **1513 testes** aprovados;
+- **98,66%** de coverage total;
 - Ruff lint aprovado;
 - Ruff format check aprovado;
-- diff-check aprovado;
-- CI com Quality + Unit Tests, Integration Smoke, Secret Scanning, SBOM e Container Security aprovados.
+- diff-check aprovado.
 
-Esses números representam o último checkpoint global validado da `main` anterior ao bloco da interface Streamlit e podem evoluir com novos commits.
+Esse checkpoint pertence à branch de avaliação generativa antes de sua integração à `main`. A validação de CI do Pull Request continua sendo necessária antes do merge.
 
 ---
 
@@ -515,6 +515,7 @@ Nem todo artefato do repositório representa a mesma geração do projeto. Para 
 | `README.md` | visão pública, escopo, capacidades e status da linha ativa | **V3 atual** |
 | `docs/architecture/` | documentação técnica detalhada da arquitetura | documentação existente; parcialmente desatualizada em relação à V3 atual |
 | `docs/devsecops/` | documentação dos controles de qualidade e segurança | documentação técnica complementar; código e CI continuam sendo a referência executável |
+| `docs/bootcamp/` | documentação e evidências da camada GenAI desenvolvida no contexto do bootcamp | inclui agente, base de conhecimento, prompts e avaliação generativa formal |
 | `reports/resultado_multimodelo/` | artefatos públicos de reporting | PDF analítico atualizado em 08/09/2026 com correções de reporting da V3; CSV, JSON e gráficos permanecem históricos da v2.0.0 |
 | `src/reporting/pdf_report.py` | gerador atual de relatório analítico de execução | origem do formato do PDF analítico atual; não é sistema de case management nem trilha operacional completa |
 
@@ -537,6 +538,13 @@ A regra de documentação da linha V3 é simples: **não promover um artefato hi
 - [Controles de segurança](docs/devsecops/security-controls.md)
 - [Software supply chain](docs/devsecops/supply-chain.md)
 - [Container security](docs/devsecops/container-security.md)
+
+### GenAI / Bootcamp
+
+- [Documentação do agente](docs/bootcamp/01-documentacao-agente.md)
+- [Base de conhecimento](docs/bootcamp/02-base-conhecimento.md)
+- [Prompts](docs/bootcamp/03-prompts.md)
+- [Avaliação generativa formal](docs/bootcamp/04-avaliacao-generativa.md)
 
 Os documentos de arquitetura existentes ainda não refletem integralmente todas as mudanças da linha V3; por isso, devem ser lidos em conjunto com o código, testes e este README.
 
@@ -682,7 +690,7 @@ Principais limitações:
 - KUMA GUARD não confirma incidentes automaticamente;
 - a interface conversacional atual é uma demo Streamlit baseada em cenário sintético e integração Gemini;
 - o histórico do chat é visual; ainda não existe memória conversacional semântica incorporada ao estado factual da investigação;
-- a Evaluation Matrix atual cobre o núcleo defensivo determinístico; a avaliação generativa formal da camada LLM ainda precisa ser executada e registrada;
+- a avaliação generativa formal foi executada em cinco cenários sintéticos controlados; seus resultados não devem ser generalizados para todos os cenários SOC, modelos ou providers;
 - a regressão de severidade permanece experimental;
 - ainda não existe monitoramento operacional de data drift ou concept drift;
 - o backend atual utiliza PostgreSQL/Supabase;
@@ -732,7 +740,8 @@ Já implementado e validado:
 - contrato provider-neutral para LLM;
 - builder de contexto grounded e `ConversationService`;
 - adapter Gemini via API REST;
-- interface conversacional Streamlit com testes de integração.
+- interface conversacional Streamlit com testes de integração;
+- avaliação generativa formal com cinco cenários sintéticos, métricas automáticas, revisão humana e artefatos auditáveis.
 
 A V3 ainda não foi publicada como nova release formal. O estado público atual deve ser interpretado pelos contratos, testes, CI e limitações documentadas neste README.
 

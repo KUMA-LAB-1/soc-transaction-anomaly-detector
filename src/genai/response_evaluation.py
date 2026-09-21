@@ -9,7 +9,8 @@ from src.genai.evaluation_cases import GenerativeEvaluationCase
 
 
 class EvaluationVerdict(str, Enum):
-    PASS = "pass"
+    # "pass" é um rótulo de domínio do veredito, não uma credencial.
+    PASS = "pass"  # nosec B105
     FAIL = "fail"
     REVIEW = "review"
 

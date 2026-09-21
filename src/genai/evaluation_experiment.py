@@ -4,36 +4,35 @@ import json
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
+import requests
+
 from src.genai.contracts import LlmAdapter
 from src.genai.evaluation_artifact import build_evaluation_artifact
 from src.genai.evaluation_cases import build_generative_evaluation_cases
-from src.genai.evaluation_runner import run_generative_evaluation
+from src.genai.evaluation_runner import (
+    GenerativeEvaluationExecution,
+    GenerativeEvaluationRun,
+    run_generative_evaluation,
+)
 from src.genai.evaluation_summary import summarize_generative_run
 from src.genai.providers.gemini import GeminiLlmAdapter
 from src.genai.runtime import load_genai_runtime_config
 
 
-def run_gemini_evaluation_experiment(
+def _persist_experiment_artifact(
     *,
-    environment: Mapping[str, str],
+    executions: list[GenerativeEvaluationExecution],
     output_path: Path,
+    provider: str,
+    model: str,
     generated_at: str,
-    adapter_factory: Callable[..., LlmAdapter] = GeminiLlmAdapter,
+    experiment_status: str,
+    failure: dict | None,
 ) -> dict:
-    """Executa o catálogo generativo e persiste um artefato JSON auditável."""
+    """Persiste o estado auditável corrente do experimento."""
 
-    config = load_genai_runtime_config(environment)
-
-    adapter = adapter_factory(
-        api_key=config.gemini_api_key,
-        model=config.gemini_model,
-    )
-
-    cases = build_generative_evaluation_cases()
-
-    run = run_generative_evaluation(
-        adapter,
-        cases=cases,
+    run = GenerativeEvaluationRun(
+        executions=tuple(executions),
     )
 
     summary = summarize_generative_run(run)
@@ -41,15 +40,14 @@ def run_gemini_evaluation_experiment(
     artifact = build_evaluation_artifact(
         run,
         summary=summary,
-        provider="gemini",
-        model=config.gemini_model,
+        provider=provider,
+        model=model,
         generated_at=generated_at,
     )
 
-    output_path.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+    artifact["experiment_status"] = experiment_status
+    artifact["completed_case_ids"] = [execution.case_id for execution in executions]
+    artifact["failure"] = failure
 
     output_path.write_text(
         json.dumps(
@@ -63,3 +61,80 @@ def run_gemini_evaluation_experiment(
     )
 
     return artifact
+
+
+def run_gemini_evaluation_experiment(
+    *,
+    environment: Mapping[str, str],
+    output_path: Path,
+    generated_at: str,
+    adapter_factory: Callable[..., LlmAdapter] = GeminiLlmAdapter,
+) -> dict:
+    """Executa o catálogo generativo com checkpoints auditáveis por caso."""
+
+    config = load_genai_runtime_config(environment)
+
+    adapter = adapter_factory(
+        api_key=config.gemini_api_key,
+        model=config.gemini_model,
+    )
+
+    cases = build_generative_evaluation_cases()
+
+    output_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    executions: list[GenerativeEvaluationExecution] = []
+
+    for case in cases:
+        try:
+            case_run = run_generative_evaluation(
+                adapter,
+                cases=(case,),
+            )
+        except requests.HTTPError as exc:
+            response = exc.response
+
+            status_code = response.status_code if response is not None else None
+
+            _persist_experiment_artifact(
+                executions=executions,
+                output_path=output_path,
+                provider="gemini",
+                model=config.gemini_model,
+                generated_at=generated_at,
+                experiment_status="partial",
+                failure={
+                    "case_id": case.case_id,
+                    "error_type": type(exc).__name__,
+                    "status_code": status_code,
+                },
+            )
+
+            raise
+
+        executions.extend(
+            case_run.executions,
+        )
+
+        _persist_experiment_artifact(
+            executions=executions,
+            output_path=output_path,
+            provider="gemini",
+            model=config.gemini_model,
+            generated_at=generated_at,
+            experiment_status="partial",
+            failure=None,
+        )
+
+    return _persist_experiment_artifact(
+        executions=executions,
+        output_path=output_path,
+        provider="gemini",
+        model=config.gemini_model,
+        generated_at=generated_at,
+        experiment_status="completed",
+        failure=None,
+    )

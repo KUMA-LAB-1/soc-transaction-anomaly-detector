@@ -16,6 +16,11 @@ from src.genai.evaluation_runner import (
 )
 from src.genai.evaluation_summary import summarize_generative_run
 from src.genai.providers.gemini import GeminiLlmAdapter
+from src.genai.response_evaluation import (
+    CriterionEvaluation,
+    EvaluationVerdict,
+    GenerativeResponseEvaluation,
+)
 from src.genai.runtime import load_genai_runtime_config
 
 
@@ -63,14 +68,69 @@ def _persist_experiment_artifact(
     return artifact
 
 
+def _load_checkpoint_executions(
+    output_path: Path,
+) -> list[GenerativeEvaluationExecution]:
+    """Reconstrói execuções já persistidas em um checkpoint."""
+
+    if not output_path.exists():
+        return []
+
+    artifact = json.loads(
+        output_path.read_text(
+            encoding="utf-8",
+        )
+    )
+
+    executions = []
+
+    for stored_execution in artifact.get(
+        "executions",
+        (),
+    ):
+        criteria = tuple(
+            CriterionEvaluation(
+                name=criterion["name"],
+                verdict=EvaluationVerdict(
+                    criterion["verdict"],
+                ),
+                reason=criterion["reason"],
+            )
+            for criterion in stored_execution.get(
+                "criteria",
+                (),
+            )
+        )
+
+        response_text = stored_execution["response_text"]
+        case_id = stored_execution["case_id"]
+
+        evaluation = GenerativeResponseEvaluation(
+            case_id=case_id,
+            response_text=response_text,
+            criteria=criteria,
+        )
+
+        executions.append(
+            GenerativeEvaluationExecution(
+                case_id=case_id,
+                response_text=response_text,
+                evaluation=evaluation,
+            )
+        )
+
+    return executions
+
+
 def run_gemini_evaluation_experiment(
     *,
     environment: Mapping[str, str],
     output_path: Path,
     generated_at: str,
     adapter_factory: Callable[..., LlmAdapter] = GeminiLlmAdapter,
+    resume: bool = False,
 ) -> dict:
-    """Executa o catálogo generativo com checkpoints auditáveis por caso."""
+    """Executa ou retoma o catálogo generativo com checkpoints por caso."""
 
     config = load_genai_runtime_config(environment)
 
@@ -86,9 +146,20 @@ def run_gemini_evaluation_experiment(
         exist_ok=True,
     )
 
-    executions: list[GenerativeEvaluationExecution] = []
+    executions = (
+        _load_checkpoint_executions(
+            output_path,
+        )
+        if resume
+        else []
+    )
+
+    completed_case_ids = {execution.case_id for execution in executions}
 
     for case in cases:
+        if case.case_id in completed_case_ids:
+            continue
+
         try:
             case_run = run_generative_evaluation(
                 adapter,
@@ -117,6 +188,10 @@ def run_gemini_evaluation_experiment(
 
         executions.extend(
             case_run.executions,
+        )
+
+        completed_case_ids.add(
+            case.case_id,
         )
 
         _persist_experiment_artifact(

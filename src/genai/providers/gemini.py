@@ -12,6 +12,60 @@ DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
 GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
 
+def _provider_retry_delay_seconds(
+    response: Any,
+) -> float | None:
+    """Extrai google.rpc.RetryInfo quando o provider o disponibiliza."""
+
+    try:
+        payload = response.json()
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    error = payload.get("error")
+
+    if not isinstance(error, dict):
+        return None
+
+    details = error.get("details", ())
+
+    if not isinstance(details, list):
+        return None
+
+    for detail in details:
+        if not isinstance(detail, dict):
+            continue
+
+        detail_type = detail.get("@type", "")
+
+        if not isinstance(detail_type, str):
+            continue
+
+        if not detail_type.endswith("google.rpc.RetryInfo"):
+            continue
+
+        retry_delay = detail.get("retryDelay")
+
+        if not isinstance(retry_delay, str):
+            continue
+
+        if not retry_delay.endswith("s"):
+            continue
+
+        try:
+            seconds = float(retry_delay[:-1])
+        except ValueError:
+            continue
+
+        if seconds >= 0:
+            return seconds
+
+    return None
+
+
 class GeminiLlmAdapter:
     """Adapter Gemini isolado atrás do contrato provider-neutral."""
 
@@ -93,7 +147,18 @@ class GeminiLlmAdapter:
                 if not retryable or attempt >= self._max_attempts:
                     raise
 
-                delay = self._backoff_base_seconds * (2 ** (attempt - 1))
+                backoff_delay = self._backoff_base_seconds * (2 ** (attempt - 1))
+
+                provider_delay = _provider_retry_delay_seconds(
+                    response,
+                )
+
+                delay = (
+                    max(backoff_delay, provider_delay)
+                    if provider_delay is not None
+                    else backoff_delay
+                )
+
                 self._sleep_fn(delay)
 
         data = response.json()

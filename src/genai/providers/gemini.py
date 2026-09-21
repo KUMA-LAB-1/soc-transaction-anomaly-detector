@@ -121,15 +121,27 @@ class GeminiLlmAdapter:
         response = None
 
         for attempt in range(1, self._max_attempts + 1):
-            response = self._session.post(
-                url,
-                headers={
-                    "Content-Type": "application/json",
-                    "x-goog-api-key": self._api_key,
-                },
-                json=payload,
-                timeout=self._timeout,
-            )
+            try:
+                response = self._session.post(
+                    url,
+                    headers={
+                        "Content-Type": "application/json",
+                        "x-goog-api-key": self._api_key,
+                    },
+                    json=payload,
+                    timeout=self._timeout,
+                )
+            except (
+                requests.Timeout,
+                requests.ConnectionError,
+            ):
+                if attempt >= self._max_attempts:
+                    raise
+
+                delay = self._backoff_base_seconds * (2 ** (attempt - 1))
+
+                self._sleep_fn(delay)
+                continue
 
             try:
                 response.raise_for_status()
@@ -140,6 +152,7 @@ class GeminiLlmAdapter:
                     "status_code",
                     None,
                 )
+
                 retryable = status_code == 429 or (
                     status_code is not None and 500 <= status_code < 600
                 )

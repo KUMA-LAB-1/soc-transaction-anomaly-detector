@@ -165,7 +165,7 @@ def run_gemini_evaluation_experiment(
                 adapter,
                 cases=(case,),
             )
-        except requests.HTTPError as exc:
+        except requests.RequestException as exc:
             response = exc.response
 
             status_code = response.status_code if response is not None else None

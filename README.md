@@ -14,7 +14,7 @@ A primeira versão nasceu durante um bootcamp de GenAI, Dados e Cybersecurity. D
 > - Linha ativa de desenvolvimento: **V3**
 > - Estado da V3: núcleo defensivo validado por testes automatizados e CI; linha V3 ainda em fechamento
 > - PDF público versionado: relatório analítico atualizado em **08/09/2026**, já com correções de reporting realizadas na linha **V3**; os demais artefatos multimodelo permanecem históricos da **v2.0.0**
-> - Camada conversacional com LLM: **integrada e avaliada formalmente** por contrato provider-neutral, adapter Gemini e interface Streamlit; experimento generativo controlado concluído e versionado
+> - Camada conversacional com LLM: **integrada e avaliada formalmente** por contrato provider-neutral, adapter Gemini, adapter OpenAI-compatible e interface Streamlit; experimento generativo controlado concluído e versionado; runtime local com Ollama + Qwen3 4B validado para desenvolvimento e demonstração
 >
 > O projeto continua sendo uma **prova de conceito baseada em dados sintéticos**. Não deve ser interpretado como sistema de detecção de fraude pronto para produção nem como mecanismo de confirmação automática de incidentes.
 
@@ -54,6 +54,9 @@ Entre as capacidades implementadas estão:
 - contratos provider-neutral para integração com LLM;
 - construção de contexto conversacional grounded a partir do `GuardedSocAssessment`;
 - adapter Gemini via API REST;
+- adapter OpenAI-compatible reutilizável para providers compatíveis;
+- runtime conversacional provider-neutral com seleção por configuração;
+- execução local validada com Ollama + Qwen3 4B, sem chave de API e sem custo por chamada;
 - interface conversacional Streamlit para demonstração interativa;
 - avaliação generativa formal com casos sintéticos, métricas automáticas, revisão humana e artefatos auditáveis;
 - **Evaluation Matrix** independente para avaliar claims sem suporte e falsas confirmações;
@@ -148,7 +151,14 @@ Conversation Context
           ▼
 LlmAdapter
           │
+          ▼
+Provider Runtime
+          │
           ├──────────────► Gemini REST
+          │
+          └──────────────► OpenAI-compatible
+                              │
+                              └── Ollama + Qwen3 4B
           │
           ▼
 Streamlit
@@ -204,6 +214,31 @@ incident_confirmed = False
 A camada conversacional usa esse assessment estruturado como autoridade factual. O LLM recebe contexto derivado do estado defensivo e atua como camada de linguagem e interação; ele não altera o estado de confirmação nem transforma hipótese, anomalia ou score em incidente confirmado.
 
 A interface Streamlit mantém histórico visual da sessão. No estágio atual, cada nova pergunta continua sendo grounded no `GuardedSocAssessment` atual, sem tratar mensagens anteriores do chat como nova evidência factual.
+
+### Runtime generativo e execução local
+
+A primeira integração do runtime generativo e a avaliação generativa formal foram realizadas com **Gemini**. Durante testes interativos da demonstração, porém, foram observadas indisponibilidades temporárias da API remota, incluindo respostas **HTTP 503**. Isso introduzia uma dependência operacional externa que não fazia parte do objetivo da demonstração.
+
+Para tornar desenvolvimento, testes manuais e gravações de demo mais reproduzíveis, o projeto passou a oferecer **Ollama + Qwen3 4B** como runtime local. Essa opção não exige chave de API, não possui custo por chamada e reduz a dependência da disponibilidade de um serviço remoto.
+
+O Gemini **permanece suportado**. A aplicação não foi reescrita para um novo fornecedor: ela passou a selecionar o provider por configuração, preservando o mesmo contrato interno `LlmAdapter`. O runtime local utiliza um adapter OpenAI-compatible, mantendo a camada generativa desacoplada de um fornecedor específico.
+
+```text
+KUMA GUARD
+    │
+    ▼
+ConversationService
+    │
+    ▼
+LlmAdapter
+    │
+    ▼
+Provider Runtime
+    ├── Gemini
+    └── Ollama / OpenAI-compatible
+```
+
+A avaliação generativa formal versionada continua representando o experimento executado com Gemini; a adoção do runtime local é uma decisão de execução e arquitetura para desenvolvimento e demonstração, não uma substituição retroativa daquele experimento.
 
 Uma hipótese só pode ser adicionada quando declara quais fatos observados a suportam. Suporte vazio ou referência a fato não observado é rejeitado.
 
@@ -414,15 +449,18 @@ Também são aplicados:
 
 ### Último checkpoint técnico validado da linha V3
 
-Em **21/09/2026**, durante o fechamento local do bloco de avaliação generativa formal da V3:
+Em **22/09/2026**, durante o fechamento local da integração provider-neutral com runtime local:
 
-- **1513 testes** aprovados;
-- **98,66%** de coverage total;
+- **1523 testes** aprovados;
+- **98,48%** de coverage total;
 - Ruff lint aprovado;
 - Ruff format check aprovado;
-- diff-check aprovado.
+- Bandit sem issues identificadas;
+- diff-check aprovado;
+- smoke test real concluído através de `ConversationService → provider runtime → OpenAI-compatible adapter → Ollama → Qwen3 4B`;
+- demo Streamlit validada com o provider local preservando `incident_confirmed = false` diante de uma solicitação adversarial de confirmação.
 
-Esse checkpoint pertence à branch de avaliação generativa antes de sua integração à `main`. A validação de CI do Pull Request continua sendo necessária antes do merge.
+Esse checkpoint pertence à branch de integração do runtime provider-neutral. A validação de CI do Pull Request continua sendo necessária antes do merge.
 
 ---
 
@@ -621,7 +659,10 @@ Principais variáveis:
 - `MITRE_DATABASE_URL`: ingestão de Threat Intelligence;
 - `SOC_PIPELINE_USER`: identidade lógica de auditoria;
 - `ALERT_STORAGE`: backend opcional para persistência dos alertas;
-- `GEMINI_API_KEY`: credencial local para a demo conversacional;
+- `LLM_PROVIDER`: provider conversacional selecionado (`gemini` ou `ollama`);
+- `OLLAMA_MODEL`: modelo local utilizado pelo Ollama, com `qwen3:4b-instruct` como padrão atual;
+- `OLLAMA_BASE_URL`: endpoint OpenAI-compatible local, com `http://localhost:11434/v1` como padrão;
+- `GEMINI_API_KEY`: credencial local necessária apenas quando `LLM_PROVIDER=gemini`;
 - `GEMINI_MODEL`: modelo Gemini utilizado pelo adapter, com `gemini-3.8-flash` como padrão atual.
 
 O arquivo `.env` não deve ser versionado. A interface Streamlit atual lê a configuração GenAI do ambiente do processo; o `.env.example` serve como referência segura e não deve conter credenciais reais.
@@ -648,18 +689,35 @@ uv run python -m src.security_detector
 
 ### 8. Executar a interface conversacional
 
-A demo usa um cenário sintético canônico. Sem `GEMINI_API_KEY`, a interface continua abrindo em modo seguro e informa que a configuração está ausente. Para conversar com o provider Gemini, exponha a chave apenas no ambiente local.
+A demo usa um cenário sintético canônico e aceita seleção de provider por variável de ambiente.
 
-No PowerShell:
+#### Opção recomendada para desenvolvimento e demo local: Ollama
+
+Com o Ollama instalado e o modelo disponível localmente:
 
 ```powershell
+ollama pull qwen3:4b-instruct
+
+$env:LLM_PROVIDER = "ollama"
+$env:OLLAMA_MODEL = "qwen3:4b-instruct"
+$env:OLLAMA_BASE_URL = "http://localhost:11434/v1"
+
+uv run streamlit run streamlit_app.py
+```
+
+Essa configuração não exige chave de API nem chamada a serviço externo.
+
+#### Provider alternativo: Gemini
+
+```powershell
+$env:LLM_PROVIDER = "gemini"
 $env:GEMINI_API_KEY = "<SUA_CHAVE_LOCAL>"
 $env:GEMINI_MODEL = "gemini-3.8-flash"
 
 uv run streamlit run streamlit_app.py
 ```
 
-A chave não deve ser adicionada ao Git nem registrada em arquivos públicos.
+A chave não deve ser adicionada ao Git nem registrada em arquivos públicos. Se `LLM_PROVIDER=gemini` for selecionado sem `GEMINI_API_KEY`, a interface mantém o modo seguro e informa que a configuração está ausente.
 
 ### 9. Executar a suíte global
 
@@ -688,7 +746,7 @@ Principais limitações:
 - o pipeline não está conectado a um SOC real;
 - ainda não existem conectores operacionais de SIEM, EDR ou XDR;
 - KUMA GUARD não confirma incidentes automaticamente;
-- a interface conversacional atual é uma demo Streamlit baseada em cenário sintético e integração Gemini;
+- a interface conversacional atual é uma demo Streamlit baseada em cenário sintético; o runtime suporta Gemini e Ollama/OpenAI-compatible, mas essa flexibilidade não elimina as limitações do cenário demonstrativo;
 - o histórico do chat é visual; ainda não existe memória conversacional semântica incorporada ao estado factual da investigação;
 - a avaliação generativa formal foi executada em cinco cenários sintéticos controlados; seus resultados não devem ser generalizados para todos os cenários SOC, modelos ou providers;
 - a regressão de severidade permanece experimental;
@@ -740,7 +798,10 @@ Já implementado e validado:
 - contrato provider-neutral para LLM;
 - builder de contexto grounded e `ConversationService`;
 - adapter Gemini via API REST;
-- interface conversacional Streamlit com testes de integração;
+- adapter OpenAI-compatible para execução local e providers compatíveis;
+- runtime conversacional provider-neutral com seleção Gemini/Ollama por configuração;
+- execução local validada com Ollama + Qwen3 4B;
+- interface conversacional Streamlit integrada ao runtime provider-neutral;
 - avaliação generativa formal com cinco cenários sintéticos, métricas automáticas, revisão humana e artefatos auditáveis.
 
 A V3 ainda não foi publicada como nova release formal. O estado público atual deve ser interpretado pelos contratos, testes, CI e limitações documentadas neste README.

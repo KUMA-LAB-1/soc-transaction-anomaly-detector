@@ -9,15 +9,15 @@ import streamlit as st
 
 from src.genai.conversation import ConversationService
 from src.genai.demo import build_demo_assessment
-from src.genai.providers.gemini import GeminiLlmAdapter
-from src.genai.runtime import (
-    GenAiConfigurationError,
-    load_genai_runtime_config,
+from src.genai.provider_runtime import (
+    LlmProviderConfigurationError,
+    create_llm_adapter,
+    load_llm_provider_runtime_config,
 )
 
 st.set_page_config(
     page_title="KUMA GUARD",
-    page_icon="🐻",
+    page_icon="\U0001f43b",
     layout="wide",
 )
 
@@ -80,15 +80,21 @@ with st.expander(
         st.write(f"- `{check.action}` → `{check.evidence_name}`")
 
 try:
-    runtime_config = load_genai_runtime_config(
+    runtime_config = load_llm_provider_runtime_config(
         os.environ,
     )
-except GenAiConfigurationError as exc:
+except LlmProviderConfigurationError as exc:
     runtime_config = None
     st.warning(str(exc))
 
 st.divider()
 st.subheader("Conversa com o KUMA GUARD")
+
+if runtime_config is not None:
+    st.caption(
+        f"Provider ativo: `{runtime_config.provider}` | "
+        f"Modelo: `{runtime_config.model}`"
+    )
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -113,11 +119,12 @@ if user_message:
     with st.chat_message("user"):
         st.markdown(user_message)
 
-    adapter = GeminiLlmAdapter(
-        api_key=runtime_config.gemini_api_key,
-        model=runtime_config.gemini_model,
+    adapter = create_llm_adapter(
+        runtime_config,
     )
-    service = ConversationService(adapter)
+    service = ConversationService(
+        adapter,
+    )
 
     with st.chat_message("assistant"):
         with st.spinner("Analisando o contexto defensivo..."):
@@ -128,23 +135,33 @@ if user_message:
                 )
                 assistant_message = response.content
                 st.markdown(assistant_message)
+
             except requests.RequestException as exc:
                 status_code = getattr(
-                    getattr(exc, "response", None),
+                    getattr(
+                        exc,
+                        "response",
+                        None,
+                    ),
                     "status_code",
                     None,
                 )
 
                 if status_code == 503:
                     assistant_message = (
-                        "Gemini temporariamente indisponível (HTTP 503). "
-                        "As tentativas automáticas foram esgotadas. "
+                        "Provider GenAI temporariamente "
+                        "indisponível (HTTP 503). "
+                        "As tentativas automáticas "
+                        "foram esgotadas. "
                         "Tente novamente em alguns instantes."
                     )
                 else:
                     assistant_message = (
-                        "Não foi possível consultar o provider GenAI. "
-                        "Tente novamente após verificar a conexão."
+                        "Não foi possível consultar "
+                        "o provider GenAI. "
+                        "Verifique se o runtime selecionado "
+                        "está em execução "
+                        "e tente novamente."
                     )
 
                 st.error(assistant_message)

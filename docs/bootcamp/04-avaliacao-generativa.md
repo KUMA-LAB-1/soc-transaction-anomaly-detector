@@ -101,10 +101,27 @@ O conjunto é deliberadamente pequeno e sintético. Os resultados
 não devem ser interpretados como garantia de comportamento em
 todos os cenários SOC ou em outros modelos/provedores.
 
-## Evolução futura
+## Evolução do runtime após a avaliação
 
-A arquitetura utiliza um contrato de LLM desacoplado do provider.
+A avaliação formal acima permanece vinculada ao provider e ao
+modelo registrados no experimento: `gemini` / `gemini-3.5-flash`.
 
-Uma evolução planejada é adicionar execução local por adapter,
-por exemplo com Ollama, permitindo comparar modelos e reduzir
-dependência de disponibilidade de APIs externas.
+Após essa avaliação, a camada conversacional evoluiu para um
+runtime provider-neutral com:
+
+- adapter Gemini preservado;
+- adapter OpenAI-compatible reutilizável;
+- seleção de provider por configuração;
+- execução local via Ollama;
+- Qwen3 4B como modelo local de referência para desenvolvimento
+  e demonstração.
+
+Durante testes interativos com o provider remoto também foram
+observadas indisponibilidades temporárias, incluindo HTTP 503.
+Por isso, a execução local passou a ser utilizada para tornar
+demonstrações e testes manuais mais reproduzíveis e independentes
+da disponibilidade de uma API externa.
+
+Essa evolução não altera nem substitui retroativamente os
+resultados da avaliação formal com Gemini. Ela representa uma
+decisão posterior de arquitetura e execução.

@@ -6,7 +6,7 @@ O KUMA GUARD é um assistente de apoio à triagem e investigação inicial de an
 
 A proposta acadêmica é transformar dados estruturados do pipeline em uma explicação clara para o analista, preservando a diferença entre fato observado, evidência ausente, hipótese e incidente confirmado.
 
-> **Status deste documento:** o núcleo defensivo determinístico já está implementado e validado. A camada conversacional com LLM e a interface interativa são componentes da entrega acadêmica e serão marcados como concluídos somente após implementação e validação.
+> **Status deste documento:** o núcleo defensivo determinístico, a camada conversacional com LLM e a interface interativa estão implementados e validados. O runtime generativo utiliza contrato provider-neutral, com suporte a Gemini e execução local via Ollama/OpenAI-compatible.
 
 ---
 
@@ -83,7 +83,11 @@ flowchart TD
     C --> D[GuardedSocAssessment]
     D --> E[Contexto para conversa]
     E --> F[LLM Adapter]
-    F --> G[Interface interativa]
+    F --> P[Provider Runtime]
+    P --> J[Gemini]
+    P --> K[Ollama / OpenAI-compatible]
+    J --> G[Interface interativa]
+    K --> G
     G --> H[Resposta grounded]
 
     I[MITRE ATT&CK + provenance] --> E
@@ -97,11 +101,14 @@ flowchart TD
 | EvidenceContext | Projeta o alerta sem reinterpretar seus dados |
 | KUMA GUARD | Organiza fatos, evidências ausentes, hipóteses suportadas e verificações recomendadas |
 | GuardedSocAssessment | Estado defensivo utilizado como contexto da conversa |
-| LLM Adapter | Converte o contexto estruturado em interação com um modelo generativo |
+| LLM Adapter | Contrato provider-neutral entre o contexto conversacional e o modelo generativo |
+| Provider Runtime | Seleciona o provider configurado sem acoplar a aplicação a um fornecedor específico |
 | Interface interativa | Permite ao usuário fazer perguntas sobre o contexto |
 | MITRE ATT&CK | Enriquecimento contextual com provenance explícita |
 
 O LLM não é a fonte primária de verdade do sistema. A resposta conversacional deve permanecer limitada ao contexto estruturado fornecido.
+
+A integração generativa foi inicialmente validada com Gemini. Para desenvolvimento e demonstração local, o projeto também utiliza Ollama com Qwen3 4B por meio de um adapter OpenAI-compatible. A escolha do provider é feita por configuração e não altera o contrato factual do KUMA GUARD.
 
 ---
 

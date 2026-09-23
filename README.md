@@ -22,6 +22,7 @@ A primeira versão nasceu durante um bootcamp de GenAI, Dados e Cybersecurity. D
 
 - [Arquitetura V3](#️-arquitetura-v3)
 - [KUMA GUARD](#-kuma-guard---guarded-soc-assistant)
+- [Pitch e demonstração](#-pitch-e-demonstração)
 - [Evaluation Matrix](#-evaluation-matrix)
 - [DevSecOps e segurança](#️-devsecops-e-segurança)
 - [Estado da documentação](#-estado-da-documentação-e-fonte-de-verdade)
@@ -103,6 +104,20 @@ Em outras palavras:
 - hipótese plausível não confirma incidente.
 
 Esse contrato é o "truth firewall" do KUMA GUARD.
+
+---
+
+## 🎬 Pitch e demonstração
+
+O projeto possui uma apresentação específica da entrega acadêmica do **KUMA GUARD**, concentrada no problema central, no contrato defensivo, na demonstração com cenário sintético e na avaliação generativa formal.
+
+A apresentação preserva a mesma regra do projeto:
+
+> **Anomalia não é confirmação.**
+
+A demonstração utiliza o cenário sintético `ALT-DEMO-001`, no qual sinais como `failed_logins = 5` e `new_device = true` sustentam uma hipótese de `possible_account_compromise`, enquanto `incident_confirmed` permanece `false`.
+
+➡️ [Ver Pitch e Demonstração do KUMA GUARD](docs/bootcamp/05-pitch-demo.md)
 
 ---
 
@@ -460,7 +475,7 @@ Em **22/09/2026**, durante o fechamento local da integração provider-neutral c
 - smoke test real concluído através de `ConversationService → provider runtime → OpenAI-compatible adapter → Ollama → Qwen3 4B`;
 - demo Streamlit validada com o provider local preservando `incident_confirmed = false` diante de uma solicitação adversarial de confirmação.
 
-Esse checkpoint pertence à branch de integração do runtime provider-neutral. A validação de CI do Pull Request continua sendo necessária antes do merge.
+Esse checkpoint foi integrado à `main` pelo [PR #74 - Runtime LLM local e provider-neutral](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/74), com a **CI #207 concluída com sucesso**. O merge commit correspondente é `8c968f044e1adba8edd4eaf5ef2f11257f5cf1b0`.
 
 ---
 
@@ -583,6 +598,7 @@ A regra de documentação da linha V3 é simples: **não promover um artefato hi
 - [Base de conhecimento](docs/bootcamp/02-base-conhecimento.md)
 - [Prompts](docs/bootcamp/03-prompts.md)
 - [Avaliação generativa formal](docs/bootcamp/04-avaliacao-generativa.md)
+- [Pitch e demonstração](docs/bootcamp/05-pitch-demo.md)
 
 Os documentos de arquitetura existentes ainda não refletem integralmente todas as mudanças da linha V3; por isso, devem ser lidos em conjunto com o código, testes e este README.
 
@@ -819,6 +835,7 @@ Alguns checkpoints principais da linha V3 foram integrados por Pull Requests sep
 - [PR #65 - E2E do contrato defensivo](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/65)
 - [PR #69 - Contrato provider-neutral para LLM](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/69)
 - [PR #70 - Fundação conversacional GenAI](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/70)
+- [PR #74 - Runtime LLM local e provider-neutral](https://github.com/KUMA-LAB-1/soc-transaction-anomaly-detector/pull/74)
 
 A estratégia de evolução privilegia mudanças pequenas, contratos explícitos, testes, revisão e validação antes de expandir o escopo.
 

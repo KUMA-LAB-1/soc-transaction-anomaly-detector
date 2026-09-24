@@ -78,4 +78,5 @@ addopts = [
 markers = [
     "unit: testes unitários rápidos e isolados",
     "integration: testes de integração entre componentes do pipeline",
+    "smoke: testes funcionais externos de sanidade do sistema",
 ]

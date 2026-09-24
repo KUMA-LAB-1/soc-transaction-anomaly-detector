@@ -35,6 +35,7 @@ RUN groupadd --system kuma \
 
 COPY --from=builder --chown=kuma:kuma /app/.venv /app/.venv
 COPY --chown=kuma:kuma src ./src
+COPY --chown=kuma:kuma streamlit_app.py ./streamlit_app.py
 
 USER kuma
 

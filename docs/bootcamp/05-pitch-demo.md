@@ -269,6 +269,16 @@ implementação.
 
 ---
 
+## Vídeo do pitch
+
+▶️ **[Assistir ao Pitch do KUMA GUARD](https://youtu.be/RM4e_vHMumY)**
+
+O vídeo apresenta o cenário sintético `ALT-DEMO-001`, o contrato
+defensivo do KUMA GUARD, a demonstração conversacional e os
+resultados da avaliação generativa controlada.
+
+---
+
 ## Mensagem final
 
 **KUMA GUARD - Evidence-grounded SOC investigation assistant.**

@@ -118,6 +118,7 @@ A apresentação preserva a mesma regra do projeto:
 A demonstração utiliza o cenário sintético `ALT-DEMO-001`, no qual sinais como `failed_logins = 5` e `new_device = true` sustentam uma hipótese de `possible_account_compromise`, enquanto `incident_confirmed` permanece `false`.
 
 ➡️ [Ver Pitch e Demonstração do KUMA GUARD](docs/bootcamp/05-pitch-demo.md)
+▶️ [Assistir ao vídeo do pitch](https://youtu.be/RM4e_vHMumY)
 
 ---
 

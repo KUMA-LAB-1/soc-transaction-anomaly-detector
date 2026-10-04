@@ -617,8 +617,6 @@ Isso inclui:
 - gráficos analíticos da execução v2.0.0;
 - histórico de métricas daquele snapshot.
 
-> **Importante:** o PDF público atual foi atualizado a partir da execução de **08/09/2026** e já incorpora correções realizadas na linha **V3** no gerador de PDF, incluindo o ajuste de conteúdo em tabelas para manter identificadores/pseudônimos dentro das células em vez de ultrapassar suas bordas. Ele continua sendo um **relatório analítico de execução** e, isoladamente, não representa toda a arquitetura nem o contrato defensivo integral da V3.
-
 ### Gerador atual
 
 O pipeline atual utiliza `src/reporting/pdf_report.py` para produzir um relatório analítico de execução com métricas, alertas, severidade e contexto MITRE.

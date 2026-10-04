@@ -13,6 +13,17 @@ load_dotenv(dotenv_path=DOTENV_PATH)
 SOC_DATABASE_URL = os.getenv("SOC_DATABASE_URL")
 
 
+def _sqlalchemy_database_url(database_url: str) -> str:
+    """Mantém o runtime SQLAlchemy explicitamente no driver psycopg2."""
+    if database_url.startswith("postgresql://"):
+        return database_url.replace(
+            "postgresql://",
+            "postgresql+psycopg2://",
+            1,
+        )
+    return database_url
+
+
 class DBConnector:
     """
     Classe responsável por gerenciar conexões seguras com o banco utilizado
@@ -32,7 +43,7 @@ class DBConnector:
             connect_args = {"sslmode": "require"}
 
             return create_engine(
-                SOC_DATABASE_URL,
+                _sqlalchemy_database_url(SOC_DATABASE_URL),
                 connect_args=connect_args,
             )
         except Exception as e:

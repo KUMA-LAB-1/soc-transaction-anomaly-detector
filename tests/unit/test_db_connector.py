@@ -56,10 +56,26 @@ def test_get_engine_forca_sslmode_require(monkeypatch):
     resultado = DBConnector.get_engine()
 
     assert resultado is engine_fake
-    assert chamadas["url"] == "postgresql://usuario:senha@host:5432/banco"
+    assert chamadas["url"] == "postgresql+psycopg2://usuario:senha@host:5432/banco"
     assert chamadas["connect_args"] == {
         "sslmode": "require",
     }
+
+
+def test_get_engine_usa_psycopg2_real_sem_conectar(monkeypatch):
+    monkeypatch.setattr(
+        db_connector,
+        "SOC_DATABASE_URL",
+        "postgresql://usuario:senha@host:5432/banco",
+    )
+
+    engine = DBConnector.get_engine()
+
+    try:
+        assert engine.url.drivername == "postgresql+psycopg2"
+        assert engine.dialect.driver == "psycopg2"
+    finally:
+        engine.dispose()
 
 
 def test_get_raw_connection_forca_sslmode_require(monkeypatch):
